@@ -59,9 +59,8 @@ export function CreateAssetModal({ open, onOpenChange, onSuccess }: Props) {
       // I didn't create GET /logistics/assets/categories yet in backend.
       // But branches I have from PalletsController? Or I reused it.
       // Can reuse /logistics/pallets/branches (it just returns all branches).
-      const [branchesRes, catsRes] = await Promise.all([
+      const [branchesRes] = await Promise.all([
         api.get("/logistics/pallets/branches"),
-        // api.get("/logistics/assets/categories") - Missing
       ]);
        setBranches(branchesRes.data);
        // setCategories(catsRes.data);

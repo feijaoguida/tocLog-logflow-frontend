@@ -7,17 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Car, Wrench, AlertCircle, Calendar } from "lucide-react"
 
 export default function FleetDashboardPage() {
-    const { token } = useAuth()
+    const { isAuthenticated } = useAuth()
     const [metrics, setMetrics] = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!token) return
+        if (!isAuthenticated) return
         api.get('/fleet/vehicles/dashboard/metrics')
            .then(res => setMetrics(res.data))
            .catch(console.error)
            .finally(() => setLoading(false))
-    }, [token])
+    }, [isAuthenticated])
 
     if (loading) return <div className="p-8">Carregando indicadores...</div>
     if (!metrics) return <div className="p-8">Erro ao carregar dados.</div>

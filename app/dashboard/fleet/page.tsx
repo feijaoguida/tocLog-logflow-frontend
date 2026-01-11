@@ -21,14 +21,14 @@ const STATUS_MAP: Record<string, { label: string, variant: "default" | "secondar
 }
 
 export default function FleetPage() {
-    const { token, hasPermission } = useAuth()
+    const { isAuthenticated, hasPermission } = useAuth()
     const router = useRouter()
     const [vehicles, setVehicles] = useState<Vehicle[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
 
     useEffect(() => {
-        if (!token) return
+        if (!isAuthenticated) return
 
         const fetchVehicles = async () => {
             try {
@@ -42,7 +42,7 @@ export default function FleetPage() {
         }
 
         fetchVehicles()
-    }, [token])
+    }, [isAuthenticated])
 
     const filteredVehicles = vehicles.filter(v => 
         v.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||

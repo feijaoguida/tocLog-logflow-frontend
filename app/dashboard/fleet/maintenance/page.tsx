@@ -29,7 +29,7 @@ const TYPE_MAP: Record<string, string> = {
 }
 
 export default function MaintenancePage() {
-    const { token, hasPermission } = useAuth()
+    const { isAuthenticated, hasPermission } = useAuth()
     const router = useRouter()
     const [maintenances, setMaintenances] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -48,10 +48,10 @@ export default function MaintenancePage() {
     const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
-        if (!token) return
+        if (!isAuthenticated) return
         fetchMaintenances()
         fetchVehicles()
-    }, [token])
+    }, [isAuthenticated])
 
     const fetchMaintenances = async () => {
          try {

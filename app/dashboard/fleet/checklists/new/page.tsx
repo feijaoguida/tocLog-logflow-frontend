@@ -12,10 +12,21 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import { Suspense } from "react"
 import { CheckCircle2, ChevronRight, AlertTriangle, Truck } from "lucide-react"
 
-export default function NewChecklistPage() {
-    const { token } = useAuth()
+export const dynamic = 'force-dynamic'
+
+export default function NewChecklistPageWrapper() {
+    return (
+        <Suspense fallback={<div>Carregando...</div>}>
+            <NewChecklistPageContent />
+        </Suspense>
+    )
+}
+
+function NewChecklistPageContent() {
+    const { isAuthenticated } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
     
@@ -39,9 +50,9 @@ export default function NewChecklistPage() {
 
     // Fetch Vehicles
     useEffect(() => {
-        if(!token) return
+        if(!isAuthenticated) return
         api.get('/fleet/vehicles').then(res => setVehicles(res.data)).catch(console.error)
-    }, [token])
+    }, [isAuthenticated])
 
     // Step 1: Start Checklist (Create Draft)
     const handleStart = async () => {

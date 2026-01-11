@@ -20,13 +20,13 @@ const TYPE_MAP: Record<string, string> = {
 }
 
 export default function ChecklistsPage() {
-    const { token, hasPermission } = useAuth()
+    const { isAuthenticated, hasPermission } = useAuth()
     const router = useRouter()
     const [checklists, setChecklists] = useState<Checklist[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!token) return
+        if (!isAuthenticated) return
         const fetchChecklists = async () => {
              try {
                  const res = await api.get('/fleet/checklists')
@@ -38,7 +38,7 @@ export default function ChecklistsPage() {
              }
         }
         fetchChecklists()
-    }, [token])
+    }, [isAuthenticated])
 
     return (
         <div className="space-y-6">

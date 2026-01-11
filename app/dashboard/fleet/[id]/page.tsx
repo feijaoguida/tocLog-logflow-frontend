@@ -60,7 +60,7 @@ const TimelineItem = ({ event }: TimelineItemProps) => {
 }
 
 export default function VehicleDetailsPage() {
-    const { token } = useAuth()
+    const { isAuthenticated } = useAuth()
     const router = useRouter()
     const { id } = useParams()
     
@@ -75,7 +75,7 @@ export default function VehicleDetailsPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!token || !id) return
+        if (!isAuthenticated || !id) return
 
         const fetchDetails = async () => {
             try {
@@ -88,7 +88,7 @@ export default function VehicleDetailsPage() {
             }
         }
         fetchDetails()
-    }, [token, id])
+    }, [isAuthenticated, id])
 
     if (loading) return <div className="p-8 text-center">Carregando detalhes...</div>
     if (!vehicle) return <div className="p-8 text-center">Veículo não encontrado.</div>
