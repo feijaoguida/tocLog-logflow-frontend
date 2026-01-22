@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { ImageUpload } from "@/components/image-upload"
 
 interface Department {
     id: string
@@ -305,24 +306,14 @@ export default function EmployeesPage() {
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
                         {/* Header Section: Avatar & Basic Identity */}
                         <div className="flex flex-col sm:flex-row gap-6 items-start">
-                             <div className="flex flex-col items-center gap-3">
-                                <Avatar className="h-24 w-24 border-2 border-dashed bg-muted">
-                                    <AvatarImage src={avatarUrl} className="object-cover" />
-                                    <AvatarFallback className="text-2xl">
-                                        {name ? name.substring(0,2).toUpperCase() : <span className="text-xs">FOTO</span>}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="w-full max-w-[200px]">
-                                     <Label htmlFor="avatar" className="sr-only">Avatar URL</Label>
-                                     <Input 
-                                        id="avatar" 
-                                        value={avatarUrl} 
-                                        onChange={e => setAvatarUrl(e.target.value)} 
-                                        placeholder="URL da Foto (https://...)" 
-                                        className="h-8 text-xs"
-                                     />
-                                </div>
-                             </div>
+                            <div className="flex flex-col items-center gap-3">
+                                <ImageUpload 
+                                    value={avatarUrl}
+                                    onChange={setAvatarUrl}
+                                    folder="funcionario"
+                                    placeholder="Foto de Perfil"
+                                />
+                            </div>
 
                              <div className="flex-1 space-y-4 w-full">
                                 <div className="grid gap-2">

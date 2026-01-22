@@ -96,6 +96,8 @@ export function AppSidebar() {
               { title: "Intranet", url: "/dashboard/rh" },
               { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
               { title: "Org. Chart", url: "/dashboard/rh/org-chart" },
+              { title: "Gestão de Salas", url: "/dashboard/rh/salas", permission: "rh.rooms.view" },
+              { title: "Agenda de Salas", url: "/dashboard/rh/agendas" }, // Accessible to all
           ]
       },
       {
