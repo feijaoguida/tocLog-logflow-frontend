@@ -10,6 +10,7 @@ interface User {
   email: string
   role: { name: string } | string
   companyId?: string
+  employeeId?: string
   permissions?: string[]
 }
 
