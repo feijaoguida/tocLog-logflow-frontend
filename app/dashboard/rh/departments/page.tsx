@@ -47,7 +47,7 @@ export default function DepartmentsPage() {
   const fetchEmployees = async () => {
       try {
           const token = localStorage.getItem('token')
-          const response = await fetch('http://localhost:3000/employees', {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
           if (response.ok) {
@@ -63,7 +63,7 @@ export default function DepartmentsPage() {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:3000/departments', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (!response.ok) throw new Error('Falha ao carregar departamentos')
@@ -101,7 +101,7 @@ export default function DepartmentsPage() {
           managerId
       }
 
-      const response = await fetch('http://localhost:3000/departments', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ export default function DepartmentsPage() {
       if(!confirm("Tem certeza?")) return;
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch(`http://localhost:3000/departments/${id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         })

@@ -54,7 +54,7 @@ export default function UsersPage() {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (response.ok) setEmployees(await response.json())
@@ -66,8 +66,8 @@ export default function UsersPage() {
       try {
           const token = localStorage.getItem('token')
           const [rolesRes, permsRes, branchesRes] = await Promise.all([
-              fetch(`${process.env.NEXT_PUBLIC_API_URL}/roles`, { headers: { 'Authorization': `Bearer ${token}` } }),
-              fetch(`${process.env.NEXT_PUBLIC_API_URL}/roles/permissions`, { headers: { 'Authorization': `Bearer ${token}` } }),
+              fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`, { headers: { 'Authorization': `Bearer ${token}` } }),
+              fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles/permissions`, { headers: { 'Authorization': `Bearer ${token}` } }),
                // Assuming logic for branches endpoint, if not fetching departments/branches TODO
                // For now hardcoding or assuming similar structure if endpoint missing
                // Let's assume we can get branches, or skip for now if endpoint not verified.
@@ -117,7 +117,7 @@ export default function UsersPage() {
   const fetchEmployeeDetails = async (id: string) => {
       try {
            const token = localStorage.getItem('token')
-           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees/${id}`, {
+           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${id}`, {
                headers: { 'Authorization': `Bearer ${token}` }
            })
            if(res.ok) {
@@ -141,8 +141,8 @@ export default function UsersPage() {
     try {
       const token = localStorage.getItem('token')
       const url = editingId 
-        ? `${process.env.NEXT_PUBLIC_API_URL}/employees/${editingId}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/employees`
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${editingId}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`
       
       const method = editingId ? 'PATCH' : 'POST'
 

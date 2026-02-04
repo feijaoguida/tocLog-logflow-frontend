@@ -50,7 +50,7 @@ export function ChatWidget() {
 
     const fetchMyProfile = async () => {
         const token = localStorage.getItem('token')
-        const res = await fetch('http://localhost:3000/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } })
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } })
         if(res.ok) {
             const data = await res.json()
             setMyUserId(data.userId)
@@ -60,14 +60,14 @@ export function ChatWidget() {
     const fetchUsers = async () => {
         const token = localStorage.getItem('token')
         // Using Employees Endpoint to get list of people, or Users endpoint.
-        const res = await fetch('http://localhost:3000/users', { headers: { 'Authorization': `Bearer ${token}` } })
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/users`, { headers: { 'Authorization': `Bearer ${token}` } })
         if(res.ok) setUsers(await res.json())
     }
 
     const fetchMessages = async (otherUserId: string) => {
         if(!myUserId) return
         const token = localStorage.getItem('token')
-        const res = await fetch(`http://localhost:3000/chat?userId1=${myUserId}&userId2=${otherUserId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/chat?userId1=${myUserId}&userId2=${otherUserId}`, { headers: { 'Authorization': `Bearer ${token}` } })
         if(res.ok) {
             const msgs = await res.json()
             setMessages(msgs.reverse()) // Show oldest at top? Or flex-col-reverse. Usually api returns DESC
@@ -78,7 +78,7 @@ export function ChatWidget() {
         if(!newMessage.trim() || !activeUser || !myUserId) return
         try {
             const token = localStorage.getItem('token')
-            await fetch('http://localhost:3000/chat', {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({

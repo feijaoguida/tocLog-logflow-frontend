@@ -94,10 +94,10 @@ export default function EmployeesPage() {
     try {
         const token = localStorage.getItem('token')
         const [deptRes, empRes, profileRes, roleRes] = await Promise.all([
-            fetch('http://localhost:3000/departments', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:3000/employees', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:3000/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:3000/roles', { headers: { 'Authorization': `Bearer ${token}` } })
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`, { headers: { 'Authorization': `Bearer ${token}` } })
         ])
         if(deptRes.ok) setDepartments(await deptRes.json())
         if(empRes.ok) setManagers(await empRes.json()) 
@@ -110,7 +110,7 @@ export default function EmployeesPage() {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:3000/employees', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (!response.ok) throw new Error('Falha ao carregar')
@@ -176,11 +176,11 @@ export default function EmployeesPage() {
             avatarUrl: avatarUrl || undefined
         }
         
-        let url = 'http://localhost:3000/employees'
+        let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`
         let method = 'POST'
         
         if (editingId) {
-            url = `http://localhost:3000/employees/${editingId}`
+            url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${editingId}`
             method = 'PATCH'
         }
         
@@ -211,7 +211,7 @@ export default function EmployeesPage() {
       if(!confirm("Tem certeza que deseja excluir este funcionário?")) return;
       try {
           const token = localStorage.getItem('token')
-          const res = await fetch(`http://localhost:3000/employees/${id}`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${id}`, {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}` }
           })
@@ -253,7 +253,7 @@ export default function EmployeesPage() {
             reason
         }
 
-        const response = await fetch('http://localhost:3000/movements', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/movements`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

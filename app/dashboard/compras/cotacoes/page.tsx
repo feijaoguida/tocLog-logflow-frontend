@@ -46,7 +46,7 @@ export default function QuotationsIndexPage() {
                 // I will update backend to include `GET /purchase-requests/in-progress` for Buyers.
                 
                 // Creating the endpoint in the File Write below.
-                const res = await fetch('http://localhost:3000/purchase-requests/buyer/pending', {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/buyer/pending`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if(res.ok) setRequests(await res.json())

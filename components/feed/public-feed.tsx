@@ -38,7 +38,7 @@ export function PublicFeed() {
         const fetchPosts = async () => {
             try {
                 // Public endpoint
-                const res = await fetch('http://localhost:3000/feed')
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`)
                 if (res.ok) {
                     const data = await res.json()
                     setPosts(data)

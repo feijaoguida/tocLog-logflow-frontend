@@ -73,9 +73,9 @@ export default function QuotationDetailPage() {
             const headers = { 'Authorization': `Bearer ${token}` }
             
             const [reqRes, quoteRes, supRes] = await Promise.all([
-                fetch(`http://localhost:3000/purchase-requests/${requestId}`, { headers }),
-                fetch(`http://localhost:3000/quotations/request/${requestId}`, { headers }),
-                fetch(`http://localhost:3000/suppliers`, { headers })
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${requestId}`, { headers }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/request/${requestId}`, { headers }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`, { headers })
             ])
 
             if(reqRes.ok) setRequest(await reqRes.json())
@@ -93,7 +93,7 @@ export default function QuotationDetailPage() {
         setCreateLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/quotations', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ requestId, supplierId: selectedSupplierId })
@@ -122,7 +122,7 @@ export default function QuotationDetailPage() {
         setSavingQuote(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/quotations/${editingQuote.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/${editingQuote.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ items: editItems })
@@ -145,7 +145,7 @@ export default function QuotationDetailPage() {
         if(!confirm("Definir esta cotação como VENCEDORA? Isso encerrará as outras.")) return
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/quotations/${id}/win`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/${id}/win`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -159,7 +159,7 @@ export default function QuotationDetailPage() {
         if(!confirm("Gerar Ordem de Compra agora?")) return
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/purchase-orders/generate/${quoteId}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders/generate/${quoteId}`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             })

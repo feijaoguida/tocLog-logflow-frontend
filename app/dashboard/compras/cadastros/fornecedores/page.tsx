@@ -36,7 +36,7 @@ export default function SuppliersPage() {
         try {
             setLoading(true)
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/suppliers', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if(res.ok) setSuppliers(await res.json())
@@ -53,10 +53,10 @@ export default function SuppliersPage() {
             const token = localStorage.getItem('token')
             const payload = { name, cnpj, email, phone }
             
-            let url = 'http://localhost:3000/suppliers'
+            let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`
             let method = 'POST'
             if(editingId) {
-                url = `http://localhost:3000/suppliers/${editingId}`
+                url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers/${editingId}`
                 method = 'PATCH'
             }
 
@@ -79,7 +79,7 @@ export default function SuppliersPage() {
         if(!confirm("Excluir fornecedor?")) return
         try {
             const token = localStorage.getItem('token')
-            await fetch(`http://localhost:3000/suppliers/${id}`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers/${id}`, {
                 method: 'DELETE', 
                 headers: { 'Authorization': `Bearer ${token}` }
             })

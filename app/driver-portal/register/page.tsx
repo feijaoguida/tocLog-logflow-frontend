@@ -59,7 +59,7 @@ export default function RegisterPage() {
     
     try {
       // 1. Create Driver
-      const driverRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/external-fleet/drivers`, {
+      const driverRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/external-fleet/drivers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +79,7 @@ export default function RegisterPage() {
       const driverId = driverData.id;
 
       // 2. Create Vehicle
-      const vehicleRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/external-fleet/vehicles`, {
+      const vehicleRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/external-fleet/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -55,7 +55,7 @@ export default function RoomsManagementPage() {
     const fetchRooms = async () => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/meeting-rooms', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
@@ -69,7 +69,7 @@ export default function RoomsManagementPage() {
     const fetchItems = async () => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/meeting-rooms/items', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms/items`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
@@ -81,7 +81,7 @@ export default function RoomsManagementPage() {
     const handleCreateItem = async (name: string) => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/meeting-rooms/items', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms/items`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export default function RoomsManagementPage() {
             }
             
             // Actually call Backend
-            const res = await fetch('http://localhost:3000/meeting-rooms', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

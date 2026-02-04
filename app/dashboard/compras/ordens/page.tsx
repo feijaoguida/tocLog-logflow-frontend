@@ -28,7 +28,7 @@ export default function PurchaseOrdersPage() {
         try {
             setLoading(true)
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/purchase-orders', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if(res.ok) setOrders(await res.json())
@@ -42,7 +42,7 @@ export default function PurchaseOrdersPage() {
         if(!confirm(`Alterar status para ${status}?`)) return
         try {
              const token = localStorage.getItem('token')
-            await fetch(`http://localhost:3000/purchase-orders/${id}/status`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status })

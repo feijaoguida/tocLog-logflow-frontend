@@ -63,7 +63,7 @@ export default function AgendaPage() {
     const fetchRooms = async () => {
          try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/meeting-rooms', { headers: { 'Authorization': `Bearer ${token}` } })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, { headers: { 'Authorization': `Bearer ${token}` } })
             if (res.ok) setRooms(await res.json())
         } catch (e) {}
     }
@@ -81,7 +81,7 @@ export default function AgendaPage() {
             const token = localStorage.getItem('token')
             // Hack: Calling without date param returns ALL future reservations (logic in service: if date undefined, returns all? No, checked code: `if (roomId) ... if (date) ... else return all`). 
             // So if we pass nothing, it returns all. Let's rely on that for now.
-            const res = await fetch(`http://localhost:3000/reservations`, { 
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/reservations`, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             })
             if (res.ok) {
@@ -104,7 +104,7 @@ export default function AgendaPage() {
             const start = new Date(`${selectedDateStr}T${bookingData.startTime}:00`)
             const end = new Date(`${selectedDateStr}T${bookingData.endTime}:00`)
 
-            const res = await fetch('http://localhost:3000/reservations', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/reservations`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

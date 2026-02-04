@@ -29,7 +29,7 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
         setUploading(true)
         try {
             const token = localStorage.getItem('token')
-            const response = await fetch(`http://localhost:3000/uploads/${folder}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/uploads/${folder}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -54,7 +54,7 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
             // NextJS is 3001 (maybe?) Backend 3000.
             // If backend returns `/files/img.jpg`, and we are on 3001, `<img src="/files..">` will check 3001.
             // So we should prepend the backend URL if it is relative.
-            const fullUrl = `http://localhost:3000${data.url}`
+            const fullUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}${data.url}`
             
             onChange(fullUrl)
             toast.success("Imagem carregada com sucesso!")

@@ -113,7 +113,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         try {
             const token = localStorage.getItem('token')
             const query = types.join(',')
-            const res = await fetch(`http://localhost:3000/dashboard/data?widgets=${query}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/data?widgets=${query}`, {
                  headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
@@ -165,7 +165,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
                 i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, minW: l.minW, minH: l.minH
             }))
 
-            const res = await fetch(`http://localhost:3000/dashboard/views/${currentView.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views/${currentView.id}`, {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -197,7 +197,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
 
          try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/dashboard/views`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -235,7 +235,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
 
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/dashboard/views/${currentView.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views/${currentView.id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             })

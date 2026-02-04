@@ -29,11 +29,11 @@ export function FeedComponent() {
              const token = localStorage.getItem('token')
              
              // 1. Profile
-             const authRes = await fetch('http://localhost:3000/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } });
+             const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
              const user = await authRes.json();
              
              // 2. Employees
-             const empRes = await fetch('http://localhost:3000/employees', { headers: { 'Authorization': `Bearer ${token}` } });
+             const empRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } });
              const allEmployees = await empRes.json();
              
              const me = allEmployees.find((e: any) => e.userId === user.userId);
@@ -50,7 +50,7 @@ export function FeedComponent() {
 
     const fetchFeed = async (token: string | null, tenantId?: string) => {
         if(!token) return;
-        const feedUrl = tenantId ? `http://localhost:3000/feed?tenantId=${tenantId}` : 'http://localhost:3000/feed';
+        const feedUrl = tenantId ? `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed?tenantId=${tenantId}` : `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`;
         const feedRes = await fetch(feedUrl, { headers: { 'Authorization': `Bearer ${token}` } });
         if(feedRes.ok) setPosts(await feedRes.json())
     }
@@ -59,7 +59,7 @@ export function FeedComponent() {
         if(!myProfile) return;
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/feed', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -85,7 +85,7 @@ export function FeedComponent() {
         if(!confirm("Tem certeza que deseja excluir?")) return;
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/feed/${postId}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -101,7 +101,7 @@ export function FeedComponent() {
             const token = localStorage.getItem('token')
             // Toggle logic: If pinned -> set false. If not -> set true (indefinite or handle logic)
             // Backend treats isFixed boolean.
-            const res = await fetch(`http://localhost:3000/feed/${post.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${post.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ isFixed: !post.isFixed })
@@ -131,7 +131,7 @@ export function FeedComponent() {
 
         try {
             const token = localStorage.getItem('token')
-            await fetch(`http://localhost:3000/feed/${postId}/like`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}/like`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ authorId: myProfile.id })
@@ -143,7 +143,7 @@ export function FeedComponent() {
         if(!myProfile) return;
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/feed/${postId}/comments`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}/comments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ authorId: myProfile.id, content })

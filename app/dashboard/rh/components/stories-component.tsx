@@ -44,7 +44,7 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
         setLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/stories', { headers: { 'Authorization': `Bearer ${token}` } });
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (res.ok) {
                  const data: Story[] = await res.json()
                  setStories(data)
@@ -67,7 +67,7 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
             const token = localStorage.getItem('token')
             const styles = newStoryType === 'TEXT' ? JSON.stringify({ background: newStoryColor }) : undefined;
             
-            const res = await fetch('http://localhost:3000/stories', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -98,7 +98,7 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
     const markAsViewed = async (storyId: string) => {
         try {
              const token = localStorage.getItem('token')
-             await fetch(`http://localhost:3000/stories/${storyId}/view`, {
+             await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories/${storyId}/view`, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                  body: JSON.stringify({ viewerId: currentUser?.id })

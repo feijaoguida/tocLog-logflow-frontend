@@ -82,12 +82,12 @@ export default function VacationsPage() {
             // Let's assume we find the employee by matching userId from auth profile.
             
             // A. Get Auth Profile
-            const authRes = await fetch('http://localhost:3000/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } });
+            const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
             if(!authRes.ok) throw new Error("Falha auth");
             const user = await authRes.json();
             
             // B. Get All Employees (Inefficient but works for now) -> Optimization: Endpoint /employees/me
-            const empRes = await fetch('http://localhost:3000/employees', { headers: { 'Authorization': `Bearer ${token}` } });
+            const empRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } });
             const employees: EmployeeProfile[] = await empRes.json();
             const me = employees.find(e => e.userId === user.userId || e.user.name === user.name); // Fallback name check if ID separate
             
@@ -110,7 +110,7 @@ export default function VacationsPage() {
     const fetchMyVacations = async (myEmployeeId: string) => {
         try {
              const token = localStorage.getItem('token')
-             const res = await fetch(`http://localhost:3000/vacations?employeeId=${myEmployeeId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations?employeeId=${myEmployeeId}`, { headers: { 'Authorization': `Bearer ${token}` } });
              if(res.ok) setMyVacations(await res.json())
         } catch(e) {}
     }
@@ -118,7 +118,7 @@ export default function VacationsPage() {
     const fetchAllVacations = async (myEmployeeId: string) => {
          try {
              const token = localStorage.getItem('token')
-             const res = await fetch(`http://localhost:3000/vacations`, { headers: { 'Authorization': `Bearer ${token}` } }); // Get ALL
+             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations`, { headers: { 'Authorization': `Bearer ${token}` } }); // Get ALL
              if(res.ok) {
                  const all: Vacation[] = await res.json()
                  
@@ -144,7 +144,7 @@ export default function VacationsPage() {
         setRequestLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/vacations', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
@@ -171,7 +171,7 @@ export default function VacationsPage() {
     const handleAction = async (id: string, newStatus: string) => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/vacations/${id}/status`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status: newStatus })

@@ -32,7 +32,7 @@ export default function ApprovalsPage() {
         try {
             setLoading(true)
             const token = localStorage.getItem('token')
-            const res = await fetch('http://localhost:3000/purchase-requests/pending', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/pending`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if(res.ok) setRequests(await res.json())
@@ -46,7 +46,7 @@ export default function ApprovalsPage() {
         if(!confirm("Aprovar este pedido?")) return
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/purchase-requests/${id}/approve`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${id}/approve`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -61,7 +61,7 @@ export default function ApprovalsPage() {
         setActionLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/purchase-requests/${rejectId}/reject`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${rejectId}/reject`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ reason })

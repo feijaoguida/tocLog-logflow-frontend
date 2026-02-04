@@ -25,7 +25,7 @@ export default function DashboardPage() {
   const fetchViews = async (employeeId: string) => {
       try {
           const token = localStorage.getItem('token')
-          const res = await fetch(`http://localhost:3000/dashboard/views?employeeId=${employeeId}`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views?employeeId=${employeeId}`, {
                headers: { 'Authorization': `Bearer ${token}` }
           })
           if (res.ok) {

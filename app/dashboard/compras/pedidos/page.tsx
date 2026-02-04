@@ -59,9 +59,9 @@ export default function MyRequestsPage() {
             const token = localStorage.getItem('token')
             const headers = { 'Authorization': `Bearer ${token}` }
             const [reqRes, prodRes, unitRes] = await Promise.all([
-                fetch('http://localhost:3000/purchase-requests/my', { headers }),
-                fetch('http://localhost:3000/products', { headers }),
-                fetch('http://localhost:3000/products/units/all', { headers })
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/my`, { headers }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`, { headers }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/units/all`, { headers })
             ])
             if(reqRes.ok) setRequests(await reqRes.json())
             if(prodRes.ok) setProducts(await prodRes.json())
@@ -116,7 +116,7 @@ export default function MyRequestsPage() {
                 }))
             }
 
-            const res = await fetch('http://localhost:3000/purchase-requests', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(payload)
@@ -136,7 +136,7 @@ export default function MyRequestsPage() {
         if(!confirm("Enviar pedido para aprovação?")) return
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:3000/purchase-requests/${id}/submit`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${id}/submit`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             })

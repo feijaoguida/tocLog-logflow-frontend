@@ -49,9 +49,9 @@ export default function ProductsPage() {
       const headers = { 'Authorization': `Bearer ${token}` }
       
       const [prodRes, catRes, unitRes] = await Promise.all([
-          fetch('http://localhost:3000/products', { headers }),
-          fetch('http://localhost:3000/products/categories/all', { headers }),
-          fetch('http://localhost:3000/products/units/all', { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`, { headers }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/categories/all`, { headers }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/units/all`, { headers })
       ])
       
       if(prodRes.ok) setProducts(await prodRes.json())
@@ -74,10 +74,10 @@ export default function ProductsPage() {
           const token = localStorage.getItem('token')
           const payload = { name, description, categoryId, unitId }
           
-          let url = 'http://localhost:3000/products'
+          let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`
           let method = 'POST'
           if(editingId) {
-              url = `http://localhost:3000/products/${editingId}`
+              url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/${editingId}`
               method = 'PATCH'
           }
 
@@ -107,7 +107,7 @@ export default function ProductsPage() {
       if(!confirm("Deseja excluir este produto?")) return
       try {
           const token = localStorage.getItem('token')
-          await fetch(`http://localhost:3000/products/${id}`, {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/${id}`, {
               method: 'DELETE',
               headers: { 'Authorization': `Bearer ${token}` }
           })

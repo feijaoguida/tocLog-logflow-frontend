@@ -29,7 +29,7 @@ export default function ProfilesPage() {
     const fetchRoles = async () => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/roles`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`, {
                  headers: { 'Authorization': `Bearer ${token}` }
             })
             if(res.ok) setRoles(await res.json())
@@ -40,7 +40,7 @@ export default function ProfilesPage() {
         try {
             const token = localStorage.getItem('token')
             // Using the endpoint we verified exists in controller
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/roles/permissions`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles/permissions`, {
                  headers: { 'Authorization': `Bearer ${token}` }
             })
             if(res.ok) {
@@ -70,8 +70,8 @@ export default function ProfilesPage() {
         try {
             const token = localStorage.getItem('token')
             const url = editingRole 
-                ? `${process.env.NEXT_PUBLIC_API_URL}/roles/${editingRole.id}`
-                : `${process.env.NEXT_PUBLIC_API_URL}/roles`
+                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles/${editingRole.id}`
+                : `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`
             
             const method = editingRole ? 'PATCH' : 'POST'
 
