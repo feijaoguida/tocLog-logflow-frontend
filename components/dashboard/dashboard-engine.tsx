@@ -259,13 +259,20 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
                 <div className="flex items-center gap-2">
                     {isEditing ? (
                         <>
-                             <div className="mr-4 flex gap-2">
-                                <p className="text-sm font-medium text-muted-foreground self-center">Adicionar Widget:</p>
-                                {Object.values(WIDGET_REGISTRY).map(w => (
-                                    <Button key={w.id} variant="secondary" size="sm" onClick={() => handleAddWidget(w.id)}>
-                                        {w.name}
-                                    </Button>
-                                ))}
+                             <div className="mr-4 flex gap-2 items-center">
+                                <p className="text-sm font-medium text-muted-foreground">Adicionar Widget:</p>
+                                <Select onValueChange={(val) => handleAddWidget(val as WidgetType)}>
+                                    <SelectTrigger className="w-[200px] h-8">
+                                        <SelectValue placeholder="Selecione..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.values(WIDGET_REGISTRY).map(w => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <Button variant="default" onClick={handleSaveView}>
                                 <Save className="h-4 w-4 mr-2" /> Salvar Layout

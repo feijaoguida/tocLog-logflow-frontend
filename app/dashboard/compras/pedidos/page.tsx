@@ -97,6 +97,28 @@ export default function MyRequestsPage() {
         setItems(newItems)
     }
 
+    const [editingId, setEditingId] = useState<string | null>(null)
+
+    const handleEdit = (request: PurchaseRequest) => {
+        setEditingId(request.id)
+        setJustification(request.justification)
+        // @ts-ignore
+        setObservation(request.observation || "") 
+        // Map items
+        setItems(request.items.map(i => ({
+            id: i.id,
+            productId: i.productId,
+            quantity: i.quantity,
+            description: i.description,
+            unitId: i.unitId,
+            observation: i.observation,
+            // Restore UI helpers if possible (need to look up product name from list if loaded)
+            productName: i.product?.name,
+            unitSymbol: i.unit?.symbol
+        })))
+        setIsFormOpen(true)
+    }
+
     const handleSubmit = async () => {
         if(!justification) return toast.error("Justificativa obrigatória")
         if(items.length === 0) return toast.error("Adicione pelo menos um item")
@@ -115,13 +137,18 @@ export default function MyRequestsPage() {
                 }))
             }
 
-            await api.post('/purchase-requests', payload)
+            if (editingId) {
+                await api.patch(`/purchase-requests/${editingId}`, payload)
+                toast.success("Pedido atualizado")
+            } else {
+                await api.post('/purchase-requests', payload)
+                toast.success("Pedido criado (Rascunho)")
+            }
             
-            toast.success("Pedido criado (Rascunho)")
             setIsFormOpen(false)
             fetchData()
             resetForm()
-        } catch { toast.error("Erro ao criar pedido") }
+        } catch { toast.error("Erro ao salvar pedido") }
         finally { setFormLoading(false) }
     }
 
@@ -135,6 +162,7 @@ export default function MyRequestsPage() {
     }
 
     const resetForm = () => {
+        setEditingId(null)
         setJustification(""); setObservation(""); setItems([])
     }
 
@@ -185,7 +213,10 @@ export default function MyRequestsPage() {
                                     <Button size="sm" className="w-full gap-2" variant="default" onClick={() => handleSubmitRequest(req.id)}>
                                         <Send className="h-3.5 w-3.5"/> Enviar
                                     </Button>
-                                    {/* Edit button could go here */}
+                                    {/* Edit button */}
+                                    <Button size="sm" variant="outline" onClick={() => handleEdit(req)}>
+                                        <FileText className="h-3.5 w-3.5 mr-2"/> Editar
+                                    </Button>
                                 </div>
                             )}
                         </CardContent>
@@ -197,7 +228,7 @@ export default function MyRequestsPage() {
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 border-b bg-muted/40">
-                        <DialogTitle>Novo Pedido de Compra</DialogTitle>
+                        <DialogTitle>{editingId ? 'Editar Pedido' : 'Novo Pedido de Compra'}</DialogTitle>
                     </DialogHeader>
                     
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
