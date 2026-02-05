@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { api } from "@/lib/api"
 // @ts-ignore
 import { Responsive as ResponsiveGridLayout } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -111,15 +112,9 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         if (types.length === 0) return
 
         try {
-            const token = localStorage.getItem('token')
             const query = types.join(',')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/data?widgets=${query}`, {
-                 headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (res.ok) {
-                const data = await res.json()
-                setWidgetData(data)
-            }
+            const { data } = await api.get(`/dashboard/data?widgets=${query}`)
+            setWidgetData(data)
         } catch (e) {
             console.error("Failed to fetch widget data", e)
         }
@@ -158,37 +153,25 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         if (!currentView) return
         
         try {
-            const token = localStorage.getItem('token')
             // layout to save is layouts.lg
             // Clean up RGL props
             const cleanLayout = layouts.lg.map((l: any) => ({
                 i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, minW: l.minW, minH: l.minH
             }))
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views/${currentView.id}`, {
-                method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name: currentView.name,
-                    description: '',
-                    layout: cleanLayout, // Saving as the JSON
-                    isDefault: currentView.isDefault
-                })
+            await api.put(`/dashboard/views/${currentView.id}`, {
+                name: currentView.name,
+                description: '',
+                layout: cleanLayout, // Saving as the JSON
+                isDefault: currentView.isDefault
             })
 
-            if (res.ok) {
-                toast.success("Visão salva com sucesso!")
-                setIsEditing(false)
-                // Update local state views to reflect saved layout
-                setViews(prev => prev.map(v => v.id === currentView.id ? { ...v, configuration: cleanLayout } : v))
-            } else {
-                toast.error("Erro ao salvar visão.")
-            }
+            toast.success("Visão salva com sucesso!")
+            setIsEditing(false)
+            // Update local state views to reflect saved layout
+            setViews(prev => prev.map(v => v.id === currentView.id ? { ...v, configuration: cleanLayout } : v))
         } catch (e) {
-             toast.error("Erro de conexão.")
+             toast.error("Erro ao salvar visão.")
         }
     }
 
@@ -196,30 +179,19 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
          if (!newViewName) return
 
          try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name: newViewName,
-                    employeeId: currentEmployeeId,
-                    layout: [] // Start empty
-                })
+            const { data: newView } = await api.post('/dashboard/views', {
+                name: newViewName,
+                employeeId: currentEmployeeId,
+                layout: [] // Start empty
             })
 
-            if (res.ok) {
-                const newView = await res.json()
-                // Configuration comes back as JSON, ensure it's handled
-                setViews(prev => [...prev, newView])
-                setCurrentViewId(newView.id)
-                setIsNewViewOpen(false)
-                setNewViewName('')
-                setIsEditing(true) // Immediately enter edit mode
-                toast.success("Nova visão criada!")
-            }
+            // Configuration comes back as JSON, ensure it's handled
+            setViews(prev => [...prev, newView])
+            setCurrentViewId(newView.id)
+            setIsNewViewOpen(false)
+            setNewViewName('')
+            setIsEditing(true) // Immediately enter edit mode
+            toast.success("Nova visão criada!")
          } catch(e) {
              toast.error("Erro ao criar visão")
          }
@@ -234,19 +206,15 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         if (!confirm("Tem certeza que deseja excluir esta visão?")) return
 
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views/${currentView.id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
+            await api.delete(`/dashboard/views/${currentView.id}`)
             
-            if (res.ok) {
-                const newViews = views.filter(v => v.id !== currentView.id)
-                setViews(newViews)
-                setCurrentViewId(newViews[0].id) // Switch to another
-                toast.success("Visão removida.")
-            }
-        } catch (e) {}
+            const newViews = views.filter(v => v.id !== currentView.id)
+            setViews(newViews)
+            setCurrentViewId(newViews[0].id) // Switch to another
+            toast.success("Visão removida.")
+        } catch (e) {
+            toast.error("Erro ao deletar visão.")
+        }
     }
 
     return (

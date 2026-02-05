@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Plus, LifeBuoy } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { api } from "@/lib/api"
 
 export default function HelpdeskPage() {
   const { user, hasPermission } = useAuth()
@@ -15,19 +16,20 @@ export default function HelpdeskPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Determine which endpoint or filter to use? Backend handles logic based on permissions.
-    fetch('/api/helpdesk/tickets', {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-        setTickets(data)
-        setLoading(false)
-    })
-    .catch(err => {
-        console.error(err)
-        setLoading(false)
-    })
+    const fetchTickets = async () => {
+        try {
+            // Determine which endpoint or filter to use? Backend handles logic based on permissions.
+            // Using /helpdesk/tickets assuming backend has this endpoint logic (extracted from previous /api/helpdesk/tickets usage)
+            const { data } = await api.get('/helpdesk/tickets')
+            setTickets(data)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setLoading(false)
+        }
+    }
+    
+    fetchTickets()
   }, [])
 
   return (

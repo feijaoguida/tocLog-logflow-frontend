@@ -12,6 +12,7 @@ import { FeedPostItem } from './feed-post-item'
 import { FeedComposer } from './feed-composer'
 import { StoriesComponent } from './stories-component'
 import { FeedbackWidget } from './feedback-widget'
+import { api } from "@/lib/api"
 
 export function FeedComponent() {
     const [posts, setPosts] = useState<FeedPost[]>([])
@@ -19,22 +20,24 @@ export function FeedComponent() {
     const [myProfile, setMyProfile] = useState<Profile | null>(null)
     const [employees, setEmployees] = useState<EmployeeOption[]>([])
 
+    const fetchFeed = async (tenantId?: string) => {
+        const feedUrl = tenantId ? `/feed?tenantId=${tenantId}` : `/feed`;
+        const { data } = await api.get(feedUrl)
+        setPosts(data)
+    }
+
     useEffect(() => {
         fetchData()
     }, [])
-    
+
     const fetchData = async () => {
         setLoading(true)
         try {
-             const token = localStorage.getItem('token')
-             
              // 1. Profile
-             const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
-             const user = await authRes.json();
+             const { data: user } = await api.get('/auth/profile')
              
              // 2. Employees
-             const empRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } });
-             const allEmployees = await empRes.json();
+             const { data: allEmployees } = await api.get('/employees')
              
              const me = allEmployees.find((e: any) => e.userId === user.userId);
              if(me) setMyProfile({ ...me })
@@ -42,74 +45,48 @@ export function FeedComponent() {
              setEmployees(allEmployees.filter((e: any) => e.status === 'ACTIVE'))
 
              // 3. Feed
-             fetchFeed(token, me?.branchId)
+             fetchFeed(me?.branchId)
 
         } catch(e) {}
         finally { setLoading(false) }
     }
 
-    const fetchFeed = async (token: string | null, tenantId?: string) => {
-        if(!token) return;
-        const feedUrl = tenantId ? `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed?tenantId=${tenantId}` : `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`;
-        const feedRes = await fetch(feedUrl, { headers: { 'Authorization': `Bearer ${token}` } });
-        if(feedRes.ok) setPosts(await feedRes.json())
-    }
-
     const handlePost = async (content: string, type: 'TEXT' | 'MEDIA' | 'VIDEO' | 'EVENT', mediaUrls: string[], eventDate: string | undefined, mentions: string[]) => {
         if(!myProfile) return;
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    content,
-                    authorId: myProfile.id,
-                    tenantId: myProfile.branchId,
-                    type,
-                    mediaUrls,
-                    eventDate,
-                    mentionedEmployeeIds: mentions
-                })
+            await api.post('/feed', {
+                content,
+                authorId: myProfile.id,
+                tenantId: myProfile.branchId,
+                type,
+                mediaUrls,
+                eventDate,
+                mentionedEmployeeIds: mentions
             })
-            if(res.ok) {
-                toast.success("Publicado!")
-                fetchFeed(token, myProfile.branchId)
-            } else {
-                toast.error("Erro ao publicar")
-            }
+
+            toast.success("Publicado!")
+            fetchFeed(myProfile.branchId)
         } catch(e) { toast.error("Erro ao publicar") }
     }
 
     const handleDelete = async (postId: string) => {
         if(!confirm("Tem certeza que deseja excluir?")) return;
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) {
-                toast.success("Post excluído")
-                fetchFeed(token, myProfile?.branchId)
-            }
+            await api.delete(`/feed/${postId}`)
+            
+            toast.success("Post excluído")
+            fetchFeed(myProfile?.branchId)
         } catch(e) { toast.error("Erro ao excluir") }
     }
 
     const handleTogglePin = async (post: FeedPost) => {
         try {
-            const token = localStorage.getItem('token')
             // Toggle logic: If pinned -> set false. If not -> set true (indefinite or handle logic)
             // Backend treats isFixed boolean.
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${post.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ isFixed: !post.isFixed })
-            })
-            if(res.ok) {
-                toast.success(post.isFixed ? "Desafixado" : "Fixado no topo")
-                fetchFeed(token, myProfile?.branchId)
-            }
+            await api.patch(`/feed/${post.id}`, { isFixed: !post.isFixed })
+
+            toast.success(post.isFixed ? "Desafixado" : "Fixado no topo")
+            fetchFeed(myProfile?.branchId)
         } catch(e) {}
     }
 
@@ -130,28 +107,16 @@ export function FeedComponent() {
         }));
 
         try {
-            const token = localStorage.getItem('token')
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}/like`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ authorId: myProfile.id })
-            })
-        } catch(e) { toast.error("Erro ao curtir"); fetchFeed(localStorage.getItem('token'), myProfile.branchId); }
+            await api.post(`/feed/${postId}/like`, { authorId: myProfile.id })
+        } catch(e) { toast.error("Erro ao curtir"); fetchFeed(myProfile.branchId); }
     }
 
     const handleComment = async (postId: string, content: string) => {
         if(!myProfile) return;
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed/${postId}/comments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ authorId: myProfile.id, content })
-            })
-            if(res.ok) {
-                toast.success("Comentário enviado")
-                fetchFeed(token, myProfile.branchId)
-            }
+            await api.post(`/feed/${postId}/comments`, { authorId: myProfile.id, content })
+            toast.success("Comentário enviado")
+            fetchFeed(myProfile.branchId)
         } catch(e) { toast.error("Erro ao comentar") }
     }
 

@@ -20,6 +20,7 @@ import { Clock, Calendar as CalendarIcon, Users, ChevronLeft, ChevronRight, Plus
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, getDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { api } from "@/lib/api"
 
 interface Reservation {
     id: string
@@ -62,31 +63,16 @@ export default function AgendaPage() {
 
     const fetchRooms = async () => {
          try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, { headers: { 'Authorization': `Bearer ${token}` } })
-            if (res.ok) setRooms(await res.json())
+            const { data } = await api.get('/meeting-rooms')
+            setRooms(data)
         } catch (e) {}
     }
 
     const fetchMonthReservations = async () => {
-        // Fetch all reservations for range of currentMonth
-        // Ideally backend should support start/end range, for now fetching by date (daily) won't work for full month view without spamming API or changing API.
-        // Let's modify logic: We'll fetch for the whole month if API supports it, or just MVP loop (inefficient but works for small scale).
-        // Actually, the Service `findAll(date)` filters by single day.
-        // We will improve Service to fallback to no-filter aka All, OR let's just make it simple:
-        // Update Backend to accept startDate/endDate?
-        // Or just fetch all active reservations and filter in frontend (easiest for now given complexity constraint).
-        
         try {
-            const token = localStorage.getItem('token')
-            // Hack: Calling without date param returns ALL future reservations (logic in service: if date undefined, returns all? No, checked code: `if (roomId) ... if (date) ... else return all`). 
-            // So if we pass nothing, it returns all. Let's rely on that for now.
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/reservations`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            })
-            if (res.ok) {
-                setReservations(await res.json())
-            }
+            // Note: Keeping the logic of fetching all reservations without date filter as per previous comment
+            const { data } = await api.get('/reservations')
+            setReservations(data)
         } catch (e) { toast.error("Erro ao carregar agenda") }
     }
 
@@ -99,34 +85,25 @@ export default function AgendaPage() {
         if (!selectedDate || !bookingData.meetingRoomId) return
         
         try {
-            const token = localStorage.getItem('token')
             const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
             const start = new Date(`${selectedDateStr}T${bookingData.startTime}:00`)
             const end = new Date(`${selectedDateStr}T${bookingData.endTime}:00`)
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/reservations`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                },
-                body: JSON.stringify({
-                    meetingRoomId: bookingData.meetingRoomId,
-                    title: bookingData.title,
-                    startTime: start.toISOString(),
-                    endTime: end.toISOString()
-                })
+            await api.post('/reservations', {
+                meetingRoomId: bookingData.meetingRoomId,
+                title: bookingData.title,
+                startTime: start.toISOString(),
+                endTime: end.toISOString()
             })
 
-            if (res.ok) {
-                toast.success("Sala reservada com sucesso!")
-                setIsBookingOpen(false)
-                fetchMonthReservations()
-            } else {
-                const err = await res.json()
-                toast.error(err.message || "Erro ao reservar (Conflito?)")
-            }
-        } catch (e) { toast.error("Falha na requisição") }
+            toast.success("Sala reservada com sucesso!")
+            setIsBookingOpen(false)
+            fetchMonthReservations()
+        } catch (e: any) { 
+            // Axios error handling
+            const msg = e.response?.data?.message || "Erro ao reservar (Conflito?)"
+            toast.error(msg) 
+        }
     }
 
     // Calendar Grid Logic

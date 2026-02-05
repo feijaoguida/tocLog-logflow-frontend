@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Send } from "lucide-react"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 export default function TicketDetailsPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()
@@ -19,24 +20,20 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
   const [newMessage, setNewMessage] = useState("")
   const [sending, setSending] = useState(false)
 
-  const fetchTicket = () => {
-      fetch(`/api/helpdesk/tickets/${params.id}`, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
-      })
-      .then(res => {
-          if (!res.ok) throw new Error('Failed to load')
-          return res.json()
-      })
-      .then(data => setTicket(data))
-      .catch(err => {
+  const fetchTicket = async () => {
+      try {
+          const { data } = await api.get(`/helpdesk/tickets/${params.id}`)
+          setTicket(data)
+      } catch (err) {
           toast.error("Erro ao carregar chamado")
           router.push('/dashboard/helpdesk')
-      })
-      .finally(() => setLoading(false))
+      } finally {
+          setLoading(false)
+      }
   }
 
   useEffect(() => {
-    fetchTicket()
+    if(params.id) fetchTicket()
   }, [params.id])
 
   const handleSendMessage = async () => {
@@ -44,16 +41,9 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
       setSending(true)
 
       try {
-          const res = await fetch(`/api/helpdesk/tickets/${params.id}/messages`, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${sessionStorage.getItem('token')}`
-              },
-              body: JSON.stringify({ content: newMessage })
+          await api.post(`/helpdesk/tickets/${params.id}/messages`, {
+              content: newMessage
           })
-
-          if (!res.ok) throw new Error('Falha no envio')
 
           setNewMessage("")
           fetchTicket() // Refresh to show new message

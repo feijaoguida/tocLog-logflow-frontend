@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { api } from "@/lib/api"
 
 interface ImageUploadProps {
     value?: string | null
@@ -28,33 +29,13 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
 
         setUploading(true)
         try {
-            const token = localStorage.getItem('token')
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/uploads/${folder}`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            })
+            const { data } = await api.post(`/uploads/${folder}`, formData)
 
-            if (!response.ok) {
-                throw new Error('Falha no upload')
-            }
-
-            const data = await response.json()
-            // Backend returns { url, filename, path }
-            // We assume backend serves /files pointing to uploads
-            // Ensure URL is absolute or handled correctly by receiver. 
-            // The backend returns "/files/..." which is relative to domain. 
-            // If running on localhost:3000, we stick with relative or prepend.
-            // But if we want to store the FULL URL, we might need to handle that.
-            // For now, let's store the relative path as returned by backend.
-            
-            // Actually, for the Avatar component to work, it needs http if on different port?
-            // NextJS is 3001 (maybe?) Backend 3000.
-            // If backend returns `/files/img.jpg`, and we are on 3001, `<img src="/files..">` will check 3001.
-            // So we should prepend the backend URL if it is relative.
-            const fullUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}${data.url}`
+            // Construct full URL for display - relying on backend returning path relative to its root
+            // We use the direct backend URL here because image serving might not be proxied via /api/files yet, or to avoid extra hop.
+            // If CORS allows, this works. If not, we might need a proxy route for files too.
+            // Assuming existing behavior was correct about this variable.
+            const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}${data.url}`
             
             onChange(fullUrl)
             toast.success("Imagem carregada com sucesso!")

@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { api } from "@/lib/api"
 
 interface PurchaseRequest {
     id: string
@@ -31,11 +32,8 @@ export default function ApprovalsPage() {
     const fetchPending = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/pending`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) setRequests(await res.json())
+            const { data } = await api.get('/purchase-requests/pending')
+            setRequests(data)
         } catch { toast.error("Erro ao carregar aprovações") }
         finally { setLoading(false) }
     }
@@ -45,12 +43,7 @@ export default function ApprovalsPage() {
     const handleApprove = async (id: string) => {
         if(!confirm("Aprovar este pedido?")) return
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${id}/approve`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(!res.ok) throw new Error()
+            await api.patch(`/purchase-requests/${id}/approve`)
             toast.success("Pedido Aprovado!")
             fetchPending()
         } catch { toast.error("Erro ao aprovar") }
@@ -60,13 +53,7 @@ export default function ApprovalsPage() {
         if(!rejectId || !reason) return
         setActionLoading(true)
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${rejectId}/reject`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ reason })
-            })
-            if(!res.ok) throw new Error()
+            await api.patch(`/purchase-requests/${rejectId}/reject`, { reason })
             toast.success("Pedido Reprovado.")
             setRejectId(null)
             setReason("")

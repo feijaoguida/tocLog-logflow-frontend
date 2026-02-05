@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Plus, Pencil, Trash2, Loader2, Search } from "lucide-react"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { api } from "@/lib/api"
 
 interface Employee {
     id: string
@@ -46,14 +47,8 @@ export default function DepartmentsPage() {
 
   const fetchEmployees = async () => {
       try {
-          const token = localStorage.getItem('token')
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (response.ok) {
-              const data = await response.json()
-              setEmployees(data)
-          }
+          const { data } = await api.get('/employees')
+          setEmployees(data)
       } catch (e) {
           console.error(e)
       }
@@ -62,12 +57,7 @@ export default function DepartmentsPage() {
   const fetchDepartments = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error('Falha ao carregar departamentos')
-      const data = await response.json()
+      const { data } = await api.get('/departments')
       setDepartments(data)
     } catch (error) {
       console.error(error)
@@ -92,8 +82,6 @@ export default function DepartmentsPage() {
 
     setCreateLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      
       const payload = {
           name,
           description,
@@ -101,16 +89,7 @@ export default function DepartmentsPage() {
           managerId
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) throw new Error('Erro ao criar')
+      await api.post('/departments', payload)
 
       setIsCreateOpen(false)
       setName("")
@@ -129,12 +108,7 @@ export default function DepartmentsPage() {
   const handleDelete = async (id: string) => {
       if(!confirm("Tem certeza?")) return;
       try {
-        const token = localStorage.getItem('token')
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-        if (!response.ok) throw new Error('Erro ao excluir')
+        await api.delete(`/departments/${id}`)
         fetchDepartments()
         toast.success("Departamento excluído.")
       } catch (error) {

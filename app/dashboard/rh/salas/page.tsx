@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api"
 
 interface MeetingRoom {
     id: string
@@ -54,76 +55,41 @@ export default function RoomsManagementPage() {
 
     const fetchRooms = async () => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (res.ok) {
-                const data = await res.json()
-                setRooms(data)
-            }
+            const { data } = await api.get('/meeting-rooms')
+            setRooms(data)
         } catch (e) { toast.error("Erro ao carregar salas") }
         finally { setLoading(false) }
     }
 
     const fetchItems = async () => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms/items`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (res.ok) {
-                setAvailableItems(await res.json())
-            }
+            const { data } = await api.get('/meeting-rooms/items')
+            setAvailableItems(data)
         } catch (e) {}
     }
 
     const handleCreateItem = async (name: string) => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms/items`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                },
-                body: JSON.stringify({ name })
-            })
-            if (res.ok) {
-                const newItem = await res.json()
-                setAvailableItems(prev => [...prev, newItem])
-                toggleItem(newItem.id)
-                toast.success(`Item "${name}" criado!`)
-            }
+            const { data: newItem } = await api.post('/meeting-rooms/items', { name })
+            setAvailableItems(prev => [...prev, newItem])
+            toggleItem(newItem.id)
+            toast.success(`Item "${name}" criado!`)
         } catch (e) { toast.error("Erro ao criar item") }
     }
 
     const handleCreate = async () => {
         try {
-            const token = localStorage.getItem('token')
             // Hardcoding branchId for MVP since we don't have selector yet in this view
             const payload = {
                 ...formData,
                 branchId: rooms.length > 0 ? rooms[0].branch?.name : 'default-branch-id' // Fallback
             }
             
-            // Actually call Backend
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/meeting-rooms`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                },
-                body: JSON.stringify(payload)
-            })
+            await api.post('/meeting-rooms', payload)
 
-            if (res.ok) {
-                toast.success("Sala criada com sucesso!")
-                setIsOpen(false)
-                fetchRooms()
-            } else {
-                toast.error("Erro ao criar sala")
-            }
+            toast.success("Sala criada com sucesso!")
+            setIsOpen(false)
+            fetchRooms()
         } catch (e) { toast.error("Erro de conexão") }
     }
     

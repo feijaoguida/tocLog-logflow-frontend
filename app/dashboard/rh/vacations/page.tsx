@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Plus, Check, X, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { api } from "@/lib/api"
 
 // Interfaces
 interface Vacation {
@@ -75,31 +76,18 @@ export default function VacationsPage() {
     const fetchInitialData = async () => {
         setLoading(true)
         try {
-            const token = localStorage.getItem('token')
             // 1. Get Me (Auth Profile -> find Employee)
-            // Simplified: User Service needs to give me my Employee ID.
-            // Using the same logic as EmployeesPage: Fetch all employees and find me? Or fetch /auth/profile and pray it has employee info?
-            // Let's assume we find the employee by matching userId from auth profile.
-            
-            // A. Get Auth Profile
-            const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if(!authRes.ok) throw new Error("Falha auth");
-            const user = await authRes.json();
+            const { data: user } = await api.get('/auth/profile')
             
             // B. Get All Employees (Inefficient but works for now) -> Optimization: Endpoint /employees/me
-            const empRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const employees: EmployeeProfile[] = await empRes.json();
-            const me = employees.find(e => e.userId === user.userId || e.user.name === user.name); // Fallback name check if ID separate
+            const { data: employees } = await api.get('/employees')
+            const me: EmployeeProfile | undefined = employees.find((e: EmployeeProfile) => e.userId === user.userId || e.user.name === user.name); 
             
             if(me) {
                 setMyProfile(me)
                 // C. Fetch My Vacations
                 fetchMyVacations(me.id)
-                // D. Fetch Team Vacations (If I am a manager, I should see requests from others? 
-                // Currently backend doesn't have "my subordinates requests" filter easily exposed without custom endpoint.
-                // Hack: Fetch ALL and filter in frontend where directManagerId == me.id.
-                // Note: The `employees` list in context B likely doesn't have directManagerId populated deep enough or I need to check the Vacation -> Employee -> directManagerId relation.
-                // Let's fetch ALL vacations and filter.
+                // D. Fetch Team Vacations
                 fetchAllVacations(me.id)
             }
 
@@ -109,32 +97,27 @@ export default function VacationsPage() {
 
     const fetchMyVacations = async (myEmployeeId: string) => {
         try {
-             const token = localStorage.getItem('token')
-             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations?employeeId=${myEmployeeId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-             if(res.ok) setMyVacations(await res.json())
+             const { data } = await api.get(`/vacations?employeeId=${myEmployeeId}`)
+             setMyVacations(data)
         } catch(e) {}
     }
 
     const fetchAllVacations = async (myEmployeeId: string) => {
          try {
-             const token = localStorage.getItem('token')
-             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations`, { headers: { 'Authorization': `Bearer ${token}` } }); // Get ALL
-             if(res.ok) {
-                 const all: Vacation[] = await res.json()
-                 
-                 // FILTER TEAM: Where employee.directManagerId == me.id (Need this data in Vacation include)
-                 // My generic findAll includes employee.user but maybe not directManagerId.
-                 // Let's assume for now I see EVERYTHING in Team tab to demonstrate. 
-                 // Real filter: all.filter(v => v.employee.directManagerId === myEmployeeId)
-                 // Since I don't have that field easily, I'll filter items that are NOT mine for Team view (and status REQUESTED).
-                 
-                 const others = all.filter(v => v.employee?.user?.name !== myProfile?.user?.name) // weak check
-                 const pendingManager = others.filter(v => v.status === 'REQUESTED')
-                 setTeamVacations(pendingManager)
+             const { data: all } = await api.get('/vacations') // Get ALL
+             
+             // FILTER TEAM: Where employee.directManagerId == me.id (Need this data in Vacation include)
+             // My generic findAll includes employee.user but maybe not directManagerId.
+             // Let's assume for now I see EVERYTHING in Team tab to demonstrate. 
+             // Real filter: all.filter(v => v.employee.directManagerId === myEmployeeId)
+             // Since I don't have that field easily, I'll filter items that are NOT mine for Team view (and status REQUESTED).
+             
+             const others = all.filter((v: Vacation) => v.employee?.user?.name !== myProfile?.user?.name) // weak check
+             const pendingManager = others.filter((v: Vacation) => v.status === 'REQUESTED')
+             setTeamVacations(pendingManager)
 
-                 const pendingHR = all.filter(v => v.status === 'MANAGER_APPROVED')
-                 setHrVacations(pendingHR)
-             }
+             const pendingHR = all.filter((v: Vacation) => v.status === 'MANAGER_APPROVED')
+             setHrVacations(pendingHR)
         } catch(e) {}
     }
 
@@ -143,26 +126,18 @@ export default function VacationsPage() {
         if(!myProfile) return toast.error("Perfil não identificado")
         setRequestLoading(true)
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    employeeId: myProfile.id,
-                    startDate,
-                    endDate,
-                    note
-                })
+            await api.post('/vacations', {
+                employeeId: myProfile.id,
+                startDate,
+                endDate,
+                note
             })
-            if(!res.ok) {
-                const err = await res.json()
-                throw new Error(err.message)
-            }
             toast.success("Férias solicitadas!")
             setIsRequestOpen(false)
             fetchMyVacations(myProfile.id)
         } catch (e: any) {
-            toast.error(e.message || "Erro ao solicitar")
+            const msg = e.response?.data?.message || "Erro ao solicitar"
+            toast.error(msg)
         } finally {
             setRequestLoading(false)
         }
@@ -170,13 +145,7 @@ export default function VacationsPage() {
 
     const handleAction = async (id: string, newStatus: string) => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/vacations/${id}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status: newStatus })
-            })
-            if(!res.ok) throw new Error("Erro")
+            await api.patch(`/vacations/${id}/status`, { status: newStatus })
             toast.success("Status atualizado")
             // Refresh
             if(myProfile) fetchAllVacations(myProfile.id)

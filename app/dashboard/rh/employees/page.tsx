@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
+import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -92,31 +93,25 @@ export default function EmployeesPage() {
 
   const fetchAuxData = async () => {
     try {
-        const token = localStorage.getItem('token')
         const [deptRes, empRes, profileRes, roleRes] = await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/departments`, { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`, { headers: { 'Authorization': `Bearer ${token}` } })
+            api.get('/departments'),
+            api.get('/employees'),
+            api.get('/auth/profile'),
+            api.get('/roles')
         ])
-        if(deptRes.ok) setDepartments(await deptRes.json())
-        if(empRes.ok) setManagers(await empRes.json()) 
-        if(profileRes.ok) setCurrentUserProfile(await profileRes.json())
-        if(roleRes.ok) setAvailableRoles(await roleRes.json())
+        setDepartments(deptRes.data)
+        setManagers(empRes.data) 
+        setCurrentUserProfile(profileRes.data)
+        setAvailableRoles(roleRes.data)
     } catch(e) { console.error(e) }
   }
 
   const fetchEmployees = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error('Falha ao carregar')
-      const data = await response.json()
+      const { data } = await api.get('/employees')
       setEmployees(data)
-      return data 
+      return data  
     } catch (error) {
       console.error(error)
       toast.error("Erro ao buscar funcionários.")
@@ -176,24 +171,17 @@ export default function EmployeesPage() {
             avatarUrl: avatarUrl || undefined
         }
         
-        let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees`
-        let method = 'POST'
+        let url = `/employees`
+        let method = 'post'
         
         if (editingId) {
-            url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${editingId}`
-            method = 'PATCH'
+            url = `/employees/${editingId}`
+            method = 'patch'
         }
         
-        const response = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-        })
+        // @ts-ignore
+        await api[method](url, payload)
         
-        if (!response.ok) throw new Error('Erro ao salvar')
         
         setIsFormOpen(false)
         fetchEmployees()
@@ -210,17 +198,10 @@ export default function EmployeesPage() {
   const handleDelete = async (id: string) => {
       if(!confirm("Tem certeza que deseja excluir este funcionário?")) return;
       try {
-          const token = localStorage.getItem('token')
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/employees/${id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if(res.ok) {
-              toast.success("Funcionário excluído")
-              fetchEmployees()
-          } else {
-              toast.error("Erro ao excluir")
-          }
+          await api.delete(`/employees/${id}`)
+          
+          toast.success("Funcionário excluído")
+          fetchEmployees()
       } catch(e) { toast.error("Erro ao excluir") }
   }
 
@@ -243,29 +224,16 @@ export default function EmployeesPage() {
 
       setMovementLoading(true)
       try {
-        const token = localStorage.getItem('token')
-        
-        const realPayload = {
+         // Create proper payload from state
+         const movementPayload = {
             type: movementType,
             employeeId: selectedEmployee.id,
             authorId: author.id,
             newValue,
             reason
-        }
+         }
+         await api.post('/movements', movementPayload)
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/movements`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(realPayload)
-        })
-
-        if (!response.ok) {
-            const err = await response.json()
-            throw new Error(err.message || 'Erro ao registrar movimentação')
-        }
         
         setIsMovementOpen(false)
         setNewValue("")

@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { Loader2, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 interface PurchaseRequest {
     id: string
@@ -27,7 +28,6 @@ export default function QuotationsIndexPage() {
     useEffect(() => {
         const fetchRequests = async () => {
             try {
-                const token = localStorage.getItem('token')
                 // Reusing pending endpoint or creating a new specific one? 
                 // We need Requests that are APPROVED or IN_QUOTATION.
                 // The 'pending' endpoint was for Manager Pending Approval.
@@ -46,10 +46,8 @@ export default function QuotationsIndexPage() {
                 // I will update backend to include `GET /purchase-requests/in-progress` for Buyers.
                 
                 // Creating the endpoint in the File Write below.
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/buyer/pending`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
-                if(res.ok) setRequests(await res.json())
+                const { data } = await api.get('/purchase-requests/buyer/pending')
+                setRequests(data)
             } catch { toast.error("Erro ao carregar requisições") }
             finally { setLoading(false) }
         }

@@ -9,6 +9,7 @@ import { Truck, Lock, Mail, ArrowRight, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,17 +25,7 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Falha no login. Verifique suas credenciais.')
-      }
-
-      const data = await response.json()
+      const { data } = await api.post('/auth/login', { email, password })
       
       // data.user now includes permissions
       login(data.access_token, data.user)

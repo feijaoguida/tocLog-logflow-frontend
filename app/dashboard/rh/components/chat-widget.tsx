@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageCircle, X, Send, Minus, Users } from "lucide-react"
+import { api } from "@/lib/api"
 
 interface Message {
     id: string
@@ -49,43 +50,34 @@ export function ChatWidget() {
     }, [activeUser, myUserId])
 
     const fetchMyProfile = async () => {
-        const token = localStorage.getItem('token')
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/auth/profile`, { headers: { 'Authorization': `Bearer ${token}` } })
-        if(res.ok) {
-            const data = await res.json()
+        try {
+            const { data } = await api.get('/auth/profile')
             setMyUserId(data.userId)
-        }
+        } catch {}
     }
 
     const fetchUsers = async () => {
-        const token = localStorage.getItem('token')
-        // Using Employees Endpoint to get list of people, or Users endpoint.
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/users`, { headers: { 'Authorization': `Bearer ${token}` } })
-        if(res.ok) setUsers(await res.json())
+        try {
+            const { data } = await api.get('/users')
+            setUsers(data)
+        } catch {}
     }
 
     const fetchMessages = async (otherUserId: string) => {
         if(!myUserId) return
-        const token = localStorage.getItem('token')
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/chat?userId1=${myUserId}&userId2=${otherUserId}`, { headers: { 'Authorization': `Bearer ${token}` } })
-        if(res.ok) {
-            const msgs = await res.json()
-            setMessages(msgs.reverse()) // Show oldest at top? Or flex-col-reverse. Usually api returns DESC
-        }
+        try {
+            const { data } = await api.get(`/chat?userId1=${myUserId}&userId2=${otherUserId}`)
+            setMessages(data.reverse())
+        } catch {}
     }
 
     const handleSend = async () => {
         if(!newMessage.trim() || !activeUser || !myUserId) return
         try {
-            const token = localStorage.getItem('token')
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    content: newMessage,
-                    senderId: myUserId,
-                    receiverId: activeUser.id
-                })
+            await api.post('/chat', {
+                content: newMessage,
+                senderId: myUserId,
+                receiverId: activeUser.id
             })
             setNewMessage("")
             fetchMessages(activeUser.id)

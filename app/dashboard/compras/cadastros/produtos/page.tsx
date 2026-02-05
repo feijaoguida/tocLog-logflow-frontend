@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, Loader2, Search, Package, Ruler, Tag } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api"
 
 // Interfaces
 interface Category { id: string, name: string }
@@ -45,18 +46,16 @@ export default function ProductsPage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const headers = { 'Authorization': `Bearer ${token}` }
       
       const [prodRes, catRes, unitRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/categories/all`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/units/all`, { headers })
+          api.get('/products'),
+          api.get('/products/categories/all'),
+          api.get('/products/units/all')
       ])
       
-      if(prodRes.ok) setProducts(await prodRes.json())
-      if(catRes.ok) setCategories(await catRes.json())
-      if(unitRes.ok) setUnits(await unitRes.json())
+      setProducts(prodRes.data)
+      setCategories(catRes.data)
+      setUnits(unitRes.data)
     } catch (error) {
       toast.error("Erro ao carregar dados.")
     } finally {
@@ -71,26 +70,13 @@ export default function ProductsPage() {
       e.preventDefault()
       setFormLoading(true)
       try {
-          const token = localStorage.getItem('token')
           const payload = { name, description, categoryId, unitId }
           
-          let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`
-          let method = 'POST'
           if(editingId) {
-              url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/${editingId}`
-              method = 'PATCH'
+              await api.patch(`/products/${editingId}`, payload)
+          } else {
+              await api.post('/products', payload)
           }
-
-          const res = await fetch(url, {
-              method,
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(payload)
-          })
-
-          if(!res.ok) throw new Error()
           
           toast.success("Produto salvo com sucesso")
           setIsProductOpen(false)
@@ -106,11 +92,7 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (id: string) => {
       if(!confirm("Deseja excluir este produto?")) return
       try {
-          const token = localStorage.getItem('token')
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/${id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${token}` }
-          })
+          await api.delete(`/products/${id}`)
           toast.success("Produto excluído")
           fetchData()
       } catch { toast.error("Erro ao excluir") }

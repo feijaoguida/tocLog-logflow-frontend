@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 const CATEGORIES = [
     { id: "uuid-hardware", name: "Hardware (Computador, Impressora)" }, 
@@ -29,12 +30,13 @@ export default function NewTicketPage() {
   const [categoryId, setCategoryId] = useState("")
 
   useEffect(() => {
-      fetch('/api/helpdesk/categories', {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
-      })
-      .then(res => res.json())
-      .then(data => setCategories(data))
-      .catch(console.error)
+      const fetchCategories = async () => {
+          try {
+              const { data } = await api.get('/helpdesk/categories')
+              setCategories(data)
+          } catch(e) { console.error(e) }
+      }
+      fetchCategories()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,21 +44,12 @@ export default function NewTicketPage() {
     setLoading(true)
 
     try {
-        const res = await fetch('/api/helpdesk/tickets', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${sessionStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                subject,
-                description,
-                priority,
-                categoryId // UUID
-            })
+        await api.post('/helpdesk/tickets', {
+            subject,
+            description,
+            priority,
+            categoryId // UUID
         })
-
-        if (!res.ok) throw new Error('Falha ao criar chamado')
 
         toast.success("Chamado criado com sucesso!")
         router.push('/dashboard/helpdesk')

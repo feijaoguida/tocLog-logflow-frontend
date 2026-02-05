@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
+import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -27,11 +28,8 @@ export default function PurchaseOrdersPage() {
     const fetchOrders = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) setOrders(await res.json())
+            const { data } = await api.get('/purchase-orders')
+            setOrders(data)
         } catch { toast.error("Erro ao carregar ordens") }
         finally { setLoading(false) }
     }
@@ -41,13 +39,8 @@ export default function PurchaseOrdersPage() {
     const updateStatus = async (id: string, status: string) => {
         if(!confirm(`Alterar status para ${status}?`)) return
         try {
-             const token = localStorage.getItem('token')
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders/${id}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status })
-            })
-            toast.success("Status atualizado")
+             await api.patch(`/purchase-orders/${id}/status`, { status })
+             toast.success("Status atualizado")
             fetchOrders()
         } catch { toast.error("Erro ao atualizar") }
     }

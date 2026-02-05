@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Profile, Story } from './feed-types'
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 interface StoriesComponentProps {
     currentUser: Profile | null
@@ -43,20 +44,16 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
         if (!currentUser) return;
         setLoading(true)
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (res.ok) {
-                 const data: Story[] = await res.json()
-                 setStories(data)
-                 
-                 // Group by Author
-                 const grouped: { [key: string]: Story[] } = {};
-                 data.forEach(s => {
-                     if (!grouped[s.authorId]) grouped[s.authorId] = [];
-                     grouped[s.authorId].push(s);
-                 });
-                 setGroupedStories(grouped);
-            }
+            const { data } = await api.get('/stories')
+             setStories(data)
+             
+             // Group by Author
+             const grouped: { [key: string]: Story[] } = {};
+             data.forEach((s: any) => {
+                 if (!grouped[s.authorId]) grouped[s.authorId] = [];
+                 grouped[s.authorId].push(s);
+             });
+             setGroupedStories(grouped);
         } catch (e) { }
         finally { setLoading(false) }
     }
@@ -64,28 +61,21 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
     const handleCreateStory = async () => {
         if (!currentUser) return;
         try {
-            const token = localStorage.getItem('token')
             const styles = newStoryType === 'TEXT' ? JSON.stringify({ background: newStoryColor }) : undefined;
             
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    authorId: currentUser.id,
-                    type: newStoryType,
-                    mediaUrl: newStoryMediaUrl,
-                    content: newStoryContent,
-                    styles
-                })
+            await api.post('/stories', {
+                authorId: currentUser.id,
+                type: newStoryType,
+                mediaUrl: newStoryMediaUrl,
+                content: newStoryContent,
+                styles
             })
             
-            if (res.ok) {
-                toast.success("Story publicado!")
-                setIsCreatorOpen(false)
-                setNewStoryContent("")
-                setNewStoryMediaUrl("")
-                fetchStories()
-            }
+            toast.success("Story publicado!")
+            setIsCreatorOpen(false)
+            setNewStoryContent("")
+            setNewStoryMediaUrl("")
+            fetchStories()
         } catch(e) { toast.error("Erro ao publicar") }
     }
     
@@ -97,12 +87,7 @@ export function StoriesComponent({ currentUser, onRefreshNeeded }: StoriesCompon
     
     const markAsViewed = async (storyId: string) => {
         try {
-             const token = localStorage.getItem('token')
-             await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/stories/${storyId}/view`, {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                 body: JSON.stringify({ viewerId: currentUser?.id })
-             })
+             await api.post(`/stories/${storyId}/view`, { viewerId: currentUser?.id })
              // Update local state to show 'viewed' ring without refetch
              // Simplified: just refetch or ignore for now
         } catch(e) {}

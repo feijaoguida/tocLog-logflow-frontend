@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/auth-context'
 import { DashboardEngine } from '@/components/dashboard/dashboard-engine'
 import { Skeleton } from "@/components/ui/skeleton"
+import { api } from "@/lib/api"
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -24,14 +25,8 @@ export default function DashboardPage() {
 
   const fetchViews = async (employeeId: string) => {
       try {
-          const token = localStorage.getItem('token')
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/dashboard/views?employeeId=${employeeId}`, {
-               headers: { 'Authorization': `Bearer ${token}` }
-          })
-          if (res.ok) {
-              const data = await res.json()
-              setViews(data)
-          }
+          const { data } = await api.get(`/dashboard/views?employeeId=${employeeId}`)
+          setViews(data)
       } catch (e) {
           console.error("Failed to fetch views", e)
       } finally {

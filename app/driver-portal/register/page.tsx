@@ -1,5 +1,7 @@
 'use client';
 
+import { api } from '@/lib/api';
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,43 +61,23 @@ export default function RegisterPage() {
     
     try {
       // 1. Create Driver
-      const driverRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/external-fleet/drivers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data: driverData } = await api.post('/external-fleet/drivers', {
             nome: values.nome,
             documento: values.documento,
             telefone: values.telefone,
             email: values.email
-        })
       });
-
-      if (!driverRes.ok) {
-         const error = await driverRes.json();
-         throw new Error(error.message || 'Erro ao cadastrar motorista');
-      }
       
-      const driverData = await driverRes.json();
       const driverId = driverData.id;
 
       // 2. Create Vehicle
-      const vehicleRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/external-fleet/vehicles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await api.post('/external-fleet/vehicles', {
            tipo: values.vehicleTipo,
            placa: values.vehiclePlaca,
            capacidadePeso: Number(values.vehicleCapacidadePeso),
            capacidadeVolume: Number(values.vehicleCapacidadeVolume),
            driverId: driverId
-        })
       });
-
-      if (!vehicleRes.ok) {
-        // Warning: Driver created but vehicle failed. In real world we might want transactions or cleanup.
-        const error = await vehicleRes.json();
-        throw new Error(error.message || 'Erro ao cadastrar veículo');
-      }
 
       setIsSuccess(true);
       toast.success('Cadastro realizado com sucesso!');

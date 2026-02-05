@@ -12,6 +12,7 @@ import { Plus, Trash2, Loader2, Eye, Send, FileText, CheckCircle, XCircle } from
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
+import { api } from "@/lib/api"
 
 interface Product { id: string, name: string, unit: { symbol: string } }
 interface Unit { id: string, symbol: string }
@@ -56,16 +57,15 @@ export default function MyRequestsPage() {
     const fetchData = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
-            const headers = { 'Authorization': `Bearer ${token}` }
             const [reqRes, prodRes, unitRes] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/my`, { headers }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products`, { headers }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/products/units/all`, { headers })
+                api.get('/purchase-requests/my'),
+                api.get('/products'),
+                api.get('/products/units/all')
             ])
-            if(reqRes.ok) setRequests(await reqRes.json())
-            if(prodRes.ok) setProducts(await prodRes.json())
-            if(unitRes.ok) setUnits(await unitRes.json())
+            
+            setRequests(reqRes.data)
+            setProducts(prodRes.data)
+            setUnits(unitRes.data)
         } catch { toast.error("Erro ao carregar dados") }
         finally { setLoading(false) }
     }
@@ -103,7 +103,6 @@ export default function MyRequestsPage() {
 
         setFormLoading(true)
         try {
-            const token = localStorage.getItem('token')
             const payload = {
                 justification,
                 observation,
@@ -116,13 +115,7 @@ export default function MyRequestsPage() {
                 }))
             }
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(payload)
-            })
-
-            if(!res.ok) throw new Error()
+            await api.post('/purchase-requests', payload)
             
             toast.success("Pedido criado (Rascunho)")
             setIsFormOpen(false)
@@ -135,12 +128,7 @@ export default function MyRequestsPage() {
     const handleSubmitRequest = async (id: string) => {
         if(!confirm("Enviar pedido para aprovação?")) return
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${id}/submit`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(!res.ok) throw new Error()
+            await api.patch(`/purchase-requests/${id}/submit`)
             toast.success("Pedido enviado para aprovação")
             fetchData()
         } catch { toast.error("Erro ao enviar pedido") }

@@ -12,6 +12,7 @@ import { Loader2, Plus, DollarSign, Trophy, FileCheck, ShoppingCart } from "luci
 import { toast } from "sonner"
 import { useParams, useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api"
 
 interface RequestItem {
     id: string
@@ -69,18 +70,16 @@ export default function QuotationDetailPage() {
     const fetchData = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
-            const headers = { 'Authorization': `Bearer ${token}` }
             
             const [reqRes, quoteRes, supRes] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-requests/${requestId}`, { headers }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/request/${requestId}`, { headers }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`, { headers })
+                api.get(`/purchase-requests/${requestId}`),
+                api.get(`/quotations/request/${requestId}`),
+                api.get('/suppliers')
             ])
 
-            if(reqRes.ok) setRequest(await reqRes.json())
-            if(quoteRes.ok) setQuotations(await quoteRes.json())
-            if(supRes.ok) setSuppliers(await supRes.json())
+            setRequest(reqRes.data)
+            setQuotations(quoteRes.data)
+            setSuppliers(supRes.data)
 
         } catch { toast.error("Erro ao carregar dados") }
         finally { setLoading(false) }
@@ -92,13 +91,7 @@ export default function QuotationDetailPage() {
         if(!selectedSupplierId) return
         setCreateLoading(true)
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ requestId, supplierId: selectedSupplierId })
-            })
-            if(!res.ok) throw new Error()
+            await api.post('/quotations', { requestId, supplierId: selectedSupplierId })
             toast.success("Cotação iniciada")
             setIsAddOpen(false)
             fetchData()
@@ -121,13 +114,7 @@ export default function QuotationDetailPage() {
         if (!editingQuote) return
         setSavingQuote(true)
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/${editingQuote.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ items: editItems })
-            })
-            if(!res.ok) throw new Error()
+            await api.patch(`/quotations/${editingQuote.id}`, { items: editItems })
             toast.success("Valores atualizados")
             setIsEditOpen(false)
             fetchData()
@@ -144,12 +131,7 @@ export default function QuotationDetailPage() {
     const handleWin = async (id: string) => {
         if(!confirm("Definir esta cotação como VENCEDORA? Isso encerrará as outras.")) return
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/quotations/${id}/win`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(!res.ok) throw new Error()
+            await api.patch(`/quotations/${id}/win`)
             toast.success("Vencedor definido!")
             fetchData()
         } catch { toast.error("Erro ao definir vencedor") }
@@ -158,12 +140,7 @@ export default function QuotationDetailPage() {
     const handleGenerateOrder = async (quoteId: string) => {
         if(!confirm("Gerar Ordem de Compra agora?")) return
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/purchase-orders/generate/${quoteId}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(!res.ok) throw new Error()
+            await api.post(`/purchase-orders/generate/${quoteId}`)
             toast.success("Ordem de Compra Gerada!")
             router.push('/dashboard/compras/ordens')
         } catch { toast.error("Erro ao gerar ordem") }

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Pencil, Trash2, Loader2, Search, Truck, Phone, Mail } from "lucide-react"
 import { toast } from "sonner"
+import { api } from "@/lib/api"
 
 interface Supplier {
     id: string
@@ -35,11 +36,8 @@ export default function SuppliersPage() {
     const fetchSuppliers = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) setSuppliers(await res.json())
+            const { data } = await api.get('/suppliers')
+            setSuppliers(data)
         } catch { toast.error("Erro ao carregar fornecedores") }
         finally { setLoading(false) }
     }
@@ -50,23 +48,14 @@ export default function SuppliersPage() {
         e.preventDefault()
         setFormLoading(true)
         try {
-            const token = localStorage.getItem('token')
             const payload = { name, cnpj, email, phone }
             
-            let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers`
-            let method = 'POST'
             if(editingId) {
-                url = `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers/${editingId}`
-                method = 'PATCH'
+                await api.patch(`/suppliers/${editingId}`, payload)
+            } else {
+                await api.post('/suppliers', payload)
             }
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(payload)
-            })
-
-            if(!res.ok) throw new Error()
             toast.success("Fornecedor salvo.")
             setIsFormOpen(false)
             fetchSuppliers()
@@ -78,11 +67,7 @@ export default function SuppliersPage() {
     const handleDelete = async (id: string) => {
         if(!confirm("Excluir fornecedor?")) return
         try {
-            const token = localStorage.getItem('token')
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/suppliers/${id}`, {
-                method: 'DELETE', 
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
+            await api.delete(`/suppliers/${id}`)
             toast.success("Fornecedor excluído.")
             fetchSuppliers()
         } catch { toast.error("Erro ao excluir.") }

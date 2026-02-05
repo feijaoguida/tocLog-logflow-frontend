@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import { MessageSquare, ThumbsUp, Share2, MoreHorizontal } from "lucide-react"
-import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -17,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
+import { api } from "@/lib/api"
 
 interface FeedPost {
     id: string
@@ -38,11 +37,8 @@ export function PublicFeed() {
         const fetchPosts = async () => {
             try {
                 // Public endpoint
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/feed`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setPosts(data)
-                }
+                const { data } = await api.get('/feed')
+                setPosts(data)
             } catch (error) {
                 console.error("Failed to fetch public feed", error)
             } finally {

@@ -11,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Shield } from "lucide-react"
 import _ from "lodash"
+import { api } from "@/lib/api"
 
 export default function ProfilesPage() {
     const [roles, setRoles] = useState<any[]>([])
@@ -28,25 +29,16 @@ export default function ProfilesPage() {
 
     const fetchRoles = async () => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`, {
-                 headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) setRoles(await res.json())
+            const { data } = await api.get('/roles')
+            setRoles(data)
         } catch (e) { toast.error("Erro ao buscar perfis") }
     }
 
     const fetchPermissions = async () => {
         try {
-            const token = localStorage.getItem('token')
             // Using the endpoint we verified exists in controller
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles/permissions`, {
-                 headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if(res.ok) {
-                const data = await res.json()
-                setPermissions(data)
-            }
+            const { data } = await api.get('/roles/permissions')
+            setPermissions(data)
         } catch (e) { toast.error("Erro ao buscar permissões") }
         finally { setLoading(false) }
     }
@@ -68,30 +60,16 @@ export default function ProfilesPage() {
 
     const handleSubmit = async () => {
         try {
-            const token = localStorage.getItem('token')
-            const url = editingRole 
-                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles/${editingRole.id}`
-                : `${process.env.NEXT_PUBLIC_API_URL || 'http://162.215.222.208:4000'}/roles`
-            
-            const method = editingRole ? 'PATCH' : 'POST'
-
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            })
-
-            if(res.ok) {
-                toast.success(editingRole ? "Perfil atualizado!" : "Perfil criado!")
-                setIsDialogOpen(false)
-                fetchRoles()
+            if (editingRole) {
+                await api.patch(`/roles/${editingRole.id}`, formData)
             } else {
-                toast.error("Erro ao salvar perfil")
+                await api.post('/roles', formData)
             }
-        } catch (e) { toast.error("Erro de conexão") }
+
+            toast.success(editingRole ? "Perfil atualizado!" : "Perfil criado!")
+            setIsDialogOpen(false)
+            fetchRoles()
+        } catch (e) { toast.error(editingRole ? "Erro ao atualizar perfil" : "Erro ao criar perfil") }
     }
 
     const togglePermission = (slug: string) => {
