@@ -12,6 +12,7 @@ interface User {
   companyId?: string
   employeeId?: string
   permissions?: string[]
+  avatarUrl?: string
 }
 
 interface AuthContextType {

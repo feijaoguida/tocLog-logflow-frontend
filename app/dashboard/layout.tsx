@@ -14,6 +14,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ChatWidget } from "./rh/components/chat-widget"
+import { UserProfile } from "@/components/user-profile"
 
 export default function DashboardLayout({
   children,
@@ -24,8 +25,8 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b">
-          <div className="flex items-center gap-2 px-4">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b glass sticky top-0 z-10 px-4">
+          <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
@@ -39,6 +40,9 @@ export default function DashboardLayout({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-2">
+             <UserProfile />
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

@@ -39,12 +39,12 @@ export function FeedbackWidget() {
                     value={content}
                     onChange={e => setContent(e.target.value)}
                 />
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center space-x-2">
                         <Switch id="private-mode" checked={isPrivate} onCheckedChange={setIsPrivate} />
                         <Label htmlFor="private-mode">Mensagem Privada (Ouvidoria)</Label>
                     </div>
-                    <Button size="sm" onClick={handleSend} disabled={!content}>Enviar</Button>
+                    <Button size="sm" onClick={handleSend} disabled={!content} className="w-full sm:w-auto">Enviar</Button>
                 </div>
             </CardContent>
         </Card>

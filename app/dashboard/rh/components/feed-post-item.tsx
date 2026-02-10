@@ -82,18 +82,18 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
 
     return (
         <Card 
-            className={`group border-none shadow-md transition-shadow hover:shadow-lg ${post.isFixed ? 'ring-2 ring-yellow-400/30' : ''}`}
+            className={`group border-none shadow-md transition-shadow hover:shadow-lg glass ${post.isFixed ? 'ring-2 ring-yellow-400/50' : ''}`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             <CardHeader className="flex flex-row items-start gap-3 space-y-0 p-4">
-                <Avatar className="h-10 w-10 cursor-pointer">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-medium">{initials}</AvatarFallback>
+                <Avatar className="h-10 w-10 cursor-pointer ring-1 ring-border">
+                    <AvatarFallback className="bg-primary/10 text-primary font-medium">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h4 className="font-semibold text-sm hover:underline cursor-pointer text-slate-900">{post.author.user.name}</h4>
+                            <h4 className="font-semibold text-sm hover:underline cursor-pointer text-foreground">{post.author.user.name}</h4>
                             <p className="text-xs text-muted-foreground truncate">{post.author.user.email}</p>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                 <span>{format(new Date(post.createdAt), "d 'de' MMM", { locale: ptBR })}</span>
@@ -108,8 +108,8 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
                         
                         <div className="flex items-center gap-1">
                             {post.isFixed && (
-                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 transition-colors">
-                                    <Pin className="w-3 h-3 mr-1 fill-yellow-800" /> Destaque
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 transition-colors dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-900/50">
+                                    <Pin className="w-3 h-3 mr-1 fill-yellow-800 dark:fill-yellow-200" /> Destaque
                                 </Badge>
                             )}
                             
@@ -120,14 +120,14 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
                                             <MoreVertical className="w-4 h-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuContent align="end" className="glass">
                                         {canManage && (
                                             <DropdownMenuItem onClick={() => onTogglePin(post)}>
                                                 <Pin className="w-4 h-4 mr-2" /> {post.isFixed ? "Remover Destaque" : "Destacar no Topo"}
                                             </DropdownMenuItem>
                                         )}
                                         {(canManage || isAuthor) && (
-                                            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => onDelete(post.id)}>
+                                            <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10" onClick={() => onDelete(post.id)}>
                                                 <Trash2 className="w-4 h-4 mr-2" /> Excluir Publicação
                                             </DropdownMenuItem>
                                         )}
@@ -139,7 +139,7 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
                 </div>
             </CardHeader>
             <CardContent className="px-4 py-2">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">{post.content}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{post.content}</p>
                 {renderMedia()}
                 {renderEvent()}
                 
@@ -149,10 +149,10 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
             
             <CardFooter className="flex-col p-0">
                 {/* Stats Row */}
-                <div className="flex items-center justify-between px-4 py-2 w-full text-xs text-muted-foreground border-b border-border/40 bg-slate-50/50">
+                <div className="flex items-center justify-between px-4 py-2 w-full text-xs text-muted-foreground border-b border-border/40 bg-muted/20">
                     <div className="flex items-center gap-3">
                         {post.likes.length > 0 && (
-                            <div className="flex items-center gap-1 hover:text-blue-600 transition-colors cursor-pointer">
+                            <div className="flex items-center gap-1 hover:text-blue-500 transition-colors cursor-pointer">
                                 <div className="bg-blue-500 rounded-full p-1"><ThumbsUp className="w-2 h-2 text-white fill-white" /></div>
                                 <span className="font-medium">{post.likes.length}</span>
                             </div>
@@ -164,24 +164,24 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
                 </div>
 
                 {/* Actions Row */}
-                <div className="flex items-center justify-between px-2 py-1 w-full bg-white">
+                <div className="flex items-center justify-between px-2 py-1 w-full bg-card/50">
                     <Button 
                         variant="ghost" 
-                        className={`flex-1 gap-2 rounded-xl transition-all active:scale-95 ${isLiked ? 'text-blue-600 font-semibold bg-blue-50' : 'text-slate-600 hover:bg-slate-100'}`} 
+                        className={`flex-1 gap-2 rounded-xl transition-all active:scale-95 ${isLiked ? 'text-blue-500 font-semibold bg-blue-500/10' : 'text-muted-foreground hover:bg-muted'}`} 
                         onClick={() => onLike(post.id)}
                     >
-                        <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-blue-600' : ''}`} /> 
+                        <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-blue-500' : ''}`} /> 
                         <span className="text-xs">Curtir</span>
                     </Button>
                     <Button 
                         variant="ghost" 
-                        className="flex-1 gap-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+                        className="flex-1 gap-2 text-muted-foreground hover:bg-muted rounded-xl"
                         onClick={() => setCommentsOpen(!commentsOpen)}
                     >
                         <MessageSquare className="w-4 h-4" /> 
                         <span className="text-xs">Comentar</span>
                     </Button>
-                    <Button variant="ghost" className="flex-1 gap-2 text-slate-600 hover:bg-slate-100 rounded-xl">
+                    <Button variant="ghost" className="flex-1 gap-2 text-muted-foreground hover:bg-muted rounded-xl">
                         <Send className="w-4 h-4" /> 
                         <span className="text-xs">Compartilhar</span>
                     </Button>
@@ -189,16 +189,16 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
 
                  {/* Comments Section */}
                  {(commentsOpen || (post.comments.length > 0 && commentsOpen)) && (
-                     <div className="bg-slate-50/80 px-4 py-3 space-y-4 w-full border-t animate-in slide-in-from-top-2 duration-200">
+                     <div className="bg-muted/30 px-4 py-3 space-y-4 w-full border-t border-border/50 animate-in slide-in-from-top-2 duration-200">
                          {/* Comment Input */}
                         <div className="flex gap-3">
-                            <Avatar className="w-8 h-8 ring-2 ring-white">
-                                <AvatarFallback className="text-xs bg-slate-200">{currentUser?.user.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                            <Avatar className="w-8 h-8 ring-2 ring-background">
+                                <AvatarFallback className="text-xs bg-muted text-muted-foreground">{currentUser?.user.name.substring(0,2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 relative group/input">
                                 <Textarea 
                                     placeholder="Escreva um comentário..." 
-                                    className="min-h-[40px] h-[40px] py-2 resize-none pr-12 text-sm rounded-2xl border-slate-200 focus:border-blue-400 focus:ring-blue-100 transition-all"
+                                    className="min-h-[40px] h-[40px] py-2 resize-none pr-12 text-sm rounded-2xl border-border bg-background focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                                     value={commentText}
                                     onChange={e => setCommentText(e.target.value)}
                                     onKeyDown={e => {
@@ -211,7 +211,7 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
                                 <Button 
                                     size="icon" 
                                     variant="ghost" 
-                                    className="absolute right-1 top-1 h-8 w-8 text-blue-600 hover:bg-blue-50 rounded-full"
+                                    className="absolute right-1 top-1 h-8 w-8 text-blue-500 hover:bg-blue-500/10 rounded-full"
                                     onClick={handleCommentSubmit}
                                     disabled={!commentText.trim()}
                                 >
@@ -222,13 +222,13 @@ export function FeedPostItem({ post, currentUser, onLike, onComment, onDelete, o
 
                          {post.comments.map(c => (
                              <div key={c.id} className="flex gap-2 text-sm group/comment">
-                                 <Avatar className="w-8 h-8 mt-0.5 ring-1 ring-slate-100">
-                                      <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-medium">{c.author.user.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                                 <Avatar className="w-8 h-8 mt-0.5 ring-1 ring-border">
+                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">{c.author.user.name.substring(0,2).toUpperCase()}</AvatarFallback>
                                  </Avatar>
                                  <div className="space-y-1 max-w-[90%]">
-                                     <div className="bg-white border border-slate-100 rounded-2xl px-4 py-2 shadow-sm">
-                                         <span className="font-semibold text-xs block text-slate-900 hover:underline cursor-pointer mb-0.5">{c.author.user.name}</span>
-                                         <span className="text-slate-700 text-sm leading-relaxed break-words">{c.content}</span>
+                                     <div className="bg-background border border-border/60 rounded-2xl px-4 py-2 shadow-sm">
+                                         <span className="font-semibold text-xs block text-foreground hover:underline cursor-pointer mb-0.5">{c.author.user.name}</span>
+                                         <span className="text-foreground/90 text-sm leading-relaxed break-words">{c.content}</span>
                                      </div>
                                  </div>
                              </div>

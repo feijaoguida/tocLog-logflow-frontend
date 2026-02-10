@@ -1,5 +1,7 @@
 'use client'
 
+import Link from "next/link"
+
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +17,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   House,
@@ -40,33 +43,55 @@ import { Label } from "@/components/ui/label" // Added
 export function AppSidebar() {
   const router = useRouter()
   const { hasPermission, logout, isLoading } = useAuth()
+  const { setOpen, isMobile, setOpenMobile } = useSidebar()
   
   // Configuration State
-  const [autoCollapse, setAutoCollapse] = React.useState(true)
+  const [accordionMode, setAccordionMode] = React.useState(true)
+  const [collapseOnClick, setCollapseOnClick] = React.useState(false) // Default false, user can enable
   const [openGroup, setOpenGroup] = React.useState<string | null>(null)
 
   // Load Config
   React.useEffect(() => {
-      const storedConfig = localStorage.getItem('sidebar_autocollapse')
-      if (storedConfig !== null) {
-          setAutoCollapse(storedConfig === 'true')
+      const storedAccordion = localStorage.getItem('sidebar_accordion_mode')
+      if (storedAccordion !== null) {
+          setAccordionMode(storedAccordion === 'true')
+      }
+      const storedCollapseClick = localStorage.getItem('sidebar_collapse_on_click')
+      if (storedCollapseClick !== null) {
+          setCollapseOnClick(storedCollapseClick === 'true')
       }
   }, [])
 
-  const toggleAutoCollapse = () => {
-      const newState = !autoCollapse
-      setAutoCollapse(newState)
-      localStorage.setItem('sidebar_autocollapse', String(newState))
+  const toggleAccordionMode = () => {
+      const newState = !accordionMode
+      setAccordionMode(newState)
+      localStorage.setItem('sidebar_accordion_mode', String(newState))
+  }
+
+  const toggleCollapseOnClick = () => {
+      const newState = !collapseOnClick
+      setCollapseOnClick(newState)
+      localStorage.setItem('sidebar_collapse_on_click', String(newState))
   }
 
   // Handle Group Toggle
   const handleGroupToggle = (title: string, isOpen: boolean) => {
-      if (!autoCollapse) return; // Independent toggles if config is off
+      if (!accordionMode) return; // Independent toggles if config is off
       if (isOpen) {
           setOpenGroup(title)
       } else if (openGroup === title) {
           setOpenGroup(null) // Closing the current one
       }
+  }
+
+  const handleItemClick = () => {
+    if (collapseOnClick) {
+        if (isMobile) {
+            setOpenMobile(false)
+        } else {
+            setOpen(false)
+        }
+    }
   }
 
   // Menu Definition with Permissions
@@ -173,14 +198,32 @@ export function AppSidebar() {
       return false;
   });
 
+    // Hover Logic for "Collapse on Click"
+    const handleMouseEnter = () => {
+        if (collapseOnClick && !isMobile) {
+            setOpen(true)
+        }
+    }
+
+    const handleMouseLeave = () => {
+        if (collapseOnClick && !isMobile) {
+            setOpen(false)
+        }
+    }
+
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar 
+        collapsible="icon" 
+        className="glass border-r-0 transition-all duration-300"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+    >
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Truck className="h-5 w-5" />
             </div>
-            <span className="truncate font-semibold text-lg text-primary">TocLog</span>
+            <span className="truncate font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">TocLog</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -204,18 +247,18 @@ export function AppSidebar() {
                           // Simple Link
                           return (
                             <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton asChild tooltip={item.title}>
-                                    <a href={item.url}>
+                                <SidebarMenuButton asChild tooltip={item.title} onClick={handleItemClick}>
+                                    <Link href={item.url}>
                                     <item.icon />
                                     <span>{item.title}</span>
-                                    </a>
+                                    </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                           )
                       }
                       
                       // Collapsible Group
-                      const isOpen = autoCollapse ? openGroup === item.title : undefined;
+                      const isOpen = accordionMode ? openGroup === item.title : undefined;
 
                       return (
                         <Collapsible 
@@ -237,10 +280,10 @@ export function AppSidebar() {
                                     <SidebarMenuSub>
                                         {item.items?.map(sub => (
                                             <SidebarMenuSubItem key={sub.title}>
-                                                <SidebarMenuSubButton asChild>
-                                                    <a href={sub.url}>
+                                                <SidebarMenuSubButton asChild onClick={handleItemClick}>
+                                                    <Link href={sub.url}>
                                                         <span>{sub.title}</span>
-                                                    </a>
+                                                    </Link>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>
                                         ))}
@@ -262,9 +305,16 @@ export function AppSidebar() {
             </SidebarMenuItem>
             
             <SidebarMenuItem>
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                    <Switch checked={autoCollapse} onCheckedChange={toggleAutoCollapse} id="collapse-mode" className="scale-75 origin-left" />
-                    <Label htmlFor="collapse-mode" className="cursor-pointer">Menu Compacto</Label>
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden transition-all duration-200 overflow-hidden">
+                    <Switch checked={accordionMode} onCheckedChange={toggleAccordionMode} id="accordion-mode" className="scale-75 origin-left" />
+                    <Label htmlFor="accordion-mode" className="cursor-pointer whitespace-nowrap">Modo Acordeão</Label>
+                </div>
+            </SidebarMenuItem>
+            
+             <SidebarMenuItem>
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden transition-all duration-200 overflow-hidden">
+                    <Switch checked={collapseOnClick} onCheckedChange={toggleCollapseOnClick} id="collapse-click" className="scale-75 origin-left" />
+                    <Label htmlFor="collapse-click" className="cursor-pointer whitespace-nowrap">Recolher ao Clicar</Label>
                 </div>
             </SidebarMenuItem>
 
