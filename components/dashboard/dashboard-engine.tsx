@@ -12,9 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { WidgetType, WIDGET_REGISTRY } from './widget-registry'
-import { Plus, Save, Trash2, Layout } from 'lucide-react'
+import { Plus, Save, Trash2, Layout, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import _ from 'lodash'
+import { useAuth } from '@/context/auth-context'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
 
 // Custom Width Provider wrapper using ResizeObserver
 const WidthWrapper = ({ children, className }: { children: (width: number) => React.ReactNode, className?: string }) => {
@@ -25,25 +29,20 @@ const WidthWrapper = ({ children, className }: { children: (width: number) => Re
         const element = ref.current
         if (!element) return
         
-        const updateWidth = () => {
-             if (element) {
-                 const newWidth = element.offsetWidth
-                 // Avoid state update if width hasn't changed meaningfully
-                 setWidth(prev => Math.abs(prev - newWidth) > 1 ? newWidth : prev)
-             }
-        }
-        
-        updateWidth()
-
-        const resizeObserver = new ResizeObserver(() => {
-             window.requestAnimationFrame(() => {
-                 updateWidth()
-             })
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                // Use contentRect for more precise inner width
+                const newWidth = entry.contentRect.width
+                if (newWidth > 0 && Math.abs(width - newWidth) > 5) { // 5px threshold to avoid jitter
+                     // Defer update to next frame to avoid "ResizeObserver loop limit exceeded" or React render cycles
+                     requestAnimationFrame(() => setWidth(newWidth))
+                }
+            }
         })
         
-        resizeObserver.observe(element)
-        return () => resizeObserver.disconnect()
-    }, [])
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, []) // Empty dependency, use functional state update if needed but here we lazily update
 
     return (
         <div ref={ref} className={className} style={{ width: '100%' }}>
@@ -66,63 +65,150 @@ interface DashboardView {
 interface DashboardEngineProps {
     initialViews: DashboardView[]
     currentEmployeeId: string
+    onViewsChanged?: () => void
 }
 
-export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEngineProps) {
+const WIDGET_COLORS = [
+    { name: 'Branco', value: '#ffffff' },
+    { name: 'Cinza Claro', value: '#f8fafc' },
+    { name: 'Azul Claro', value: '#eff6ff' },
+    { name: 'Verde Claro', value: '#f0fdf4' },
+    { name: 'Amarelo Claro', value: '#fefce8' },
+    { name: 'Vermelho Claro', value: '#fef2f2' },
+]
+
+export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChanged }: DashboardEngineProps) {
+    const { hasPermission } = useAuth()
+    const canManageDashboard = hasPermission('dashboard.manage') || hasPermission('system.settings.view') // Fallback or specific permission
+
     const [views, setViews] = useState<DashboardView[]>(initialViews)
     const [currentViewId, setCurrentViewId] = useState<string>(initialViews.length > 0 ? initialViews[0].id : '')
     const [isEditing, setIsEditing] = useState(false)
     const [layouts, setLayouts] = useState<any>({})
     const [widgetData, setWidgetData] = useState<any>({})
+    const [widgetConfig, setWidgetConfig] = useState<any>({}) // Stores color, title overrides, etc. keyed by widget instance ID (i)
     
     // New View Dialog State
     const [isNewViewOpen, setIsNewViewOpen] = useState(false)
     const [newViewName, setNewViewName] = useState('')
 
-    const currentView = views.find(v => v.id === currentViewId)
+    // Memoize currentView to prevent unnecessary effect triggers
+    const currentView = React.useMemo(() => 
+        views.find(v => v.id === currentViewId), 
+    [views, currentViewId])
+
+    // Sync views from props ONLY if they look genuinely new (e.g. from server refresh)
+    // and we haven't touched them locally.
+    // Actually, simpler: Only sync if ID list changes or length changes to avoid deep compare loops.
+    // Sync views from props ONLY if they look genuinely new (e.g. from server refresh)
+    // and we haven't touched them locally.
+    useEffect(() => {
+        if (initialViews.length > 0) {
+             const isDifferent = initialViews.length !== views.length || 
+                                 !_.isEqual(initialViews.map(v => v.id), views.map(v => v.id))
+             
+             if (isDifferent) {
+                 const currentViewExistsInInitial = initialViews.some(v => v.id === currentViewId)
+                 const currentViewExistsInLocal = views.some(v => v.id === currentViewId)
+                 
+                 // If we are viewing something that exists locally but NOT in the incoming props,
+                 // it's likely a newly created view that hasn't made the round-trip yet.
+                 // Preserve local state to avoid jumping back.
+                 if (currentViewExistsInLocal && !currentViewExistsInInitial) {
+                     return
+                 }
+
+                 setViews(initialViews)
+                 // Ensure currentViewId is valid
+                 if (!currentViewExistsInInitial) {
+                     setCurrentViewId(initialViews[0].id)
+                 }
+             }
+        }
+    }, [initialViews, currentViewId, views]) // Added views to dependency to be safe with checks
+
+    // Helper to fetch data safely
+    const fetchWidgetData = useCallback(async (layout: any[]) => {
+        const types = [...new Set(layout.map((item: any) => item.i.split('-')[0]))]
+        if (types.length === 0) return
+        
+        const query = types.join(',')
+        api.get(`/dashboard/data?widgets=${query}`)
+           .then(({data}) => {
+               setWidgetData((prev: any) => {
+                   if (_.isEqual(prev, data)) return prev
+                   return data
+               })
+           })
+           .catch(e => console.error("Widget data fetch error", e))
+    }, [])
 
     useEffect(() => {
-        if (currentView) {
-            // Load layout
-             // Ensuring layout is in the correct format for RGL
-            // If saved from DB, it might be in `currentView.configuration` directly if it's single breakpoint
-            // But we want to support responsive. For MVP, we might treat `currentView.configuration` as the main layout array
-            // and adapt it.
-            
-            // Simplification: currentView.configuration IS the array of items with {i, x, y, w, h}
-            // We map it to { lg: configuration }
-            const loadedLayout = Array.isArray(currentView.configuration) 
-                ? currentView.configuration 
-                : (currentView.configuration as any)?.layout || []
-                
-            setLayouts({ lg: loadedLayout })
-            
-            // Fetch Data
-            fetchWidgetData(loadedLayout)
-        }
-    }, [currentViewId])
+        if (!currentView) return
 
-    const fetchWidgetData = async (layout: any[]) => {
-        // Extract unique widget types from layout
-        const types = [...new Set(layout.map((item: any) => {
-            // item.i is usually "type-randomId" or just "type"
-            return item.i.split('-')[0]
-        }))]
+        // Load layout
+        const config: any = currentView.configuration
+        const loadedLayout = Array.isArray(config) ? config : (config?.layout || [])
         
-        if (types.length === 0) return
+        // Extract styles
+        const styles: any = {}
+        loadedLayout.forEach((item: any) => {
+            if (item.style) {
+                styles[item.i] = item.style
+            }
+        })
+        
+        // Update widget config only if different
+        setWidgetConfig((prev: any) => {
+            if (_.isEqual(prev, styles)) return prev
+            return styles
+        })
 
-        try {
-            const query = types.join(',')
-            const { data } = await api.get(`/dashboard/data?widgets=${query}`)
-            setWidgetData(data)
-        } catch (e) {
-            console.error("Failed to fetch widget data", e)
-        }
-    }
+        // Update layouts only if LOGICALLY different (ignoring RGL internal props if possible, but deep equal is safe for now if layout is clean)
+        // We compare against the stored layout in DB vs current state.
+        
+        const cleanLoaded = loadedLayout.map((l: any) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h }))
+        
+        setLayouts((prev: any) => {
+            const currentLg = prev.lg || []
+            const cleanCurrent = currentLg.map((l: any) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h }))
+            
+            if (_.isEqual(cleanLoaded, cleanCurrent)) {
+                return prev // No change
+            }
+            return { lg: loadedLayout }
+        })
+            
+        fetchWidgetData(loadedLayout)
 
-    const handleLayoutChange = (currentLayout: any, allLayouts: any) => {
-        setLayouts(allLayouts)
-    }
+    }, [currentView, fetchWidgetData])
+
+    const handleLayoutChange = useCallback((currentLayout: any, allLayouts: any) => {
+        // RGL triggers this often. We MUST compare carefully.
+        // We only care about lg layout for now (simplicity)
+        
+        setLayouts((prev: any) => {
+             const prevLg = prev.lg || []
+             const newLg = allLayouts.lg || []
+             
+             // Check lengths first
+             if (prevLg.length !== newLg.length) return allLayouts
+
+             // Check deep equality of CORE fields
+             const isSame = prevLg.every((item: any, idx: number) => {
+                 const newItem = newLg.find((n: any) => n.i === item.i)
+                 if (!newItem) return false
+                 return item.x === newItem.x && 
+                        item.y === newItem.y && 
+                        item.w === newItem.w && 
+                        item.h === newItem.h
+             })
+
+             if (isSame) return prev // Return exact same object reference to bail out of render
+             
+             return allLayouts
+        })
+    }, [])
 
     const handleAddWidget = (type: WidgetType) => {
         const def = WIDGET_REGISTRY[type]
@@ -147,6 +233,18 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
             ...prev,
             lg: (prev.lg || []).filter((item: any) => item.i !== i)
         }))
+        setWidgetConfig((prev: any) => {
+            const newConfig = { ...prev }
+            delete newConfig[i]
+            return newConfig
+        })
+    }
+
+    const handleUpdateWidgetStyle = (i: string, style: any) => {
+        setWidgetConfig((prev: any) => ({
+            ...prev,
+            [i]: { ...prev[i], ...style }
+        }))
     }
 
     const handleSaveView = async () => {
@@ -154,9 +252,10 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         
         try {
             // layout to save is layouts.lg
-            // Clean up RGL props
+            // Clean up RGL props and merge with config
             const cleanLayout = layouts.lg.map((l: any) => ({
-                i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, minW: l.minW, minH: l.minH
+                i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, minW: l.minW, minH: l.minH,
+                style: widgetConfig[l.i] // Persist style
             }))
 
             await api.put(`/dashboard/views/${currentView.id}`, {
@@ -170,6 +269,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
             setIsEditing(false)
             // Update local state views to reflect saved layout
             setViews(prev => prev.map(v => v.id === currentView.id ? { ...v, configuration: cleanLayout } : v))
+            if (onViewsChanged) onViewsChanged()
         } catch (e) {
              toast.error("Erro ao salvar visão.")
         }
@@ -177,6 +277,10 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
 
     const handleCreateView = async () => {
          if (!newViewName) return
+         if (!currentEmployeeId) {
+             toast.error("Erro: Identificação do usuário inválida. Faça logout e login novamente.")
+             return
+         }
 
          try {
             const { data: newView } = await api.post('/dashboard/views', {
@@ -192,8 +296,10 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
             setNewViewName('')
             setIsEditing(true) // Immediately enter edit mode
             toast.success("Nova visão criada!")
-         } catch(e) {
-             toast.error("Erro ao criar visão")
+            if (onViewsChanged) onViewsChanged()
+         } catch(e: any) {
+             const msg = e.response?.data?.message || "Erro ao criar visão"
+             toast.error(msg)
          }
     }
 
@@ -212,6 +318,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
             setViews(newViews)
             setCurrentViewId(newViews[0].id) // Switch to another
             toast.success("Visão removida.")
+            if (onViewsChanged) onViewsChanged()
         } catch (e) {
             toast.error("Erro ao deletar visão.")
         }
@@ -221,73 +328,81 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
         <div className="space-y-4">
             <div className="flex items-center justify-between pb-4 border-b">
                 <div className="flex items-center gap-4">
-                    <Select value={currentViewId} onValueChange={setCurrentViewId}>
-                        <SelectTrigger className="w-[250px]">
-                            <SelectValue placeholder="Selecione uma visão" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {views.map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <select 
+                        value={currentViewId} 
+                        onChange={(e) => setCurrentViewId(e.target.value)}
+                        className="w-[250px] h-10 px-3 py-2 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                        {views.map(v => (
+                            <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                    </select>
                     
-                    <Dialog open={isNewViewOpen} onOpenChange={setIsNewViewOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Nova Visão</DialogTitle>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <Input 
-                                    placeholder="Nome da Visão (ex: Gestão de Frotas)" 
-                                    value={newViewName}
-                                    onChange={(e) => setNewViewName(e.target.value)}
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={handleCreateView}>Criar</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    {canManageDashboard && (
+                        <Dialog open={isNewViewOpen} onOpenChange={setIsNewViewOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="icon">
+                                    <Plus className="h-4 w-4" />
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Nova Visão</DialogTitle>
+                                </DialogHeader>
+                                <div className="py-4">
+                                    <Input 
+                                        placeholder="Nome da Visão (ex: Gestão de Frotas)" 
+                                        value={newViewName}
+                                        onChange={(e) => setNewViewName(e.target.value)}
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button onClick={handleCreateView}>Criar</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {isEditing ? (
-                        <>
-                             <div className="mr-4 flex gap-2 items-center">
-                                <p className="text-sm font-medium text-muted-foreground">Adicionar Widget:</p>
-                                <Select onValueChange={(val) => handleAddWidget(val as WidgetType)}>
-                                    <SelectTrigger className="w-[200px] h-8">
-                                        <SelectValue placeholder="Selecione..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.values(WIDGET_REGISTRY).map(w => (
-                                            <SelectItem key={w.id} value={w.id}>
-                                                {w.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <Button variant="default" onClick={handleSaveView}>
-                                <Save className="h-4 w-4 mr-2" /> Salvar Layout
-                            </Button>
-                            <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancelar</Button>
-                        </>
+                    {canManageDashboard ? (
+                        isEditing ? (
+                            <>
+                                <div className="mr-4 flex gap-2 items-center">
+                                    <p className="text-sm font-medium text-muted-foreground">Adicionar Widget:</p>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="w-[200px] h-8 justify-between font-normal">
+                                                Selecione...
+                                                <ChevronDown className="h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-[200px]">
+                                            {Object.values(WIDGET_REGISTRY).map(w => (
+                                                <DropdownMenuItem key={w.id} onSelect={() => handleAddWidget(w.id as WidgetType)}>
+                                                    {w.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                <Button variant="default" onClick={handleSaveView}>
+                                    <Save className="h-4 w-4 mr-2" /> Salvar Layout
+                                </Button>
+                                <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancelar</Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                                    <Layout className="h-4 w-4 mr-2" /> Editar Layout
+                                </Button>
+                                 <Button variant="ghost" size="icon" onClick={handleDeleteView}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </>
+                        )
                     ) : (
-                        <>
-                            <Button variant="outline" onClick={() => setIsEditing(true)}>
-                                <Layout className="h-4 w-4 mr-2" /> Editar Layout
-                            </Button>
-                             <Button variant="ghost" size="icon" onClick={handleDeleteView}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                        </>
+                        <p className="text-sm text-muted-foreground italic">Modo de visualização</p>
                     )}
                 </div>
             </div>
@@ -314,16 +429,49 @@ export function DashboardEngine({ initialViews, currentEmployeeId }: DashboardEn
                                 const type = item.i.split('-')[0] as WidgetType
                                 const widgetDef = WIDGET_REGISTRY[type]
                                 const WidgetComponent = widgetDef?.component
+                                const config = widgetConfig[item.i] || {}
+                                const bgColor = config.backgroundColor || '#ffffff'
 
                                 return (
-                                    <div key={item.i} className={isEditing ? "border-2 border-dashed border-slate-300 bg-white" : ""}>
+                                    <div 
+                                        key={item.i} 
+                                        className={`${isEditing ? "border-2 border-dashed border-slate-300" : ""} rounded-lg shadow-sm overflow-hidden`}
+                                        style={{ backgroundColor: bgColor }}
+                                    >
                                         {isEditing && (
-                                            <div className="absolute top-1 right-1 z-10 cursor-pointer" onClick={() => handleRemoveWidget(item.i)}>
-                                                <Trash2 className="h-4 w-4 text-red-400 hover:text-red-600" />
+                                            <div className="absolute top-1 right-1 z-20 flex gap-1 bg-white/80 p-1 rounded-bl-lg">
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <div className="cursor-pointer p-1 hover:bg-slate-100 rounded">
+                                                            <Settings className="h-4 w-4 text-slate-500" />
+                                                        </div>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-50">
+                                                        <div className="grid gap-2">
+                                                            <h4 className="font-medium leading-none">Aparência</h4>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                {WIDGET_COLORS.map(c => (
+                                                                    <div 
+                                                                        key={c.value}
+                                                                        className={`w-6 h-6 rounded-full cursor-pointer border ${c.value === bgColor ? 'ring-2 ring-black' : ''}`}
+                                                                        style={{ backgroundColor: c.value }}
+                                                                        onClick={() => handleUpdateWidgetStyle(item.i, { backgroundColor: c.value })}
+                                                                        title={c.name}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <div className="cursor-pointer p-1 hover:bg-red-50 rounded" onClick={() => handleRemoveWidget(item.i)}>
+                                                    <Trash2 className="h-4 w-4 text-red-400 hover:text-red-600" />
+                                                </div>
                                             </div>
                                         )}
                                         {WidgetComponent ? (
-                                            <WidgetComponent data={widgetData[type]} />
+                                            <div className="h-full w-full">
+                                                <WidgetComponent data={widgetData[type]} />
+                                            </div>
                                         ) : (
                                             <div className="p-4 text-red-500">Widget Unknown</div>
                                         )}

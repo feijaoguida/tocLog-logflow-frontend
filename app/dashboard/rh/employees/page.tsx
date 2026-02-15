@@ -439,14 +439,14 @@ export default function EmployeesPage() {
                                 <TableCell>{emp.status}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => {
+                                        <Button variant="ghost" size="icon" onClick={() => {
                                             setSelectedEmployee(emp)
                                             setIsMovementOpen(true)
                                             setMovementType("SALARY") // Default
                                             setNewValue("")
                                             setReason("")
                                         }}>
-                                            <ArrowRightLeft className="mr-2 h-4 w-4" /> Movimentar
+                                            <ArrowRightLeft className="mr-2 h-4 w-4" />
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(emp)}>
                                             <Pencil className="h-4 w-4 text-blue-600" />
@@ -498,14 +498,14 @@ export default function EmployeesPage() {
                             </div>
 
                             <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-                                <Button variant="ghost" size="sm" className="h-8" onClick={() => {
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                     setSelectedEmployee(emp)
                                     setIsMovementOpen(true)
                                     setMovementType("SALARY")
                                     setNewValue("")
                                     setReason("")
                                 }}>
-                                    <ArrowRightLeft className="mr-2 h-3 w-3" /> Movimentar
+                                    <ArrowRightLeft className="mr-2 h-3 w-3" />
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(emp)}>
                                     <Pencil className="h-3 w-3 text-blue-600" />

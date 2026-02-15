@@ -69,6 +69,7 @@ export default function DashboardPage() {
         <DashboardEngine 
             initialViews={displayViews} 
             currentEmployeeId={user.employeeId || ''} 
+            onViewsChanged={() => user.employeeId && fetchViews(user.employeeId)}
         />
     </div>
   )

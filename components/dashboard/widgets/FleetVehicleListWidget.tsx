@@ -1,10 +1,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Car } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 export function FleetVehicleListWidget({ data }: { data?: any[] }) {
-    debugger;
     const vehicles = data || []
 
     return (
@@ -13,7 +11,7 @@ export function FleetVehicleListWidget({ data }: { data?: any[] }) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Veículos Recentes</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 min-h-0 p-0">
-                <ScrollArea className="h-[200px] px-6 pb-4">
+                <div className="h-[200px] px-6 pb-4 overflow-y-auto custom-scrollbar">
                     <div className="space-y-3 pt-2">
                     {vehicles.length === 0 ? (
                          <p className="text-xs text-muted-foreground">Nenhum veículo encontrado.</p>
@@ -39,7 +37,7 @@ export function FleetVehicleListWidget({ data }: { data?: any[] }) {
                         ))
                     )}
                     </div>
-                </ScrollArea>
+                </div>
             </CardContent>
         </Card>
     )
