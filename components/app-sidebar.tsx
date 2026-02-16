@@ -32,13 +32,12 @@ import {
   ChevronRight // Added
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { ModeToggle } from "@/components/mode-toggle"
+
 import { useAuth } from "@/context/auth-context"
 import React from "react" // Added
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible" // Added
 import { Skeleton } from "@/components/ui/skeleton" // Added
-import { Switch } from "@/components/ui/switch" // Added
-import { Label } from "@/components/ui/label" // Added
+
 
 import { useSettings } from "@/context/settings-context"
 
@@ -50,17 +49,7 @@ export function AppSidebar() {
 
   const [openGroup, setOpenGroup] = React.useState<string | null>(null)
 
-  const toggleAccordionMode = () => {
-      const newState = !accordionMode
-      setAccordionMode(newState)
-      localStorage.setItem('sidebar_accordion_mode', String(newState))
-  }
 
-  const toggleCollapseOnClick = () => {
-      const newState = !collapseOnClick
-      setCollapseOnClick(newState)
-      localStorage.setItem('sidebar_collapse_on_click', String(newState))
-  }
 
   // Handle Group Toggle
   const handleGroupToggle = (title: string, isOpen: boolean) => {
@@ -289,30 +278,12 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
          <SidebarMenu>
-            <SidebarMenuItem className="px-2 pb-2">
-                 <ModeToggle />
-            </SidebarMenuItem>
-            
-            <SidebarMenuItem>
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden transition-all duration-200 overflow-hidden">
-                    <Switch checked={accordionMode} onCheckedChange={toggleAccordionMode} id="accordion-mode" className="scale-75 origin-left" />
-                    <Label htmlFor="accordion-mode" className="cursor-pointer whitespace-nowrap">Modo Acordeão</Label>
-                </div>
-            </SidebarMenuItem>
-            
-             <SidebarMenuItem>
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden transition-all duration-200 overflow-hidden">
-                    <Switch checked={collapseOnClick} onCheckedChange={toggleCollapseOnClick} id="collapse-click" className="scale-75 origin-left" />
-                    <Label htmlFor="collapse-click" className="cursor-pointer whitespace-nowrap">Recolher ao Clicar</Label>
-                </div>
-            </SidebarMenuItem>
-
-            <SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Configurações">
-                    <a href="/settings">
+                    <Link href="/dashboard/settings">
                         <Settings />
                         <span>Configurações</span>
-                    </a>
+                    </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
