@@ -40,27 +40,15 @@ import { Skeleton } from "@/components/ui/skeleton" // Added
 import { Switch } from "@/components/ui/switch" // Added
 import { Label } from "@/components/ui/label" // Added
 
+import { useSettings } from "@/context/settings-context"
+
 export function AppSidebar() {
   const router = useRouter()
   const { hasPermission, logout, isLoading } = useAuth()
   const { setOpen, isMobile, setOpenMobile } = useSidebar()
-  
-  // Configuration State
-  const [accordionMode, setAccordionMode] = React.useState(true)
-  const [collapseOnClick, setCollapseOnClick] = React.useState(false) // Default false, user can enable
-  const [openGroup, setOpenGroup] = React.useState<string | null>(null)
+  const { accordionMode, collapseOnClick } = useSettings()
 
-  // Load Config
-  React.useEffect(() => {
-      const storedAccordion = localStorage.getItem('sidebar_accordion_mode')
-      if (storedAccordion !== null) {
-          setAccordionMode(storedAccordion === 'true')
-      }
-      const storedCollapseClick = localStorage.getItem('sidebar_collapse_on_click')
-      if (storedCollapseClick !== null) {
-          setCollapseOnClick(storedCollapseClick === 'true')
-      }
-  }, [])
+  const [openGroup, setOpenGroup] = React.useState<string | null>(null)
 
   const toggleAccordionMode = () => {
       const newState = !accordionMode

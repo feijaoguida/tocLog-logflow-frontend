@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2, Loader2, Search, History, ArrowRightLeft } from "
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useSettings } from "@/context/settings-context"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -125,9 +126,10 @@ export default function EmployeesPage() {
   // Current User State for Authorship
   const [currentUserProfile, setCurrentUserProfile] = useState<{ userId: string, role: string } | null>(null)
 
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const { itemsPerPage } = useSettings()
 
   const fetchAuxData = async () => {
     try {

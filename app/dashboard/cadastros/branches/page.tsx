@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { useSettings } from "@/context/settings-context"
 
 interface Branch {
     id: string
@@ -25,6 +26,9 @@ export default function BranchesPage() {
     const [branches, setBranches] = useState<Branch[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
+
+    const [currentPage, setCurrentPage] = useState(1)
+    const { itemsPerPage } = useSettings()
 
     // Create/Edit State
     const [isOpen, setIsOpen] = useState(false)
@@ -147,6 +151,7 @@ export default function BranchesPage() {
     }
 
     const filtered = branches.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
     return (
         <div className="flex flex-1 flex-col gap-4 p-4">
@@ -209,7 +214,7 @@ export default function BranchesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filtered.map(branch => (
+                                {paginated.map(branch => (
                                     <TableRow key={branch.id}>
                                         <TableCell className="font-medium">{branch.name}</TableCell>
                                         <TableCell>
@@ -230,6 +235,18 @@ export default function BranchesPage() {
                             </TableBody>
                         </Table>
                     )}
+                     {/* Pagination Controls */}
+                    <div className="flex items-center justify-end space-x-2 py-4">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                            Anterior
+                        </Button>
+                        <div className="text-sm text-muted-foreground">
+                            Página {currentPage} de {Math.ceil(filtered.length / itemsPerPage)}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(filtered.length / itemsPerPage), p + 1))} disabled={currentPage === Math.ceil(filtered.length / itemsPerPage)}>
+                            Próxima
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
         </div>

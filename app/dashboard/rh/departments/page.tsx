@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
+import { useSettings } from "@/context/settings-context"
 
 interface Employee {
     id: string
@@ -62,7 +63,7 @@ export default function DepartmentsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 8
+  const { itemsPerPage } = useSettings()
 
   const fetchData = async () => {
       try {
