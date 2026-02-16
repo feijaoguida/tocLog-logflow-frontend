@@ -20,13 +20,13 @@ export function IntranetProfile({ profile, employeesCount }: IntranetProfileProp
     return (
         <div className="space-y-4">
             <Card className="overflow-hidden border-none shadow-md">
-                <div className="h-24 bg-gradient-to-br from-primary/80 to-primary"></div>
-                <CardContent className="pt-0 relative px-4 pb-4 text-center">
-                    <Avatar className="h-20 w-20 border-4 border-card absolute -top-10 left-1/2 transform -translate-x-1/2 shadow-sm">
+                <div className="h-32 bg-gradient-to-br from-primary/80 to-primary"></div>
+                <CardContent className="pt-0 relative px-4 pb-6 text-center">
+                    <Avatar className="h-24 w-24 border-4 border-card absolute -top-12 left-1/2 transform -translate-x-1/2 shadow-sm">
                         <AvatarImage src={profile.avatarUrl} alt={profile.user.name} />
-                        <AvatarFallback className="text-xl bg-muted font-bold text-muted-foreground">{initials}</AvatarFallback>
+                        <AvatarFallback className="text-2xl bg-muted font-bold text-muted-foreground">{initials}</AvatarFallback>
                     </Avatar>
-                    <div className="mt-12 space-y-1">
+                    <div className="mt-16 space-y-1">
                         <h3 className="font-semibold text-lg leading-tight text-foreground">{profile.user.name}</h3>
                         <p className="text-sm text-muted-foreground">{profile.user.email}</p>
                         <Badge variant="info" className="mt-2 font-normal rounded-full px-3">

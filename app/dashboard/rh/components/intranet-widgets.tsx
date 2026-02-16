@@ -30,7 +30,7 @@ function FeedbackWidget() {
 
     return (
         <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/50">
+            <CardHeader className="pt-6 pb-3 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                     <MessageSquarePlus className="w-4 h-4 text-primary" />
                     Feedback & Sugestões
@@ -60,7 +60,7 @@ function FeedbackWidget() {
 function NoticesWidget() {
     return (
         <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/50">
+            <CardHeader className="pt-6 pb-3 border-b border-border/50">
                 <CardTitle className="text-sm font-semibold">Quadro de Avisos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
@@ -106,7 +106,7 @@ function QuickLinksWidget() {
 
     return (
         <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/50">
+            <CardHeader className="pt-6 pb-3 border-b border-border/50">
                 <CardTitle className="text-sm font-semibold">Links Rápidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 pt-2">

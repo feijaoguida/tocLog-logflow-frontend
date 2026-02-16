@@ -19,8 +19,8 @@ export function IntranetStories({ profile }: StoriesProps) {
     ]
 
     return (
-        <ScrollArea className="w-full whitespace-nowrap pb-4">
-            <div className="flex w-max space-x-4 p-1">
+        <ScrollArea className="w-full whitespace-nowrap pb-2">
+            <div className="flex w-max space-x-6 p-4">
                 {stories.map((story) => (
                     <div key={story.id} className="flex flex-col items-center gap-1 cursor-pointer group">
                         <div className={`p-[2px] rounded-full ${story.viewed ? 'bg-muted' : 'bg-gradient-to-tr from-primary to-warning'}`}>
