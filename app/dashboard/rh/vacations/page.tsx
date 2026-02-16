@@ -203,7 +203,7 @@ export default function VacationsPage() {
                 {/* MY REQUESTS */}
                 <TabsContent value="my-requests">
                     <Card>
-                        <CardHeader><CardTitle>Meus Pedidos</CardTitle><CardDescription>Histórico de solicitações.</CardDescription></CardHeader>
+                        <CardHeader className="pt-6"><CardTitle>Meus Pedidos</CardTitle><CardDescription>Histórico de solicitações.</CardDescription></CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
@@ -240,7 +240,7 @@ export default function VacationsPage() {
                 {/* TEAM MANAGEMENT */}
                 <TabsContent value="team">
                     <Card>
-                        <CardHeader><CardTitle>Aprovações Pendentes (Gestor)</CardTitle><CardDescription>Solicitações da sua equipe aguardando parecer.</CardDescription></CardHeader>
+                        <CardHeader className="pt-6"><CardTitle>Aprovações Pendentes (Gestor)</CardTitle><CardDescription>Solicitações da sua equipe aguardando parecer.</CardDescription></CardHeader>
                         <CardContent>
                              <Table>
                                 <TableHeader>
@@ -279,7 +279,7 @@ export default function VacationsPage() {
                 {/* HR ADMIN */}
                 <TabsContent value="hr">
                     <Card>
-                        <CardHeader><CardTitle>Confirmação RH</CardTitle><CardDescription>Solicitações aprovadas por gestores aguardando processamento.</CardDescription></CardHeader>
+                        <CardHeader className="pt-6"><CardTitle>Confirmação RH</CardTitle><CardDescription>Solicitações aprovadas por gestores aguardando processamento.</CardDescription></CardHeader>
                         <CardContent>
                              <Table>
                                 <TableHeader>

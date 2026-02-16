@@ -131,10 +131,10 @@ export default function VehicleDetailsPage() {
                  {/* Sidebar Info */}
                  <div className="space-y-6">
                       <Card>
-                          <CardHeader>
+                          <CardHeader className="pt-6">
                               <CardTitle>Dados Técnicos</CardTitle>
                           </CardHeader>
-                          <CardContent className="space-y-4">
+                          <CardContent className="space-y-4 pt-0">
                               <div className="flex justify-between items-center border-b pb-2">
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <Gauge className="h-4 w-4" /> Quilometragem
@@ -157,10 +157,10 @@ export default function VehicleDetailsPage() {
                       </Card>
 
                       <Card>
-                          <CardHeader>
+                          <CardHeader className="pt-6">
                               <CardTitle>Ações Rápidas</CardTitle>
                           </CardHeader>
-                          <CardContent className="flex flex-col gap-2">
+                          <CardContent className="flex flex-col gap-2 pt-0">
                               {/* TODO: Implement actions */}
                               <Button variant="outline" className="w-full justify-start">
                                   <FileCheck className="mr-2 h-4 w-4" /> Novo Checklist

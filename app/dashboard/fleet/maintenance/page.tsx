@@ -215,8 +215,8 @@ export default function MaintenancePage() {
                                         </TableCell>
                                         <TableCell>
                                             {m.finalCost 
-                                                ? `R$ ${m.finalCost.toFixed(2)}` 
-                                                : m.estimatedCost ? `Est. R$ ${m.estimatedCost.toFixed(2)}` : '-'}
+                                                ? `R$ ${Number(m.finalCost).toFixed(2)}` 
+                                                : m.estimatedCost ? `Est. R$ ${Number(m.estimatedCost).toFixed(2)}` : '-'}
                                         </TableCell>
                                     </TableRow>
                                 ))
