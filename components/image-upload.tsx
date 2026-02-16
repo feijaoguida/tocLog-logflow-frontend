@@ -2,11 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { toast } from "sonner"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { api } from "@/lib/api"
+import { ImageCropper } from "@/components/ui/image-cropper"
 
 interface ImageUploadProps {
     value?: string | null
@@ -19,22 +18,41 @@ interface ImageUploadProps {
 export function ImageUpload({ value, onChange, folder, className, placeholder = "Carregar imagem" }: ImageUploadProps) {
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    
+    // Cropper State
+    const [cropperOpen, setCropperOpen] = useState(false)
+    const [imageSrc, setImageSrc] = useState<string | null>(null)
+    const [originalFile, setOriginalFile] = useState<File | null>(null)
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        const formData = new FormData()
-        formData.append('file', file)
+        // Read file to data URL for cropper
+        const reader = new FileReader()
+        reader.addEventListener('load', () => {
+            setImageSrc(reader.result?.toString() || null)
+            setOriginalFile(file)
+            setCropperOpen(true)
+        })
+        reader.readAsDataURL(file)
+        
+        // Reset input immediately so same file can be selected again if needed
+        e.target.value = '' 
+    }
 
+    const handleCropComplete = async (croppedBlob: Blob) => {
+        setCropperOpen(false)
         setUploading(true)
+
+        const formData = new FormData()
+        // Use original filename or default
+        const filename = originalFile?.name || 'image.jpg'
+        formData.append('file', croppedBlob, filename)
+
         try {
             const { data } = await api.post(`/uploads/${folder}`, formData)
 
-            // Construct full URL for display - relying on backend returning path relative to its root
-            // We use the direct backend URL here because image serving might not be proxied via /api/files yet, or to avoid extra hop.
-            // If CORS allows, this works. If not, we might need a proxy route for files too.
-            // Assuming existing behavior was correct about this variable.
             const fullUrl = `${process.env.NEXT_PUBLIC_API_URL}${data.url}`
             
             onChange(fullUrl)
@@ -44,9 +62,15 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
             toast.error("Erro ao carregar imagem")
         } finally {
             setUploading(false)
-            // Reset input
-            if (fileInputRef.current) fileInputRef.current.value = ''
+            setImageSrc(null)
+            setOriginalFile(null)
         }
+    }
+
+    const handleCancel = () => {
+        setCropperOpen(false)
+        setImageSrc(null)
+        setOriginalFile(null)
     }
 
     return (
@@ -75,7 +99,7 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
                         accept="image/*" 
                         className="hidden" 
                         ref={fileInputRef}
-                        onChange={handleUpload}
+                        onChange={handleFileSelect}
                     />
                     <Button 
                         type="button" 
@@ -95,10 +119,19 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
                         )}
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                        JPG, PNG ou GIF. Máx 5MB.
+                        JPG, PNG ou GIF. Máx 5MB. Recorte disponível.
                     </p>
                 </div>
             </div>
+
+            {imageSrc && (
+                <ImageCropper 
+                    open={cropperOpen}
+                    imageSrc={imageSrc}
+                    onComplete={handleCropComplete}
+                    onCancel={handleCancel}
+                />
+            )}
         </div>
     )
 }

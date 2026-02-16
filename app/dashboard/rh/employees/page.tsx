@@ -17,7 +17,39 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { ImageUpload } from "@/components/image-upload"
 
+// --- CPF Utils ---
+const formatCPF = (value: string) => {
+    return value
+        .replace(/\D/g, '')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+        .replace(/(-\d{2})\d+?$/, '$1')
+}
+
+const validateCPF = (cpf: string) => {
+    cpf = cpf.replace(/[^\d]+/g, '')
+    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false
+    let sum = 0, remainder
+    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (11 - i)
+    remainder = (sum * 10) % 11
+    if (remainder === 10 || remainder === 11) remainder = 0
+    if (remainder !== parseInt(cpf.substring(9, 10))) return false
+    sum = 0
+    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cpf.substring(i - 1, i)) * (12 - i)
+    remainder = (sum * 10) % 11
+    if (remainder === 10 || remainder === 11) remainder = 0
+    if (remainder !== parseInt(cpf.substring(10, 11))) return false
+    return true
+}
+
 interface Department {
+    id: string
+    name: string
+    active?: boolean
+}
+
+interface Branch {
     id: string
     name: string
 }
@@ -66,6 +98,7 @@ export default function EmployeesPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [managers, setManagers] = useState<Employee[]>([])
   const [availableRoles, setAvailableRoles] = useState<{id: string, name: string}[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
 
   // Form State
   const [name, setName] = useState("")
@@ -79,6 +112,7 @@ export default function EmployeesPage() {
   const [departmentId, setDepartmentId] = useState("")
   const [directManagerId, setDirectManagerId] = useState("")
   const [avatarUrl, setAvatarUrl] = useState("")
+  const [branchId, setBranchId] = useState("")
 
   // Movement State
   const [isMovementOpen, setIsMovementOpen] = useState(false)
@@ -91,18 +125,24 @@ export default function EmployeesPage() {
   // Current User State for Authorship
   const [currentUserProfile, setCurrentUserProfile] = useState<{ userId: string, role: string } | null>(null)
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const fetchAuxData = async () => {
     try {
-        const [deptRes, empRes, profileRes, roleRes] = await Promise.all([
+        const [deptRes, empRes, profileRes, roleRes, branchRes] = await Promise.all([
             api.get('/departments'),
             api.get('/employees'),
             api.get('/auth/profile'),
-            api.get('/roles')
+            api.get('/roles'),
+            api.get('/branches')
         ])
         setDepartments(deptRes.data)
         setManagers(empRes.data) 
         setCurrentUserProfile(profileRes.data)
         setAvailableRoles(roleRes.data)
+        setBranches(branchRes.data)
     } catch(e) { console.error(e) }
   }
 
@@ -130,7 +170,7 @@ export default function EmployeesPage() {
       setName(""); setEmail(""); setCpf("");    setRole("")
     setSelectedRoleId("")
     setStatus("ACTIVE"); 
-      setAdmissionDate(""); setCurrentSalary(""); setDepartmentId(""); setDirectManagerId(""); setAvatarUrl("");
+      setAdmissionDate(""); setCurrentSalary(""); setDepartmentId(""); setDirectManagerId(""); setAvatarUrl(""); setBranchId("");
       setEditingId(null)
   }
 
@@ -138,8 +178,7 @@ export default function EmployeesPage() {
       setEditingId(emp.id)
       setName(emp.user.name)
       setEmail(emp.user.email)
-      setCpf(emp.cpf || "")
-      setCpf(emp.cpf || "")
+      setCpf(formatCPF(emp.cpf || ""))
       setRole(emp.legacyRole || emp.role?.name || "") // Job Title: Prefer legacy, fallback to role name
       setSelectedRoleId(emp.role?.id || "") // System Profile ID
       setStatus(emp.status)
@@ -148,22 +187,30 @@ export default function EmployeesPage() {
       setDepartmentId((emp.department as any)?.id || "") 
       setDirectManagerId(emp.directManagerId || "") 
       setAvatarUrl(emp.avatarUrl || "")
+      setBranchId((emp.branch as any)?.id || "")
       setIsFormOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Frontend CPF Validation
+    if (cpf && !validateCPF(cpf)) {
+        toast.error("CPF inválido. Verifique o número digitado.")
+        return
+    }
+
     setFormLoading(true)
     try {
         const token = localStorage.getItem('token')
         const payload: any = {
             name,
             email,
-            cpf,
+            cpf: cpf.replace(/\D/g, ''), // Send clean CPF
             role: role, // Job Title
             roleId: selectedRoleId, // System Profile
             status,
-            branchId: "11ed1668-b776-44f8-bab1-8be17a99b0f2", // Hardcoded Matriz
+            branchId, 
             departmentId: departmentId || undefined,
             directManagerId: directManagerId || undefined,
             admissionDate: admissionDate ? new Date(admissionDate).toISOString() : undefined,
@@ -187,9 +234,14 @@ export default function EmployeesPage() {
         fetchEmployees()
         toast.success(editingId ? "Funcionário atualizado." : "Funcionário criado.")
         resetForm()
-    } catch (error) {
+    } catch (error: any) {
         console.error(error)
-        toast.error("Erro ao salvar funcionário.")
+        const msg = error.response?.data?.message
+        if (Array.isArray(msg)) {
+             toast.error(msg[0] || "Erro ao salvar funcionário.")
+        } else {
+             toast.error(msg || "Erro ao salvar funcionário.")
+        }
     } finally {
         setFormLoading(false)
     }
@@ -248,10 +300,19 @@ export default function EmployeesPage() {
       }
   }
 
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const formatted = formatCPF(e.target.value)
+      setCpf(formatted)
+  }
+
     // Logic updated to check role instead of employee relationship
     const canManage = currentUserProfile?.role === 'ADMIN' || currentUserProfile?.role === 'MANAGER'
   
     const filtered = employees.filter(e => e.user?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    
+    // Pagination Logic
+    const totalPages = Math.ceil(filtered.length / itemsPerPage)
+    const paginatedEmployees = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
   
     return (
       <div className="flex flex-1 flex-col gap-4 p-4">
@@ -265,7 +326,7 @@ export default function EmployeesPage() {
           )}
 
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 overflow-hidden flex flex-col">
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 overflow-hidden flex flex-col">
                     <DialogHeader className="p-6 pb-2 border-b">
                         <DialogTitle className="text-xl font-semibold tracking-tight">{editingId ? "Editar Funcionário" : "Novo Funcionário"}</DialogTitle>
                         <DialogDescription>{editingId ? "Atualize as informações do cadastro." : "Preencha os dados para criar um novo acesso."}</DialogDescription>
@@ -273,17 +334,18 @@ export default function EmployeesPage() {
                     
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
                         {/* Header Section: Avatar & Basic Identity */}
-                        <div className="flex flex-col sm:flex-row gap-6 items-start">
+                        <div className="flex flex-col sm:flex-row gap-8 items-start">
                             <div className="flex flex-col items-center gap-3">
                                 <ImageUpload 
                                     value={avatarUrl}
                                     onChange={setAvatarUrl}
                                     folder="funcionario"
-                                    placeholder="Foto de Perfil"
+                                    placeholder="Foto"
+                                    className="w-full sm:w-auto"
                                 />
                             </div>
 
-                             <div className="flex-1 space-y-4 w-full">
+                             <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="name">Nome Completo</Label>
                                     <Input id="name" value={name} onChange={e => setName(e.target.value)} required disabled={!!editingId} className="focus:ring-primary/20" placeholder="Ex: João Silva" />
@@ -292,69 +354,9 @@ export default function EmployeesPage() {
                                     <Label htmlFor="email">Email Corporativo</Label>
                                     <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={!!editingId} className="focus:ring-primary/20" placeholder="joao@toclog.com.br" />
                                 </div>
-                             </div>
-                        </div>
-
-                        <Separator className="bg-border" />
-
-                        {/* Professional Info */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Dados Profissionais</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="systemRole">Perfil de Acesso</Label>
-                                    <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
-                                        <SelectTrigger id="systemRole"><SelectValue placeholder="Selecione o perfil..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {availableRoles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="role">Cargo / Função (RH)</Label>
-                                    <Input id="role" value={role} onChange={e => setRole(e.target.value)} placeholder="Ex: Motorista Sênior" />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dept">Departamento</Label>
-                                    <Select value={departmentId} onValueChange={setDepartmentId}>
-                                        <SelectTrigger id="dept"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="salary">Salário Atual (R$)</Label>
-                                    <Input id="salary" type="number" step="0.01" value={currentSalary} onChange={e => setCurrentSalary(e.target.value)} placeholder="0.00" />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="admission">Data de Admissão</Label>
-                                    <Input id="admission" type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} />
-                                </div>
-                                <div className="grid gap-2 sm:col-span-2">
-                                    <Label htmlFor="manager">Gestor Responsável</Label>
-                                    <Select value={directManagerId} onValueChange={setDirectManagerId}>
-                                        <SelectTrigger id="manager"><SelectValue placeholder="Selecione (Opcional)" /></SelectTrigger>
-                                        <SelectContent>
-                                            {managers.map(m => {
-                                                const mRole = m.role?.name || m.legacyRole || '';
-                                                return <SelectItem key={m.id} value={m.id}>{m.user.name} - {mRole}</SelectItem>
-                                            })}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <Separator className="bg-border" />
-
-                        {/* Documents & System */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Acesso e Documentação</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="cpf">CPF</Label>
-                                    <Input id="cpf" value={cpf} onChange={e => setCpf(e.target.value)} placeholder="000.000.000-00" />
+                                    <Input id="cpf" value={cpf} onChange={handleCpfChange} placeholder="000.000.000-00" maxLength={14} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="status">Status do Contrato</Label>
@@ -373,8 +375,69 @@ export default function EmployeesPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                             </div>
+                        </div>
+
+                        <Separator className="bg-border" />
+
+                        {/* Professional Info */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Dados Profissionais</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="systemRole">Perfil de Acesso (Sistema)</Label>
+                                    <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                                        <SelectTrigger id="systemRole"><SelectValue placeholder="Selecione o perfil..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {availableRoles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                     <Label htmlFor="branch">Filial</Label>
+                                     <Select value={branchId} onValueChange={setBranchId}>
+                                         <SelectTrigger id="branch"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                         <SelectContent>
+                                             {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                                         </SelectContent>
+                                     </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="role">Cargo / Função (RH)</Label>
+                                    <Input id="role" value={role} onChange={e => setRole(e.target.value)} placeholder="Ex: Motorista Sênior" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="dept">Departamento</Label>
+                                    <Select value={departmentId} onValueChange={setDepartmentId}>
+                                        <SelectTrigger id="dept"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {departments.filter(d => d.active !== false).map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="salary">Salário Atual (R$)</Label>
+                                    <Input id="salary" type="number" step="0.01" value={currentSalary} onChange={e => setCurrentSalary(e.target.value)} placeholder="0.00" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="admission">Data de Admissão</Label>
+                                    <Input id="admission" type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="manager">Gestor Responsável</Label>
+                                    <Select value={directManagerId} onValueChange={setDirectManagerId}>
+                                        <SelectTrigger id="manager"><SelectValue placeholder="Selecione (Opcional)" /></SelectTrigger>
+                                        <SelectContent>
+                                            {managers.map(m => {
+                                                const mRole = m.role?.name || m.legacyRole || '';
+                                                return <SelectItem key={m.id} value={m.id}>{m.user.name}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
+
                     </form>
 
                     <DialogFooter className="p-6 pt-2 border-t">
@@ -416,7 +479,7 @@ export default function EmployeesPage() {
                             </TableRow>
                         </TableHeader>
                     <TableBody>
-                        {filtered.map(emp => (
+                        {paginatedEmployees.map(emp => (
                             <TableRow key={emp.id}>
                                 <TableCell>
                                     <Avatar>
@@ -426,7 +489,7 @@ export default function EmployeesPage() {
                                 </TableCell>
                                 <TableCell className="font-medium">
                                     {emp.user?.name}
-                                    <p className="text-xs text-muted-foreground">{emp.cpf}</p>
+                                    <p className="text-xs text-muted-foreground">{emp.cpf ? formatCPF(emp.cpf) : 'Sem CPF'}</p>
                                 </TableCell>
                                 <TableCell className="hidden md:table-cell">{emp.user?.email || "Sem email"}</TableCell>
                                 <TableCell>{emp.role?.name || emp.legacyRole || "N/A"}</TableCell>
@@ -464,7 +527,7 @@ export default function EmployeesPage() {
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-                {filtered.map(emp => (
+                {paginatedEmployees.map(emp => (
                     <Card key={emp.id} className="bg-muted/40">
                         <CardContent className="p-4 space-y-4">
                             <div className="flex items-start justify-between">
@@ -517,6 +580,19 @@ export default function EmployeesPage() {
                         </CardContent>
                     </Card>
                 ))}
+            </div>
+            
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-end space-x-2 py-4">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    Anterior
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    Próxima
+                </Button>
             </div>
             </>
             )}
