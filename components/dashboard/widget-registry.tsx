@@ -16,6 +16,13 @@ import { HDRecentTicketsWidget } from "./widgets/HDRecentTicketsWidget"
 import { HDTopStatsWidget } from "./widgets/HDTopStatsWidget"
 import { LogisticsAssetsWidget } from "./widgets/LogisticsAssetsWidget"
 import { PurchaseSumsWidget } from "./widgets/PurchaseSumsWidget"
+import { UnifiedApprovalsWidget } from "./widgets/UnifiedApprovalsWidget"
+import { MyVacationsWidget } from "./widgets/MyVacationsWidget"
+import { NotificationsWidget } from "./widgets/NotificationsWidget"
+import { FleetMaintenanceWidget } from "./widgets/FleetMaintenanceWidget"
+import { MyRecentOrdersWidget } from "./widgets/MyRecentOrdersWidget"
+import { BirthdaysWidget } from "./widgets/BirthdaysWidget"
+import { SeparatorWidget } from "./widgets/SeparatorWidget"
 
 export type WidgetType = 
     | 'HR_STATS' | 'FLEET_STATUS' | 'PURCHASE_PENDING' | 'FEED'
@@ -24,6 +31,8 @@ export type WidgetType =
     | 'HD_MY_TICKETS' | 'HD_RECENT_ALL' | 'HD_TOP_AGENTS' | 'HD_TOP_REQUESTERS' | 'HD_CATEGORIES'
     | 'LOG_PALLETS' | 'LOG_ASSETS'
     | 'PURCHASE_SUMS' | 'PURCHASE_RECENT_ORDERS' | 'PURCHASE_REQ_STATUS' | 'PURCHASE_QUOTE_STATUS' | 'PURCHASE_PO_STATUS' | 'PURCHASE_NEW_PRODUCTS'
+    | 'UNIFIED_APPROVALS' | 'MY_VACATIONS' | 'NOTIFICATIONS' | 'FLEET_MAINTENANCE' | 'MY_RECENT_ORDERS' | 'BIRTHDAYS'
+    | 'SEPARATOR_H' | 'SEPARATOR_V'
 
 export interface WidgetDefinition {
     id: WidgetType
@@ -120,5 +129,37 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDefinition> = {
     'FEED': {
         id: 'FEED', name: 'Feed Social',
         minW: 4, minH: 6, defaultW: 6, defaultH: 10, component: FeedWidget
+    },
+    'UNIFIED_APPROVALS': {
+        id: 'UNIFIED_APPROVALS', name: 'Central de Aprovações',
+        minW: 2, minH: 3, defaultW: 3, defaultH: 4, component: UnifiedApprovalsWidget
+    },
+    'MY_VACATIONS': {
+        id: 'MY_VACATIONS', name: 'Minhas Férias',
+        minW: 2, minH: 2, defaultW: 3, defaultH: 3, component: MyVacationsWidget
+    },
+    'NOTIFICATIONS': {
+        id: 'NOTIFICATIONS', name: 'Notificações',
+        minW: 2, minH: 3, defaultW: 2, defaultH: 4, component: NotificationsWidget
+    },
+    'FLEET_MAINTENANCE': {
+        id: 'FLEET_MAINTENANCE', name: 'Frotas - Em Manutenção',
+        minW: 2, minH: 2, defaultW: 3, defaultH: 3, component: FleetMaintenanceWidget
+    },
+    'MY_RECENT_ORDERS': {
+        id: 'MY_RECENT_ORDERS', name: 'Meus Pedidos Recentes',
+        minW: 2, minH: 2, defaultW: 3, defaultH: 3, component: MyRecentOrdersWidget
+    },
+    'BIRTHDAYS': {
+        id: 'BIRTHDAYS', name: 'Aniversariantes do Mês',
+        minW: 2, minH: 2, defaultW: 2, defaultH: 3, component: BirthdaysWidget
+    },
+    'SEPARATOR_H': {
+        id: 'SEPARATOR_H', name: 'Separador Horizontal',
+        minW: 2, minH: 1, defaultW: 12, defaultH: 1, component: (props: any) => <SeparatorWidget orientation="horizontal" {...props} />
+    },
+    'SEPARATOR_V': {
+        id: 'SEPARATOR_V', name: 'Separador Vertical',
+        minW: 1, minH: 2, defaultW: 1, defaultH: 4, component: (props: any) => <SeparatorWidget orientation="vertical" {...props} />
     }
 }

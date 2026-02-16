@@ -1,6 +1,4 @@
 
-'use client'
-
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from "@/lib/api"
 // @ts-ignore
@@ -69,6 +67,7 @@ interface DashboardEngineProps {
 }
 
 const WIDGET_COLORS = [
+    { name: 'Transparente', value: 'transparent' },
     { name: 'Branco', value: '#ffffff' },
     { name: 'Cinza Claro', value: '#f8fafc' },
     { name: 'Azul Claro', value: '#eff6ff' },
@@ -184,30 +183,11 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
     }, [currentView, fetchWidgetData])
 
     const handleLayoutChange = useCallback((currentLayout: any, allLayouts: any) => {
-        // RGL triggers this often. We MUST compare carefully.
-        // We only care about lg layout for now (simplicity)
-        
-        setLayouts((prev: any) => {
-             const prevLg = prev.lg || []
-             const newLg = allLayouts.lg || []
-             
-             // Check lengths first
-             if (prevLg.length !== newLg.length) return allLayouts
-
-             // Check deep equality of CORE fields
-             const isSame = prevLg.every((item: any, idx: number) => {
-                 const newItem = newLg.find((n: any) => n.i === item.i)
-                 if (!newItem) return false
-                 return item.x === newItem.x && 
-                        item.y === newItem.y && 
-                        item.w === newItem.w && 
-                        item.h === newItem.h
-             })
-
-             if (isSame) return prev // Return exact same object reference to bail out of render
-             
-             return allLayouts
-        })
+        // RGL triggers this often. 
+        // We directly update layouts to ensure the controlled component stays in sync.
+        // Deep comparison here was likely causing issues where state didn't update, 
+        // forcing RGL to revert to old props on next render.
+        setLayouts(allLayouts)
     }, [])
 
     const handleAddWidget = (type: WidgetType) => {
@@ -241,10 +221,12 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
     }
 
     const handleUpdateWidgetStyle = (i: string, style: any) => {
-        setWidgetConfig((prev: any) => ({
-            ...prev,
-            [i]: { ...prev[i], ...style }
-        }))
+        setWidgetConfig((prev: any) => {
+            return {
+                ...prev,
+                [i]: { ...prev[i], ...style }
+            }
+        })
     }
 
     const handleSaveView = async () => {
@@ -307,8 +289,8 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
         if (!currentView || views.length <= 1) { // Prevents deleting the last view
              toast.error("Você não pode deletar a única visão.")
              return
-        }
-        
+         }
+         
         if (!confirm("Tem certeza que deseja excluir esta visão?")) return
 
         try {
@@ -323,6 +305,18 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
             toast.error("Erro ao deletar visão.")
         }
     }
+
+    // Compute effective layout to force static mode when not editing
+    const displayLayouts = React.useMemo(() => {
+        const newLayouts: any = {}
+        Object.keys(layouts).forEach(key => {
+            newLayouts[key] = layouts[key].map((item: any) => ({
+                ...item,
+                static: !isEditing
+            }))
+        })
+        return newLayouts
+    }, [layouts, isEditing])
 
     return (
         <div className="space-y-4">
@@ -377,7 +371,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                                 <ChevronDown className="h-4 w-4 opacity-50" />
                                             </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-[200px]">
+                                        <DropdownMenuContent className="max-h-[300px] overflow-y-auto w-[250px]">
                                             {Object.values(WIDGET_REGISTRY).map(w => (
                                                 <DropdownMenuItem key={w.id} onSelect={() => handleAddWidget(w.id as WidgetType)}>
                                                     {w.name}
@@ -413,7 +407,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                         <ResponsiveGridLayout
                             className="layout"
                             width={width} // Pass the width from wrapper
-                            layouts={layouts}
+                            layouts={displayLayouts}
                             breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
                             cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
                             rowHeight={60}
@@ -425,16 +419,20 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                             containerPadding={[0, 0]}
                             margin={[16, 16]}
                         >
-                            {(layouts.lg || []).map((item: any) => {
+                            {(displayLayouts.lg || []).map((item: any) => {
                                 const type = item.i.split('-')[0] as WidgetType
                                 const widgetDef = WIDGET_REGISTRY[type]
                                 const WidgetComponent = widgetDef?.component
                                 const config = widgetConfig[item.i] || {}
-                                const bgColor = config.backgroundColor || '#ffffff'
+                                // Default background to transparent for Separators if not set
+                                const isSeparator = type.startsWith('SEPARATOR')
+                                const defaultBg = isSeparator ? 'transparent' : '#ffffff'
+                                const bgColor = config.backgroundColor || defaultBg
 
                                 return (
                                     <div 
                                         key={item.i} 
+                                        data-grid={item}
                                         className={`${isEditing ? "border-2 border-dashed border-slate-300" : ""} rounded-lg shadow-sm overflow-hidden`}
                                         style={{ backgroundColor: bgColor }}
                                     >
@@ -446,20 +444,105 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                                             <Settings className="h-4 w-4 text-slate-500" />
                                                         </div>
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-50">
-                                                        <div className="grid gap-2">
-                                                            <h4 className="font-medium leading-none">Aparência</h4>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                {WIDGET_COLORS.map(c => (
-                                                                    <div 
-                                                                        key={c.value}
-                                                                        className={`w-6 h-6 rounded-full cursor-pointer border ${c.value === bgColor ? 'ring-2 ring-black' : ''}`}
-                                                                        style={{ backgroundColor: c.value }}
-                                                                        onClick={() => handleUpdateWidgetStyle(item.i, { backgroundColor: c.value })}
-                                                                        title={c.name}
-                                                                    />
-                                                                ))}
+                                                    <PopoverContent className="w-60">
+                                                        <div className="grid gap-4">
+                                                            <div>
+                                                                <h4 className="font-medium leading-none mb-2">Fundo do Widget</h4>
+                                                                <div className="grid grid-cols-4 gap-2">
+                                                                    {WIDGET_COLORS.map(c => (
+                                                                        <div 
+                                                                            key={c.value}
+                                                                            className={`w-6 h-6 rounded-full cursor-pointer border relative ${c.value === bgColor ? 'ring-2 ring-black' : ''}`}
+                                                                            style={{ backgroundColor: c.value === 'transparent' ? 'white' : c.value }}
+                                                                            onClick={() => handleUpdateWidgetStyle(item.i, { backgroundColor: c.value })}
+                                                                            title={c.name}
+                                                                        >
+                                                                            {c.value === 'transparent' && (
+                                                                                <div className="absolute inset-0 flex items-center justify-center text-red-500 text-[10px] font-bold">/</div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                    <div className="relative w-6 h-6 rounded-full overflow-hidden border cursor-pointer ring-offset-1 hover:ring-2 ring-gray-400">
+                                                                        <input 
+                                                                            type="color" 
+                                                                            className="absolute -top-2 -left-2 w-10 h-10 p-0 border-0 cursor-pointer"
+                                                                            value={bgColor === 'transparent' ? '#ffffff' : bgColor}
+                                                                            onChange={(e) => handleUpdateWidgetStyle(item.i, { backgroundColor: e.target.value })}
+                                                                            title="Cor Personalizada"
+                                                                        />
+                                                                    </div>
+                                                                </div>
                                                             </div>
+                                                        
+                                                        {isSeparator && (
+                                                            <div className="grid gap-2 border-t pt-2">
+                                                                <h4 className="font-medium leading-none">Estilo da Linha</h4>
+                                                                <div className="space-y-3">
+                                                                     <div>
+                                                                        <label className="text-xs text-muted-foreground block mb-1">Cor</label>
+                                                                        <div className="flex gap-2 flex-wrap">
+                                                                            {['#000000', '#e2e8f0', '#94a3b8', '#64748b', '#ef4444', '#3b82f6', '#22c55e', '#eab308'].map(c => (
+                                                                                <div 
+                                                                                    key={c}
+                                                                                    className={`w-5 h-5 rounded-full cursor-pointer border ${config.lineColor === c ? 'ring-2 ring-black' : ''}`}
+                                                                                    style={{ backgroundColor: c }}
+                                                                                    onClick={() => handleUpdateWidgetStyle(item.i, { lineColor: c })}
+                                                                                />
+                                                                            ))}
+                                                                            <div className="relative w-5 h-5 rounded-full overflow-hidden border cursor-pointer ring-offset-1 hover:ring-2 ring-gray-400">
+                                                                                <input 
+                                                                                    type="color" 
+                                                                                    className="absolute -top-2 -left-2 w-10 h-10 p-0 border-0 cursor-pointer"
+                                                                                    value={config.lineColor || '#000000'}
+                                                                                    onChange={(e) => handleUpdateWidgetStyle(item.i, { lineColor: e.target.value })}
+                                                                                    title="Cor Personalizada"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                     </div>
+                                                                     <div className="grid grid-cols-2 gap-2">
+                                                                         <div>
+                                                                             <label className="text-xs text-muted-foreground block mb-1">Espessura</label>
+                                                                             <div className="flex items-center gap-2">
+                                                                                 <input 
+                                                                                    type="range" min="1" max="10" step="1"
+                                                                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                                                    value={config.thickness || 2}
+                                                                                    onChange={(e) => handleUpdateWidgetStyle(item.i, { thickness: parseInt(e.target.value) })}
+                                                                                 />
+                                                                                 <span className="text-xs w-4">{config.thickness || 2}px</span>
+                                                                             </div>
+                                                                         </div>
+                                                                          <div>
+                                                                             <label className="text-xs text-muted-foreground block mb-1">Tipo</label>
+                                                                             <select 
+                                                                                className="w-full text-xs border rounded p-1"
+                                                                                value={config.lineStyle || 'solid'}
+                                                                                onChange={(e) => handleUpdateWidgetStyle(item.i, { lineStyle: e.target.value })}
+                                                                             >
+                                                                                 <option value="solid">Sólido</option>
+                                                                                 <option value="dashed">Tracejado</option>
+                                                                                 <option value="dotted">Pontilhado</option>
+                                                                             </select>
+                                                                         </div>
+                                                                     </div>
+                                                                     <div className="flex items-center gap-2">
+                                                                         <label className="text-xs text-muted-foreground">Pontas:</label>
+                                                                         <div className="flex gap-1">
+                                                                             {['butt', 'round', 'square'].map(cap => (
+                                                                                 <div 
+                                                                                    key={cap}
+                                                                                    className={`px-2 py-1 text-[10px] border rounded cursor-pointer ${config.lineCap === cap ? 'bg-slate-900 text-white' : 'bg-white hover:bg-slate-100'}`}
+                                                                                    onClick={() => handleUpdateWidgetStyle(item.i, { lineCap: cap })}
+                                                                                >
+                                                                                    {cap === 'butt' ? 'Reta' : cap === 'round' ? 'Red.' : 'Quad.'}
+                                                                                </div>
+                                                                             ))}
+                                                                         </div>
+                                                                     </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                         </div>
                                                     </PopoverContent>
                                                 </Popover>
@@ -470,7 +553,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                         )}
                                         {WidgetComponent ? (
                                             <div className="h-full w-full">
-                                                <WidgetComponent data={widgetData[type]} />
+                                                <WidgetComponent data={widgetData[type]} config={config} />
                                             </div>
                                         ) : (
                                             <div className="p-4 text-red-500">Widget Unknown</div>
