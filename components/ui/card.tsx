@@ -25,7 +25,7 @@ function Card({ className, variant, ...props }: React.ComponentProps<"div"> & Va
   return (
     <div
       data-slot="card"
-      className={cn(cardVariants({ variant, className }))}
+      className={cn("py-3",cardVariants({ variant, className }))}
       {...props}
     />
   )
