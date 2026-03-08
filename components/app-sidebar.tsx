@@ -29,7 +29,8 @@ import {
   Truck,
   Settings,
   LogOut,
-  ChevronRight // Added
+  ChevronRight, // Added
+  Map // Added for External Fleet
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -140,6 +141,17 @@ export function AppSidebar() {
               { title: "Novo Chamado", url: "/dashboard/helpdesk/new", permission: "helpdesk.ticket.create" },
               { title: "Atendimento", url: "/dashboard/helpdesk/queue", permission: "helpdesk.ticket.view.all" }, // For Agents
               { title: "Dashboard", url: "/dashboard/helpdesk/metrics", permission: "helpdesk.dashboard.view" }, // For Managers
+          ]
+      },
+      {
+          title: "Frota Externa",
+          url: "#",
+          icon: Map,
+          permission: "externalfleet.view", 
+          items: [
+              { title: "Motoristas", url: "/dashboard/external-fleet/drivers", permission: "externalfleet.drivers.view" },
+              { title: "Montagem Carga", url: "/dashboard/external-fleet/planning", permission: "externalfleet.planning.view" },
+              { title: "Rastreamento", url: "/dashboard/external-fleet/tracking", permission: "externalfleet.tracking.view" },
           ]
       },
       {
