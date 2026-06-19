@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { User, CheckCircle, XCircle, Truck, Plus, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 
 export default function ExternalDrivers() {
@@ -72,7 +73,7 @@ export default function ExternalDrivers() {
       setFormData({ nome: '', documento: '', telefone: '', email: '' });
       fetchDrivers();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao salvar motorista');
+      toast.error(getApiErrorMessage(err, 'Erro ao salvar motorista'));
     }
   }
 

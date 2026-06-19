@@ -3,6 +3,19 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+const PERMISSION_ALIASES: Record<string, string[]> = {
+  'rh.activities.view': ['rh.view'],
+  'rh.activities.manage': ['rh.employees.edit'],
+  'rh.expenses.view': ['rh.view'],
+  'rh.expenses.manage': ['rh.employees.edit'],
+  'rh.movements.view': ['rh.employees.view'],
+  'rh.movements.manage': ['rh.employees.edit'],
+  'vacation.request.for_others': ['vacation.manage'],
+  'vacation.approve.manager': ['vacation.manage'],
+  'vacation.approve.hr': ['vacation.manage'],
+  'vacation.cancel.hr': ['vacation.manage'],
+}
+
 
 interface User {
   id: string
@@ -70,7 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const roleName = typeof user.role === 'string' ? user.role : user.role?.name;
       if (roleName === 'ADMIN') return true;
 
-      return user.permissions?.includes(permission) || false
+      const permissions = user.permissions || []
+      if (permissions.includes(permission)) return true
+
+      return (PERMISSION_ALIASES[permission] || []).some((alias) =>
+        permissions.includes(alias),
+      )
   }
 
   return (
@@ -87,4 +105,3 @@ export function useAuth() {
   }
   return context
 }
-

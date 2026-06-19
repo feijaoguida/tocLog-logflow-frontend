@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Pencil, Trash2, Loader2, Search, UserCog } from "lucide-react"
 import { toast } from "sonner"
 import { RoleGate } from "@/components/auth/role-gate"
+import { getApiErrorMessage } from "@/lib/api-error"
 import _ from "lodash"
 
 interface Employee {
@@ -148,7 +149,7 @@ export default function UsersPage() {
       fetchEmployees()
       toast.success(editingId ? "Usuário atualizado" : "Usuário criado")
     } catch (error) {
-        toast.error("Erro ao salvar usuário.")
+        toast.error(getApiErrorMessage(error, "Erro ao salvar usuário."))
     } finally {
         setCreateLoading(false)
     }

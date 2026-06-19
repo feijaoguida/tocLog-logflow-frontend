@@ -71,7 +71,6 @@ export function AppSidebar() {
           url: "#",
           icon: "dataset",
           items: [
-              { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
               { title: "Departamentos", url: "/dashboard/rh/departments", permission: "rh.departments.view" },
               { title: "Design System", url: "/dashboard/cadastros/design-system", permission: "system.settings.view" },
               { title: "Filiais", url: "/dashboard/cadastros/branches", permission: "system.branches.view" },
@@ -84,8 +83,14 @@ export function AppSidebar() {
           icon: "group",
           permission: "rh.view",
           items: [
+              { title: "Dashboard / Analytics", url: "/dashboard/rh/analytics", permission: "rh.view" },
               { title: "Intranet", url: "/dashboard/rh" },
+              { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
               { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
+              { title: "Atividades", url: "/dashboard/rh/activities", permission: "rh.activities.view" },
+              { title: "Prestação de Contas", url: "/dashboard/rh/expenses", permission: "rh.expenses.view" },
+              { title: "Movimentação do Colaborador", url: "/dashboard/rh/movements", permission: "rh.movements.view" },
+              { title: "Atestados", url: "/dashboard/rh/certificates" },
               { title: "Org. Chart", url: "/dashboard/rh/org-chart" },
               { title: "Gestão de Salas", url: "/dashboard/rh/salas", permission: "rh.rooms.view" },
               { title: "Agenda de Salas", url: "/dashboard/rh/agendas" }, // Accessible to all
@@ -129,6 +134,11 @@ export function AppSidebar() {
               { title: "Atendimento", url: "/dashboard/helpdesk/queue", permission: "helpdesk.ticket.view.all" }, // For Agents
               { title: "Dashboard", url: "/dashboard/helpdesk/metrics", permission: "helpdesk.dashboard.view" }, // For Managers
           ]
+      },
+      {
+          title: "Ajuda",
+          url: "/dashboard/help",
+          icon: "help",
       },
       {
           title: "Frota Externa",
