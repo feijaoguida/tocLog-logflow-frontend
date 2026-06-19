@@ -1,6 +1,6 @@
 'use client'
-
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Pencil, Trash2, Loader2, Search, History, ArrowRightLeft } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -87,6 +87,7 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
+  const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -260,8 +261,7 @@ export default function EmployeesPage() {
   }
 
   const handleCreateOpen = () => {
-      resetForm()
-      setIsFormOpen(true)
+      router.push('/dashboard/rh/employees/new')
   }
 
   const handleMovement = async (e: React.FormEvent) => {
@@ -323,7 +323,7 @@ export default function EmployeesPage() {
           
           {canManage && (
             <Button className="gap-2" onClick={handleCreateOpen}>
-                <Plus className="h-4 w-4" /> Novo Funcionário
+                <span className="material-symbols-outlined text-[18px]">add</span> Novo Funcionário
             </Button>
           )}
 
@@ -445,7 +445,7 @@ export default function EmployeesPage() {
                     <DialogFooter className="p-6 pt-2 border-t">
                         <Button variant="ghost" onClick={() => setIsFormOpen(false)} className="mr-2">Cancelar</Button>
                         <Button onClick={handleSubmit} disabled={formLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                            {formLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Alterações"}
+                            {formLoading ? <span className="material-symbols-outlined animate-spin mr-2">sync</span> : "Salvar Alterações"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -458,13 +458,13 @@ export default function EmployeesPage() {
              <div className="flex justify-between items-center">
                 <CardTitle>Listagem</CardTitle>
                 <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-muted-foreground text-[18px]">search</span>
                     <Input placeholder="Buscar..." className="pl-8 w-[200px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
             </div>
         </CardHeader>
         <CardContent>
-            {loading ? <Loader2 className="mx-auto h-8 w-8 animate-spin" /> : (
+            {loading ? <div className="flex justify-center p-8"><span className="material-symbols-outlined animate-spin text-[32px]">sync</span></div> : (
                 <>
                 {/* Desktop View */}
                 <div className="hidden md:block overflow-x-auto">
@@ -504,6 +504,9 @@ export default function EmployeesPage() {
                                 <TableCell>{emp.status}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/rh/employees/${emp.id}`)}>
+                                            <span className="material-symbols-outlined text-green-600 text-[18px]">visibility</span>
+                                        </Button>
                                         <Button variant="ghost" size="icon" onClick={() => {
                                             setSelectedEmployee(emp)
                                             setIsMovementOpen(true)
@@ -511,13 +514,13 @@ export default function EmployeesPage() {
                                             setNewValue("")
                                             setReason("")
                                         }}>
-                                            <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                            <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(emp)}>
-                                            <Pencil className="h-4 w-4 text-blue-600" />
+                                            <span className="material-symbols-outlined text-blue-600 text-[18px]">edit</span>
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDelete(emp.id)}>
-                                            <Trash2 className="h-4 w-4 text-red-600" />
+                                            <span className="material-symbols-outlined text-red-600 text-[18px]">delete</span>
                                         </Button>
                                     </div>
                                 </TableCell>
@@ -563,6 +566,9 @@ export default function EmployeesPage() {
                             </div>
 
                             <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push(`/dashboard/rh/employees/${emp.id}`)}>
+                                    <span className="material-symbols-outlined text-green-600 text-[16px]">visibility</span>
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                     setSelectedEmployee(emp)
                                     setIsMovementOpen(true)
@@ -570,13 +576,13 @@ export default function EmployeesPage() {
                                     setNewValue("")
                                     setReason("")
                                 }}>
-                                    <ArrowRightLeft className="mr-2 h-3 w-3" />
+                                    <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(emp)}>
-                                    <Pencil className="h-3 w-3 text-blue-600" />
+                                    <span className="material-symbols-outlined text-blue-600 text-[16px]">edit</span>
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(emp.id)}>
-                                    <Trash2 className="h-3 w-3 text-red-600" />
+                                    <span className="material-symbols-outlined text-red-600 text-[16px]">delete</span>
                                 </Button>
                             </div>
                         </CardContent>
@@ -667,7 +673,7 @@ export default function EmployeesPage() {
 
                   <DialogFooter>
                       <Button type="submit" disabled={movementLoading}>
-                          {movementLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirmar Movimentação"}
+                          {movementLoading ? <span className="material-symbols-outlined animate-spin mr-2">sync</span> : "Confirmar Movimentação"}
                       </Button>
                   </DialogFooter>
               </form>

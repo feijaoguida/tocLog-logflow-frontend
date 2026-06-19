@@ -12,7 +12,6 @@ const cardVariants = cva(
         default: "bg-card border-border",
         elevated: "bg-card border-border shadow-md hover:shadow-lg hover:-translate-y-0.5",
         primary: "bg-primary text-primary-foreground border-primary",
-        glass: "bg-card/40 backdrop-blur-xl border-border/50",
       },
     },
     defaultVariants: {
