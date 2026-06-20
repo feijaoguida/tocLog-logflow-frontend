@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
+import { MenuFunctionHeader } from "@/components/layout/menu-function-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -170,29 +171,32 @@ export default function CertificatesPage() {
     )
 
     return (
-        <div className="flex flex-1 flex-col gap-4 p-4">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold tracking-tight">Atestados Médicos</h1>
-                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                    <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Enviar Atestado</Button></DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader><DialogTitle>Enviar Atestado</DialogTitle><DialogDescription>Anexe o documento e informe o período.</DialogDescription></DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Data Início</Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required /></div>
-                                <div className="space-y-2"><Label>Data Fim</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required /></div>
-                            </div>
-                            <div className="space-y-2"><Label>Justificativa</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva o motivo..." required /></div>
-                            <div className="space-y-2">
-                                <Label>Documentos</Label>
-                                <Input type="file" accept="image/*,.pdf,.doc,.docx" multiple onChange={e => setFiles(e.target.files)} />
-                                {files && files.length > 0 && <p className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3 w-3" /> {files.length} arquivo(s) selecionado(s)</p>}
-                            </div>
-                            <DialogFooter><Button type="submit" disabled={formLoading}>{formLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Enviar</Button></DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
+        <div className="app-page">
+            <MenuFunctionHeader
+                title="Recursos Humanos > Atestados Medicos"
+                description="Envie atestados, acompanhe aprovacoes e trate pareceres de gestor e RH no mesmo fluxo."
+                actions={
+                    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                        <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Enviar Atestado</Button></DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>Enviar Atestado</DialogTitle><DialogDescription>Anexe o documento e informe o período.</DialogDescription></DialogHeader>
+                            <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2"><Label>Data Início</Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required /></div>
+                                    <div className="space-y-2"><Label>Data Fim</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required /></div>
+                                </div>
+                                <div className="space-y-2"><Label>Justificativa</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva o motivo..." required /></div>
+                                <div className="space-y-2">
+                                    <Label>Documentos</Label>
+                                    <Input type="file" accept="image/*,.pdf,.doc,.docx" multiple onChange={e => setFiles(e.target.files)} />
+                                    {files && files.length > 0 && <p className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3 w-3" /> {files.length} arquivo(s) selecionado(s)</p>}
+                                </div>
+                                <DialogFooter><Button type="submit" disabled={formLoading}>{formLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Enviar</Button></DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                }
+            />
 
             {/* Rejection reason dialog */}
             <Dialog open={!!rejectId} onOpenChange={() => { setRejectId(null); setRejectReason("") }}>

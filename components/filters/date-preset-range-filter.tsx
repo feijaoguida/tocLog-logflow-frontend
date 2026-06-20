@@ -1,9 +1,11 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 export type DateRangePreset =
   | "today"
@@ -23,9 +25,13 @@ export type DatePresetRangeValue = {
 type DatePresetRangeFilterProps = {
   value?: DatePresetRangeValue
   onChange: (value: DatePresetRangeValue) => void
+  action?: ReactNode
+  className?: string
+  presetFieldClassName?: string
+  dateFieldClassName?: string
 }
 
-const PRESET_LABELS: Record<DateRangePreset, string> = {
+export const DATE_RANGE_PRESET_LABELS: Record<DateRangePreset, string> = {
   today: "Hoje",
   last_3_days: "Ultimos 3 dias",
   last_7_days: "Ultimos 7 dias",
@@ -99,6 +105,10 @@ function resolvePreset(preset: DateRangePreset): DatePresetRangeValue {
 export function DatePresetRangeFilter({
   value,
   onChange,
+  action,
+  className,
+  presetFieldClassName,
+  dateFieldClassName,
 }: DatePresetRangeFilterProps) {
   const [state, setState] = useState<DatePresetRangeValue>(
     value || resolvePreset("current_month"),
@@ -131,15 +141,15 @@ export function DatePresetRangeFilter({
   }
 
   return (
-    <div className="app-toolbar flex flex-col gap-3 md:flex-row md:items-end">
-      <div className="field-stack min-w-[220px]">
+    <div className={cn("app-toolbar flex flex-col gap-3 md:flex-row md:items-end", className)}>
+      <div className={cn("field-stack min-w-[220px]", presetFieldClassName)}>
         <Label htmlFor="date-range-preset">Periodo</Label>
         <Select value={state.preset} onValueChange={(nextValue) => handlePresetChange(nextValue as DateRangePreset)}>
           <SelectTrigger id="date-range-preset">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(PRESET_LABELS).map(([preset, label]) => (
+            {Object.entries(DATE_RANGE_PRESET_LABELS).map(([preset, label]) => (
               <SelectItem key={preset} value={preset}>
                 {label}
               </SelectItem>
@@ -148,7 +158,7 @@ export function DatePresetRangeFilter({
         </Select>
       </div>
 
-      <div className="field-stack max-w-[180px]">
+      <div className={cn("field-stack max-w-[180px]", dateFieldClassName)}>
         <Label htmlFor="date-range-from">De</Label>
         <Input
           id="date-range-from"
@@ -159,7 +169,7 @@ export function DatePresetRangeFilter({
         />
       </div>
 
-      <div className="field-stack max-w-[180px]">
+      <div className={cn("field-stack max-w-[180px]", dateFieldClassName)}>
         <Label htmlFor="date-range-to">Ate</Label>
         <Input
           id="date-range-to"
@@ -169,6 +179,8 @@ export function DatePresetRangeFilter({
           onChange={(event) => handleCustomField("dateTo", event.target.value)}
         />
       </div>
+
+      {action ? <div className="flex items-end">{action}</div> : null}
     </div>
   )
 }

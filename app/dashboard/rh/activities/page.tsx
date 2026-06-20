@@ -1,11 +1,18 @@
 'use client'
 
 import { useEffect, useMemo, useState } from "react"
+import { FilterPopoverButton } from "@/components/filters/filter-popover-button"
+import {
+  DATE_RANGE_PRESET_LABELS,
+  DatePresetRangeFilter,
+  type DatePresetRangeValue,
+} from "@/components/filters/date-preset-range-filter"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { MenuFunctionHeader } from "@/components/layout/menu-function-header"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -73,6 +80,12 @@ const DEFAULT_ACTIVITY_FORM = {
   breaks: [] as BreakForm[],
 }
 
+const DEFAULT_FILTER: DatePresetRangeValue = {
+  preset: 'current_month',
+  dateFrom: '',
+  dateTo: '',
+}
+
 export default function ActivitiesPage() {
   const { hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -84,8 +97,9 @@ export default function ActivitiesPage() {
   const [teamActivities, setTeamActivities] = useState<DailyActivity[]>([])
   const [categories, setCategories] = useState<ActivityCategory[]>([])
 
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [filter, setFilter] = useState(DEFAULT_FILTER)
+  const [draftFilter, setDraftFilter] = useState(DEFAULT_FILTER)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [categorySearch, setCategorySearch] = useState('')
 
   const [formOpen, setFormOpen] = useState(false)
@@ -124,9 +138,9 @@ export default function ActivitiesPage() {
 
       await Promise.all([
         fetchCategories(currentProfile.branchId),
-        fetchMyActivities(currentProfile.id, dateFrom, dateTo),
+        fetchMyActivities(currentProfile.id, filter.dateFrom, filter.dateTo),
         canViewTeamForProfile(currentProfile)
-          ? fetchTeamActivities(dateFrom, dateTo)
+          ? fetchTeamActivities(filter.dateFrom, filter.dateTo)
           : Promise.resolve(setTeamActivities([])),
       ])
     } catch (error) {
@@ -254,16 +268,42 @@ export default function ActivitiesPage() {
     )
   }
 
+  function handleFilterOpenChange(open: boolean) {
+    if (open) {
+      setDraftFilter(filter)
+    }
+    setFilterOpen(open)
+  }
+
   async function applyFilters() {
     if (!profile) return
 
     try {
-      await fetchMyActivities(profile.id, dateFrom, dateTo)
+      setFilter(draftFilter)
+      setFilterOpen(false)
+      await fetchMyActivities(profile.id, draftFilter.dateFrom, draftFilter.dateTo)
       if (canViewTeam) {
-        await fetchTeamActivities(dateFrom, dateTo)
+        await fetchTeamActivities(draftFilter.dateFrom, draftFilter.dateTo)
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Nao foi possivel aplicar os filtros.'))
+    }
+  }
+
+  async function clearFilters() {
+    if (!profile) return
+
+    setDraftFilter(DEFAULT_FILTER)
+    setFilter(DEFAULT_FILTER)
+    setFilterOpen(false)
+
+    try {
+      await fetchMyActivities(profile.id)
+      if (canViewTeam) {
+        await fetchTeamActivities()
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Nao foi possivel limpar os filtros.'))
     }
   }
 
@@ -298,9 +338,9 @@ export default function ActivitiesPage() {
 
       setFormOpen(false)
       resetActivityForm()
-      await fetchMyActivities(profile.id, dateFrom, dateTo)
+      await fetchMyActivities(profile.id, filter.dateFrom, filter.dateTo)
       if (canViewTeam) {
-        await fetchTeamActivities(dateFrom, dateTo)
+        await fetchTeamActivities(filter.dateFrom, filter.dateTo)
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Nao foi possivel salvar a atividade.'))
@@ -315,9 +355,9 @@ export default function ActivitiesPage() {
     try {
       await api.delete(`/daily-activities/${activityId}`)
       toast.success('Atividade removida.')
-      await fetchMyActivities(profile.id, dateFrom, dateTo)
+      await fetchMyActivities(profile.id, filter.dateFrom, filter.dateTo)
       if (canViewTeam) {
-        await fetchTeamActivities(dateFrom, dateTo)
+        await fetchTeamActivities(filter.dateFrom, filter.dateTo)
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Nao foi possivel remover a atividade.'))
@@ -357,6 +397,18 @@ export default function ActivitiesPage() {
     return new Date(value).toLocaleDateString('pt-BR')
   }
 
+  function buildFilterSummary(value: DatePresetRangeValue) {
+    const presetLabel = DATE_RANGE_PRESET_LABELS[value.preset] || 'Periodo personalizado'
+    const hasRange = Boolean(value.dateFrom && value.dateTo)
+
+    return {
+      active: hasRange,
+      tooltip: hasRange
+        ? [`Periodo: ${presetLabel}`, `Intervalo: ${formatDate(value.dateFrom)} ate ${formatDate(value.dateTo)}`]
+        : [],
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
@@ -367,252 +419,249 @@ export default function ActivitiesPage() {
 
   return (
     <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Recursos Humanos</p>
-          <h1 className="app-title">Registro de Atividades</h1>
-          <p className="app-subtitle">
-            Registre a rotina diaria, acompanhe a equipe quando houver escopo de gestao
-            e mantenha o catalogo de atividades organizado.
-          </p>
-        </div>
+      <MenuFunctionHeader
+        title="Recursos Humanos > Atividades"
+        description="Registre a rotina diaria, acompanhe a equipe quando houver escopo de gestao e mantenha o catalogo de atividades organizado."
+        actions={
+          <>
+            <FilterPopoverButton
+              title="Filtros"
+              description="Refine o periodo para revisar os registros individuais e, quando houver permissao, os registros da equipe."
+              active={buildFilterSummary(filter).active}
+              activeSummary={buildFilterSummary(filter).tooltip}
+              open={filterOpen}
+              onOpenChange={handleFilterOpenChange}
+              showClear={buildFilterSummary(filter).active}
+              onClear={() => void clearFilters()}
+              footer={
+                <Button type="button" onClick={() => void applyFilters()}>
+                  Aplicar
+                </Button>
+              }
+            >
+              <DatePresetRangeFilter
+                value={draftFilter}
+                onChange={setDraftFilter}
+                className="gap-4"
+                presetFieldClassName="min-w-0"
+                dateFieldClassName="min-w-0 max-w-none"
+              />
+            </FilterPopoverButton>
 
-        <Dialog
-          open={formOpen}
-          onOpenChange={(open) => {
-            setFormOpen(open)
-            if (!open) resetActivityForm()
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={openNewActivity}>
-              <Plus className="h-4 w-4" />
-              Nova Atividade
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingActivity ? 'Editar atividade' : 'Registrar atividade do dia'}
-              </DialogTitle>
-              <DialogDescription>
-                Informe o periodo, selecione um tipo do catalogo ou descreva a atividade
-                manualmente e registre observacoes relevantes.
-              </DialogDescription>
-            </DialogHeader>
+            <Dialog
+              open={formOpen}
+              onOpenChange={(open) => {
+                setFormOpen(open)
+                if (!open) resetActivityForm()
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={openNewActivity}>
+                  <Plus className="h-4 w-4" />
+                  Nova Atividade
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingActivity ? 'Editar atividade' : 'Registrar atividade do dia'}
+                </DialogTitle>
+                <DialogDescription>
+                  Informe o periodo, selecione um tipo do catalogo ou descreva a atividade
+                  manualmente e registre observacoes relevantes.
+                </DialogDescription>
+              </DialogHeader>
 
-            <form onSubmit={handleSubmitActivity} className="space-y-6 py-2">
-              <section className="app-section-card space-y-5">
-                <div className="space-y-1">
-                  <h2 className="section-title">Dados principais</h2>
-                  <p className="text-sm text-muted-foreground">
-                    O registro fica vinculado ao seu perfil atual e aparece no historico
-                    de acompanhamento.
-                  </p>
-                </div>
+              <form onSubmit={handleSubmitActivity} className="space-y-6 py-2">
+                <section className="app-section-card space-y-5">
+                  <div className="space-y-1">
+                    <h2 className="section-title">Dados principais</h2>
+                    <p className="text-sm text-muted-foreground">
+                      O registro fica vinculado ao seu perfil atual e aparece no historico
+                      de acompanhamento.
+                    </p>
+                  </div>
 
-                <div className="app-form-grid">
-                  <div className="field-stack">
-                    <Label htmlFor="activity-date">Data</Label>
-                    <Input
-                      id="activity-date"
-                      type="date"
-                      max={today}
-                      value={activityForm.date}
-                      onChange={(event) => updateActivityField('date', event.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="activity-start-time">Hora inicial</Label>
-                    <Input
-                      id="activity-start-time"
-                      type="time"
-                      value={activityForm.startTime}
-                      onChange={(event) => updateActivityField('startTime', event.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="activity-end-time">Hora final</Label>
-                    <Input
-                      id="activity-end-time"
-                      type="time"
-                      value={activityForm.endTime}
-                      onChange={(event) => updateActivityField('endTime', event.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="activity-search">Atividade do catalogo</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <div className="app-form-grid">
+                    <div className="field-stack">
+                      <Label htmlFor="activity-date">Data</Label>
                       <Input
-                        id="activity-search"
-                        placeholder="Buscar atividade cadastrada..."
-                        className="pl-9"
-                        value={categorySearch}
-                        onChange={(event) => setCategorySearch(event.target.value)}
+                        id="activity-date"
+                        type="date"
+                        max={today}
+                        value={activityForm.date}
+                        onChange={(event) => updateActivityField('date', event.target.value)}
+                        required
                       />
                     </div>
-                    <div className="grid gap-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
-                      {filteredCategories.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          Nenhuma atividade do catalogo encontrada para este filtro.
-                        </p>
-                      ) : (
-                        filteredCategories.map((category) => (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => {
-                              setCategorySearch(category.name)
-                              updateActivityField('categoryId', category.id)
-                              updateActivityField('manualDescription', '')
-                            }}
-                            className={cn(
-                              "rounded-xl border px-3 py-2 text-left text-sm transition hover:border-primary/50 hover:bg-background",
-                              activityForm.categoryId === category.id
-                                ? "border-primary bg-background shadow-sm"
-                                : "border-transparent",
-                            )}
-                          >
-                            {category.name}
-                          </button>
-                        ))
-                      )}
+                    <div className="field-stack">
+                      <Label htmlFor="activity-start-time">Hora inicial</Label>
+                      <Input
+                        id="activity-start-time"
+                        type="time"
+                        value={activityForm.startTime}
+                        onChange={(event) => updateActivityField('startTime', event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="field-stack">
+                      <Label htmlFor="activity-end-time">Hora final</Label>
+                      <Input
+                        id="activity-end-time"
+                        type="time"
+                        value={activityForm.endTime}
+                        onChange={(event) => updateActivityField('endTime', event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="field-stack md:col-span-2">
+                      <Label htmlFor="activity-search">Atividade do catalogo</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="activity-search"
+                          placeholder="Buscar atividade cadastrada..."
+                          className="pl-9"
+                          value={categorySearch}
+                          onChange={(event) => setCategorySearch(event.target.value)}
+                        />
+                      </div>
+                      <div className="grid gap-2 rounded-2xl border border-border/70 bg-muted/30 p-3">
+                        {filteredCategories.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            Nenhuma atividade do catalogo encontrada para este filtro.
+                          </p>
+                        ) : (
+                          filteredCategories.map((category) => (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() => {
+                                setCategorySearch(category.name)
+                                updateActivityField('categoryId', category.id)
+                                updateActivityField('manualDescription', '')
+                              }}
+                              className={cn(
+                                "rounded-xl border px-3 py-2 text-left text-sm transition hover:border-primary/50 hover:bg-background",
+                                activityForm.categoryId === category.id
+                                  ? "border-primary bg-background shadow-sm"
+                                  : "border-transparent",
+                              )}
+                            >
+                              {category.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="field-stack md:col-span-2">
+                      <Label htmlFor="activity-manual-description">Descricao manual</Label>
+                      <Input
+                        id="activity-manual-description"
+                        placeholder="Ex: reuniao externa com cliente, acompanhamento de carga..."
+                        value={activityForm.manualDescription}
+                        onChange={(event) => {
+                          updateActivityField('manualDescription', event.target.value)
+                          if (event.target.value.trim()) {
+                            updateActivityField('categoryId', '')
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="field-stack md:col-span-2">
+                      <Label htmlFor="activity-observation">Observacao</Label>
+                      <Textarea
+                        id="activity-observation"
+                        placeholder="Registre detalhes adicionais relevantes para o historico."
+                        value={activityForm.observation}
+                        onChange={(event) => updateActivityField('observation', event.target.value)}
+                      />
                     </div>
                   </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="activity-manual-description">Descricao manual</Label>
-                    <Input
-                      id="activity-manual-description"
-                      placeholder="Ex: reuniao externa com cliente, acompanhamento de carga..."
-                      value={activityForm.manualDescription}
-                      onChange={(event) => {
-                        updateActivityField('manualDescription', event.target.value)
-                        if (event.target.value.trim()) {
-                          updateActivityField('categoryId', '')
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="activity-observation">Observacao</Label>
-                    <Textarea
-                      id="activity-observation"
-                      placeholder="Registre detalhes adicionais relevantes para o historico."
-                      value={activityForm.observation}
-                      onChange={(event) => updateActivityField('observation', event.target.value)}
-                    />
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              <section className="app-section-card space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <h2 className="section-title">Intervalos</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Use este bloco quando precisar detalhar pausas relevantes dentro do periodo.
-                    </p>
+                <section className="app-section-card space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <h2 className="section-title">Intervalos</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Use este bloco quando precisar detalhar pausas relevantes dentro do periodo.
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="gap-2" onClick={addBreak}>
+                      <Coffee className="h-4 w-4" />
+                      Adicionar intervalo
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="gap-2" onClick={addBreak}>
-                    <Coffee className="h-4 w-4" />
-                    Adicionar intervalo
+
+                  <div className="space-y-3">
+                    {activityForm.breaks.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
+                        Nenhum intervalo informado.
+                      </p>
+                    ) : (
+                      activityForm.breaks.map((activityBreak, index) => (
+                        <div key={`${activityBreak.type}-${index}`} className="grid gap-3 rounded-2xl border border-border/70 bg-muted/25 p-4 md:grid-cols-[1fr_1fr_1fr_auto]">
+                          <div className="field-stack">
+                            <Label>Tipo</Label>
+                            <Select
+                              value={activityBreak.type}
+                              onValueChange={(value) => updateBreak(index, 'type', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(BREAK_TYPE_LABELS).map(([value, label]) => (
+                                  <SelectItem key={value} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="field-stack">
+                            <Label>Inicio</Label>
+                            <Input
+                              type="time"
+                              value={activityBreak.startTime}
+                              onChange={(event) => updateBreak(index, 'startTime', event.target.value)}
+                            />
+                          </div>
+                          <div className="field-stack">
+                            <Label>Fim</Label>
+                            <Input
+                              type="time"
+                              value={activityBreak.endTime}
+                              onChange={(event) => updateBreak(index, 'endTime', event.target.value)}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeBreak(index)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                    Cancelar
                   </Button>
-                </div>
-
-                <div className="space-y-3">
-                  {activityForm.breaks.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
-                      Nenhum intervalo informado.
-                    </p>
-                  ) : (
-                    activityForm.breaks.map((activityBreak, index) => (
-                      <div key={`${activityBreak.type}-${index}`} className="grid gap-3 rounded-2xl border border-border/70 bg-muted/25 p-4 md:grid-cols-[1fr_1fr_1fr_auto]">
-                        <div className="field-stack">
-                          <Label>Tipo</Label>
-                          <Select
-                            value={activityBreak.type}
-                            onValueChange={(value) => updateBreak(index, 'type', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(BREAK_TYPE_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="field-stack">
-                          <Label>Inicio</Label>
-                          <Input
-                            type="time"
-                            value={activityBreak.startTime}
-                            onChange={(event) => updateBreak(index, 'startTime', event.target.value)}
-                          />
-                        </div>
-                        <div className="field-stack">
-                          <Label>Fim</Label>
-                          <Input
-                            type="time"
-                            value={activityBreak.endTime}
-                            onChange={(event) => updateBreak(index, 'endTime', event.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeBreak(index)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {editingActivity ? 'Salvar alteracoes' : 'Registrar atividade'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </section>
-
-      <Card className="app-section-card">
-        <CardHeader className="px-0 pt-0">
-          <CardTitle>Filtro de periodo</CardTitle>
-          <CardDescription>
-            Use o recorte abaixo para revisar seus registros e, quando houver escopo, os registros da equipe.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          <div className="app-toolbar flex flex-col gap-3 md:flex-row md:items-end">
-            <div className="field-stack max-w-[180px]">
-              <Label htmlFor="activity-filter-from">De</Label>
-              <Input id="activity-filter-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-            </div>
-            <div className="field-stack max-w-[180px]">
-              <Label htmlFor="activity-filter-to">Ate</Label>
-              <Input id="activity-filter-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-            </div>
-            <Button variant="outline" onClick={() => void applyFilters()}>
-              Aplicar filtro
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {editingActivity ? 'Salvar alteracoes' : 'Registrar atividade'}
+                  </Button>
+                </DialogFooter>
+              </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
 
       <Tabs defaultValue="my-activities" className="space-y-4">
         <TabsList className="w-full justify-start overflow-x-auto">

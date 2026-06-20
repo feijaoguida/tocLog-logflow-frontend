@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from "react"
+import { FilterPopoverButton } from "@/components/filters/filter-popover-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,11 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { DatePresetRangeFilter, type DatePresetRangeValue } from "@/components/filters/date-preset-range-filter"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  DATE_RANGE_PRESET_LABELS,
+  DatePresetRangeFilter,
+  type DatePresetRangeValue,
+} from "@/components/filters/date-preset-range-filter"
 import { useAuth } from "@/context/auth-context"
 import { api } from "@/lib/api"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { ExternalLink, Eye, Loader2, Paperclip, Pencil, Plus, Receipt, Trash2 } from "lucide-react"
+import { ExternalLink, Eye, Info, Loader2, Paperclip, Pencil, Plus, Receipt, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 type EmployeeProfile = {
@@ -65,6 +71,8 @@ export default function ExpensesPage() {
   const [profile, setProfile] = useState<EmployeeProfile | null>(null)
   const [expenses, setExpenses] = useState<ExpenseReport[]>([])
   const [filter, setFilter] = useState(DEFAULT_FILTER)
+  const [draftFilter, setDraftFilter] = useState(DEFAULT_FILTER)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<ExpenseReport | null>(null)
@@ -96,6 +104,7 @@ export default function ExpensesPage() {
           : { ...filter, dateFrom: new Date().toISOString().slice(0, 8) + '01', dateTo: new Date().toISOString().split('T')[0] }
 
       setFilter(effectiveFilter)
+      setDraftFilter(effectiveFilter)
       await fetchExpenses(effectiveFilter)
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Nao foi possivel carregar a prestacao de contas.'))
@@ -121,6 +130,31 @@ export default function ExpensesPage() {
       date: new Date().toISOString().split('T')[0],
     })
     setReceiptFile(null)
+  }
+
+  function handleFilterOpenChange(open: boolean) {
+    if (open) {
+      setDraftFilter(filter)
+    }
+    setFilterOpen(open)
+  }
+
+  async function handleApplyFilter() {
+    setFilter(draftFilter)
+    setFilterOpen(false)
+    await fetchExpenses(draftFilter)
+  }
+
+  async function handleClearFilter() {
+    const clearedFilter = {
+      ...DEFAULT_FILTER,
+      dateFrom: new Date().toISOString().slice(0, 8) + '01',
+      dateTo: new Date().toISOString().split('T')[0],
+    }
+    setDraftFilter(clearedFilter)
+    setFilter(clearedFilter)
+    setFilterOpen(false)
+    await fetchExpenses(clearedFilter)
   }
 
   function openNewExpense() {
@@ -209,7 +243,34 @@ export default function ExpensesPage() {
     }).format(value)
   }
 
+  function isDefaultCurrentMonthFilter(value: DatePresetRangeValue) {
+    const today = new Date()
+    const currentMonthStart = `${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, '0')}-01`
+    const currentDay = today.toISOString().split('T')[0]
+
+    return (
+      value.preset === 'current_month' &&
+      value.dateFrom === currentMonthStart &&
+      value.dateTo === currentDay
+    )
+  }
+
+  function buildFilterSummary(value: DatePresetRangeValue) {
+    const presetLabel = DATE_RANGE_PRESET_LABELS[value.preset] || 'Periodo personalizado'
+    const hasRange = Boolean(value.dateFrom && value.dateTo)
+
+    return {
+      title: presetLabel,
+      detail: hasRange ? `${formatDate(value.dateFrom)} ate ${formatDate(value.dateTo)}` : 'Defina um intervalo para aplicar o filtro.',
+      tooltip: hasRange
+        ? [`Periodo: ${presetLabel}`, `Intervalo: ${formatDate(value.dateFrom)} ate ${formatDate(value.dateTo)}`]
+        : [`Periodo: ${presetLabel}`],
+      active: hasRange && !isDefaultCurrentMonthFilter(value),
+    }
+  }
+
   const isPdfPreview = previewUrl?.toLowerCase().includes('.pdf')
+  const filterSummary = buildFilterSummary(filter)
 
   if (loading) {
     return (
@@ -221,241 +282,291 @@ export default function ExpensesPage() {
 
   return (
     <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Recursos Humanos</p>
-          <h1 className="app-title">Prestacao de Contas</h1>
-          <p className="app-subtitle">
-            Registre despesas, filtre periodos recorrentes rapidamente e visualize comprovantes sem sair do fluxo.
-          </p>
-        </div>
-
-        <Dialog
-          open={formOpen}
-          onOpenChange={(open) => {
-            setFormOpen(open)
-            if (!open) resetForm()
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={openNewExpense}>
-              <Plus className="h-4 w-4" />
-              Nova Despesa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingExpense ? 'Editar prestacao de contas' : 'Registrar prestacao de contas'}
-              </DialogTitle>
-              <DialogDescription>
-                Informe a origem do gasto, o local, o valor e anexe um comprovante quando houver.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-6 py-2">
-              <section className="app-section-card space-y-5">
-                <div className="app-form-grid">
-                  <div className="field-stack">
-                    <Label htmlFor="expense-origin">Origem</Label>
-                    <Select
-                      value={formState.origin}
-                      onValueChange={(value) => setFormState((current) => ({ ...current, origin: value }))}
+      <Card className="app-section-card">
+        <CardContent className="px-0 py-0">
+          <section className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[clamp(0.875rem,1.4vw,1rem)] font-semibold tracking-[-0.01em] text-foreground">
+                  Recursos Humanos &gt; Prestacao de Contas
+                </h1>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-full text-muted-foreground hover:text-foreground"
+                      aria-label="Informacoes da funcionalidade"
                     >
-                      <SelectTrigger id="expense-origin">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(ORIGIN_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="expense-date">Data</Label>
-                    <Input
-                      id="expense-date"
-                      type="date"
-                      value={formState.date}
-                      onChange={(event) => setFormState((current) => ({ ...current, date: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="expense-location">Onde gastou</Label>
-                    <Input
-                      id="expense-location"
-                      placeholder="Ex: restaurante, posto, hotel..."
-                      value={formState.location}
-                      onChange={(event) => setFormState((current) => ({ ...current, location: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="expense-amount">Valor</Label>
-                    <Input
-                      id="expense-amount"
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={formState.amount}
-                      onChange={(event) => setFormState((current) => ({ ...current, amount: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="expense-description">Descricao</Label>
-                    <Textarea
-                      id="expense-description"
-                      placeholder="Adicione contexto para a analise do gasto."
-                      value={formState.description}
-                      onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
-                    />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="expense-receipt">Comprovante</Label>
-                    <Input
-                      id="expense-receipt"
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(event) => setReceiptFile(event.target.files?.[0] || null)}
-                    />
-                    {receiptFile ? (
-                      <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <Paperclip className="h-3.5 w-3.5" />
-                        {receiptFile.name}
-                      </p>
-                    ) : editingExpense?.receiptUrl ? (
-                      <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <Paperclip className="h-3.5 w-3.5" />
-                        Comprovante atual mantido
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={8} className="max-w-80 px-3 py-2 text-left text-xs leading-relaxed">
+                    Registre despesas, filtre periodos recorrentes rapidamente e visualize comprovantes sem sair do fluxo.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="rounded-full px-3 py-1">
+                  {filterSummary.title}
+                </Badge>
+                {filterSummary.active ? (
+                  <Badge className="rounded-full px-3 py-1">Filtro aplicado</Badge>
+                ) : null}
+              </div>
+              <p className="text-sm text-muted-foreground">{filterSummary.detail}</p>
+            </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {editingExpense ? 'Salvar alteracoes' : 'Registrar despesa'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </section>
+            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+              <FilterPopoverButton
+                title="Filtros"
+                description="Refine o periodo dos lancamentos com presets rapidos ou um intervalo personalizado."
+                active={filterSummary.active}
+                activeSummary={filterSummary.tooltip}
+                open={filterOpen}
+                onOpenChange={handleFilterOpenChange}
+                showClear={filterSummary.active}
+                onClear={() => void handleClearFilter()}
+                footer={
+                  <Button type="button" onClick={() => void handleApplyFilter()}>
+                    Aplicar
+                  </Button>
+                }
+              >
+                <DatePresetRangeFilter
+                  value={draftFilter}
+                  onChange={setDraftFilter}
+                  className="gap-4"
+                  presetFieldClassName="min-w-0"
+                  dateFieldClassName="min-w-0 max-w-none"
+                />
+              </FilterPopoverButton>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card className="app-section-card">
+              <Dialog
+                open={formOpen}
+                onOpenChange={(open) => {
+                  setFormOpen(open)
+                  if (!open) resetForm()
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button className="h-12 gap-2 px-6 lg:min-w-[164px]" onClick={openNewExpense}>
+                    <Plus className="h-4 w-4" />
+                    Nova Despesa
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingExpense ? 'Editar prestacao de contas' : 'Registrar prestacao de contas'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Informe a origem do gasto, o local, o valor e anexe um comprovante quando houver.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <form onSubmit={handleSubmit} className="space-y-6 py-2">
+                    <section className="app-section-card space-y-5">
+                      <div className="app-form-grid">
+                        <div className="field-stack">
+                          <Label htmlFor="expense-origin">Origem</Label>
+                          <Select
+                            value={formState.origin}
+                            onValueChange={(value) => setFormState((current) => ({ ...current, origin: value }))}
+                          >
+                            <SelectTrigger id="expense-origin">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(ORIGIN_LABELS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="field-stack">
+                          <Label htmlFor="expense-date">Data</Label>
+                          <Input
+                            id="expense-date"
+                            type="date"
+                            value={formState.date}
+                            onChange={(event) => setFormState((current) => ({ ...current, date: event.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="field-stack md:col-span-2">
+                          <Label htmlFor="expense-location">Onde gastou</Label>
+                          <Input
+                            id="expense-location"
+                            placeholder="Ex: restaurante, posto, hotel..."
+                            value={formState.location}
+                            onChange={(event) => setFormState((current) => ({ ...current, location: event.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="field-stack">
+                          <Label htmlFor="expense-amount">Valor</Label>
+                          <Input
+                            id="expense-amount"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={formState.amount}
+                            onChange={(event) => setFormState((current) => ({ ...current, amount: event.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="field-stack md:col-span-2">
+                          <Label htmlFor="expense-description">Descricao</Label>
+                          <Textarea
+                            id="expense-description"
+                            placeholder="Adicione contexto para a analise do gasto."
+                            value={formState.description}
+                            onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
+                          />
+                        </div>
+                        <div className="field-stack md:col-span-2">
+                          <Label htmlFor="expense-receipt">Comprovante</Label>
+                          <Input
+                            id="expense-receipt"
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(event) => setReceiptFile(event.target.files?.[0] || null)}
+                          />
+                          {receiptFile ? (
+                            <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              {receiptFile.name}
+                            </p>
+                          ) : editingExpense?.receiptUrl ? (
+                            <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              Comprovante atual mantido
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </section>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={submitting}>
+                        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {editingExpense ? 'Salvar alteracoes' : 'Registrar despesa'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </section>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,250px)_minmax(0,250px)]">
+        <Card className="app-section-card min-h-[132px]">
           <CardHeader className="px-0 pt-0">
             <CardDescription>Total de registros</CardDescription>
             <CardTitle className="text-3xl">{expenses.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="app-section-card">
+        <Card className="app-section-card relative min-h-[132px] overflow-hidden">
           <CardHeader className="px-0 pt-0">
             <CardDescription>Valor acumulado no periodo</CardDescription>
             <CardTitle className="text-3xl">{formatCurrency(total)}</CardTitle>
           </CardHeader>
+          <Receipt className="pointer-events-none absolute bottom-4 right-4 h-14 w-14 text-muted/50" />
         </Card>
       </section>
 
-      <Card className="app-section-card">
-        <CardHeader className="px-0 pt-0">
-          <CardTitle>Filtro reutilizavel por periodo</CardTitle>
-          <CardDescription>
-            O periodo padrao e o mes atual. Selecione um preset ou troque para personalizado quando precisar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          <DatePresetRangeFilter value={filter} onChange={setFilter} />
-          <div className="mt-4">
-            <Button variant="outline" onClick={() => void fetchExpenses(filter)}>
-              Aplicar filtro
-            </Button>
+      <Card className="app-section-card overflow-hidden">
+        <CardHeader className="px-0 pt-0 pb-6">
+          <div className="space-y-2">
+            <CardTitle className="text-[2rem] leading-none tracking-[-0.03em]">Minhas despesas</CardTitle>
+            <CardDescription>
+              Acompanhe seus registros, revise comprovantes e ajuste informacoes quando necessario.
+            </CardDescription>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="app-section-card">
-        <CardHeader className="px-0 pt-0">
-          <CardTitle>Minhas despesas</CardTitle>
-          <CardDescription>
-            Acompanhe seus registros, revise comprovantes e ajuste informacoes quando necessario.
-          </CardDescription>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Origem</TableHead>
-                <TableHead>Local</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Comprovante</TableHead>
-                <TableHead className="text-right">Acoes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.length === 0 ? (
+          <div className="rounded-[1.75rem] border border-border/70 overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                    Nenhum registro encontrado para o periodo selecionado.
-                  </TableCell>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Origem</TableHead>
+                  <TableHead>Local</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Comprovante</TableHead>
+                  <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
-              ) : (
-                expenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{formatDate(expense.date)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="rounded-full">
-                        {ORIGIN_LABELS[expense.origin] || expense.origin}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{expense.location}</p>
-                        {expense.description ? (
-                          <p className="text-xs text-muted-foreground">{expense.description}</p>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{formatCurrency(Number(expense.amount))}</TableCell>
-                    <TableCell>
-                      {expense.receiptUrl ? (
-                        <Button variant="ghost" size="sm" className="gap-2 px-0" onClick={() => setPreviewUrl(expense.receiptUrl)}>
-                          <Eye className="h-4 w-4" />
-                          Visualizar
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sem comprovante</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditExpense(expense)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {canManageExpenses || expense.employeeId === profile?.id ? (
-                          <Button variant="ghost" size="icon" onClick={() => void handleDelete(expense.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        ) : null}
+              </TableHeader>
+              <TableBody>
+                {expenses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-[280px]">
+                      <div className="flex flex-col items-center justify-center gap-5 text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <Receipt className="h-7 w-7" />
+                        </div>
+                        <p className="text-base text-muted-foreground">
+                          Nenhum registro encontrado para o periodo selecionado.
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+                ) : (
+                  expenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell>{formatDate(expense.date)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="rounded-full">
+                          {ORIGIN_LABELS[expense.origin] || expense.origin}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{expense.location}</p>
+                          {expense.description ? (
+                            <p className="text-xs text-muted-foreground">{expense.description}</p>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{formatCurrency(Number(expense.amount))}</TableCell>
+                      <TableCell>
+                        {expense.receiptUrl ? (
+                          <Button variant="ghost" size="sm" className="gap-2 px-0" onClick={() => setPreviewUrl(expense.receiptUrl)}>
+                            <Eye className="h-4 w-4" />
+                            Visualizar
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sem comprovante</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEditExpense(expense)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {canManageExpenses || expense.employeeId === profile?.id ? (
+                            <Button variant="ghost" size="icon" onClick={() => void handleDelete(expense.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          </CardContent>
       </Card>
 
       <Dialog open={!!previewUrl} onOpenChange={(open) => !open && setPreviewUrl(null)}>

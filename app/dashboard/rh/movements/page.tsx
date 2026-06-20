@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { FilterPopoverButton } from '@/components/filters/filter-popover-button'
+import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -69,6 +72,9 @@ export default function EmployeeMovementsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [draftSearchTerm, setDraftSearchTerm] = useState('')
+  const [draftTypeFilter, setDraftTypeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
 
   useEffect(() => {
     const fetchMovements = async () => {
@@ -127,18 +133,94 @@ export default function EmployeeMovementsPage() {
     }
   }, [movements])
 
+  const filterSummary = useMemo(() => {
+    const parts: string[] = []
+    if (searchTerm.trim()) parts.push(`Busca: ${searchTerm.trim()}`)
+    if (typeFilter !== 'all') parts.push(`Tipo: ${getMovementMeta(typeFilter).label}`)
+
+    return {
+      active: parts.length > 0,
+      tooltip: parts,
+    }
+  }, [searchTerm, typeFilter])
+
+  function handleFilterOpenChange(open: boolean) {
+    if (open) {
+      setDraftSearchTerm(searchTerm)
+      setDraftTypeFilter(typeFilter)
+    }
+    setFilterOpen(open)
+  }
+
+  function applyFilters() {
+    setSearchTerm(draftSearchTerm)
+    setTypeFilter(draftTypeFilter)
+    setFilterOpen(false)
+  }
+
+  function clearFilters() {
+    setDraftSearchTerm('')
+    setDraftTypeFilter('all')
+    setSearchTerm('')
+    setTypeFilter('all')
+    setFilterOpen(false)
+  }
+
   return (
     <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Recursos Humanos</p>
-          <h1 className="app-title">Movimentacao do Colaborador</h1>
-          <p className="app-subtitle">
-            Acompanhe transferencias, alteracoes de cargo, salario, gestor e eventos de ferias
-            em um ledger unico para auditoria e retomada.
-          </p>
-        </div>
-      </section>
+      <MenuFunctionHeader
+        title="Recursos Humanos > Movimentacao do Colaborador"
+        description="Acompanhe transferencias, alteracoes de cargo, salario, gestor e eventos de ferias em um ledger unico para auditoria e retomada."
+        actions={
+          <FilterPopoverButton
+            title="Filtros"
+            description="Busque por colaborador, responsavel ou motivo e refine por tipo de movimentacao."
+            active={filterSummary.active}
+            activeSummary={filterSummary.tooltip}
+            open={filterOpen}
+            onOpenChange={handleFilterOpenChange}
+            showClear={filterSummary.active}
+            onClear={clearFilters}
+            footer={
+              <Button type="button" onClick={applyFilters}>
+                Aplicar
+              </Button>
+            }
+          >
+            <div className="space-y-4">
+              <div className="field-stack">
+                <label htmlFor="movement-search" className="text-sm font-medium">
+                  Buscar por colaborador, responsavel ou motivo
+                </label>
+                <Input
+                  id="movement-search"
+                  value={draftSearchTerm}
+                  onChange={(event) => setDraftSearchTerm(event.target.value)}
+                  placeholder="Ex.: salario, ferias, Joao, transferencia..."
+                />
+              </div>
+              <div className="field-stack">
+                <label htmlFor="movement-type" className="text-sm font-medium">
+                  Tipo de movimentacao
+                </label>
+                <Select value={draftTypeFilter} onValueChange={setDraftTypeFilter}>
+                  <SelectTrigger id="movement-type">
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    {availableTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {getMovementMeta(type).label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </FilterPopoverButton>
+        }
+      />
 
       <section className="grid gap-4 md:grid-cols-3">
         <Card className="app-section-card">
@@ -175,38 +257,6 @@ export default function EmployeeMovementsPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="app-toolbar flex flex-col gap-3 md:flex-row md:items-end">
-            <div className="field-stack min-w-[260px] flex-1">
-              <label htmlFor="movement-search" className="text-sm font-medium">
-                Buscar por colaborador, responsavel ou motivo
-              </label>
-              <Input
-                id="movement-search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Ex.: salario, ferias, Joao, transferencia..."
-              />
-            </div>
-            <div className="field-stack min-w-[220px]">
-              <label htmlFor="movement-type" className="text-sm font-medium">
-                Tipo de movimentacao
-              </label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger id="movement-type">
-                  <SelectValue placeholder="Todos os tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  {availableTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {getMovementMeta(type).label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
           {loading ? (
             <div className="rounded-3xl border border-dashed border-border/80 px-6 py-12 text-center text-sm text-muted-foreground">
               Carregando movimentacoes...

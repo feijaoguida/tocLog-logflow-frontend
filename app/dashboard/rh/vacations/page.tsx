@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { MenuFunctionHeader } from "@/components/layout/menu-function-header"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -289,91 +290,87 @@ export default function VacationsPage() {
 
   return (
     <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Recursos Humanos</p>
-          <h1 className="app-title">Ferias</h1>
-          <p className="app-subtitle">
-            Solicite, edite, aprove, rejeite ou cancele solicitacoes de ferias conforme o seu escopo de permissao.
-          </p>
-        </div>
+      <MenuFunctionHeader
+        title="Recursos Humanos > Ferias"
+        description="Solicite, edite, aprove, rejeite ou cancele solicitacoes de ferias conforme o seu escopo de permissao."
+        actions={
+          <Dialog
+            open={requestOpen}
+            onOpenChange={(open) => {
+              setRequestOpen(open)
+              if (!open) resetRequestForm()
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="gap-2" onClick={openNewRequest}>
+                <Plus className="h-4 w-4" />
+                Solicitar Ferias
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingVacation ? 'Editar solicitacao de ferias' : 'Nova solicitacao de ferias'}
+                </DialogTitle>
+                <DialogDescription>
+                  Escolha o colaborador quando o seu perfil permitir solicitar para terceiros.
+                </DialogDescription>
+              </DialogHeader>
 
-        <Dialog
-          open={requestOpen}
-          onOpenChange={(open) => {
-            setRequestOpen(open)
-            if (!open) resetRequestForm()
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={openNewRequest}>
-              <Plus className="h-4 w-4" />
-              Solicitar Ferias
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingVacation ? 'Editar solicitacao de ferias' : 'Nova solicitacao de ferias'}
-              </DialogTitle>
-              <DialogDescription>
-                Escolha o colaborador quando o seu perfil permitir solicitar para terceiros.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmitRequest} className="space-y-6 py-2">
-              <section className="app-section-card space-y-5">
-                <div className="app-form-grid">
-                  {requestableOptions.length > 0 ? (
-                    <div className="field-stack md:col-span-2">
-                      <Label htmlFor="vacation-employee">Solicitacao para</Label>
-                      <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                        <SelectTrigger id="vacation-employee">
-                          <SelectValue placeholder="Selecione o colaborador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {requestableOptions.map((employee) => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.user.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              <form onSubmit={handleSubmitRequest} className="space-y-6 py-2">
+                <section className="app-section-card space-y-5">
+                  <div className="app-form-grid">
+                    {requestableOptions.length > 0 ? (
+                      <div className="field-stack md:col-span-2">
+                        <Label htmlFor="vacation-employee">Solicitacao para</Label>
+                        <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                          <SelectTrigger id="vacation-employee">
+                            <SelectValue placeholder="Selecione o colaborador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {requestableOptions.map((employee) => (
+                              <SelectItem key={employee.id} value={employee.id}>
+                                {employee.user.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    <div className="field-stack">
+                      <Label htmlFor="vacation-start-date">Inicio</Label>
+                      <Input id="vacation-start-date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required />
                     </div>
-                  ) : null}
-                  <div className="field-stack">
-                    <Label htmlFor="vacation-start-date">Inicio</Label>
-                    <Input id="vacation-start-date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required />
+                    <div className="field-stack">
+                      <Label htmlFor="vacation-end-date">Fim</Label>
+                      <Input id="vacation-end-date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required />
+                    </div>
+                    <div className="field-stack md:col-span-2">
+                      <Label htmlFor="vacation-note">Observacao</Label>
+                      <Textarea
+                        id="vacation-note"
+                        placeholder="Inclua contexto adicional quando necessario."
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="field-stack">
-                    <Label htmlFor="vacation-end-date">Fim</Label>
-                    <Input id="vacation-end-date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required />
-                  </div>
-                  <div className="field-stack md:col-span-2">
-                    <Label htmlFor="vacation-note">Observacao</Label>
-                    <Textarea
-                      id="vacation-note"
-                      placeholder="Inclua contexto adicional quando necessario."
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                    />
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setRequestOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {editingVacation ? 'Salvar alteracoes' : 'Registrar solicitacao'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </section>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setRequestOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {editingVacation ? 'Salvar alteracoes' : 'Registrar solicitacao'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <Tabs defaultValue="my-requests" className="space-y-4">
         <TabsList className="w-full justify-start overflow-x-auto">
