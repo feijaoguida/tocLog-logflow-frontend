@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/context/auth-context"
-import { LogOut, User } from 'lucide-react'
 
 export function UserProfile() {
   const { user, logout } = useAuth()
@@ -37,16 +36,16 @@ export function UserProfile() {
             </Avatar>
         </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 glass">
+      <DropdownMenuContent align="end" className="w-56 bg-background">
         <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
+          <span className="material-symbols-outlined mr-2 text-[20px]">person</span>
           <span>Perfil</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-red-500 focus:text-red-500">
-          <LogOut className="mr-2 h-4 w-4" />
+          <span className="material-symbols-outlined mr-2 text-[20px]">logout</span>
           <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

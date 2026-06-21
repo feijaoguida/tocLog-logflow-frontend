@@ -10,13 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { WidgetType, WIDGET_REGISTRY } from './widget-registry'
-import { Plus, Save, Trash2, Layout, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import _ from 'lodash'
 import { useAuth } from '@/context/auth-context'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
 
 // Custom Width Provider wrapper using ResizeObserver
 const WidthWrapper = ({ children, className }: { children: (width: number) => React.ReactNode, className?: string }) => {
@@ -336,7 +334,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                         <Dialog open={isNewViewOpen} onOpenChange={setIsNewViewOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" size="icon">
-                                    <Plus className="h-4 w-4" />
+                                    <span className="material-symbols-outlined text-[18px]">add</span>
                                 </Button>
                             </DialogTrigger>
                             <DialogContent>
@@ -368,7 +366,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" className="w-[200px] h-8 justify-between font-normal">
                                                 Selecione...
-                                                <ChevronDown className="h-4 w-4 opacity-50" />
+                                                <span className="material-symbols-outlined opacity-50 text-[18px]">keyboard_arrow_down</span>
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="max-h-[300px] overflow-y-auto w-[250px]">
@@ -381,17 +379,17 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                     </DropdownMenu>
                                 </div>
                                 <Button variant="default" onClick={handleSaveView}>
-                                    <Save className="h-4 w-4 mr-2" /> Salvar Layout
+                                    <span className="material-symbols-outlined mr-2 text-[18px]">save</span> Salvar Layout
                                 </Button>
                                 <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancelar</Button>
                             </>
                         ) : (
                             <>
                                 <Button variant="outline" onClick={() => setIsEditing(true)}>
-                                    <Layout className="h-4 w-4 mr-2" /> Editar Layout
+                                    <span className="material-symbols-outlined mr-2 text-[18px]">dashboard</span> Editar Layout
                                 </Button>
                                  <Button variant="ghost" size="icon" onClick={handleDeleteView}>
-                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <span className="material-symbols-outlined text-red-500 text-[18px]">delete</span>
                                 </Button>
                             </>
                         )
@@ -441,7 +439,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                                 <Popover>
                                                     <PopoverTrigger asChild>
                                                         <div className="cursor-pointer p-1 hover:bg-slate-100 rounded">
-                                                            <Settings className="h-4 w-4 text-slate-500" />
+                                                            <span className="material-symbols-outlined text-slate-500 text-[16px]">settings</span>
                                                         </div>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-60">
@@ -547,7 +545,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                                     </PopoverContent>
                                                 </Popover>
                                                 <div className="cursor-pointer p-1 hover:bg-red-50 rounded" onClick={() => handleRemoveWidget(item.i)}>
-                                                    <Trash2 className="h-4 w-4 text-red-400 hover:text-red-600" />
+                                                    <span className="material-symbols-outlined text-red-400 hover:text-red-600 text-[16px]">delete</span>
                                                 </div>
                                             </div>
                                         )}
@@ -567,7 +565,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
             </div>
              {(!layouts.lg || layouts.lg.length === 0) && !isEditing && (
                  <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-                     <Layout className="h-12 w-12 mb-4 opacity-20" />
+                     <span className="material-symbols-outlined opacity-20 text-[48px] mb-4">dashboard</span>
                      <p>Esta visão está vazia. Clique em "Editar Layout" para adicionar widgets.</p>
                  </div>
              )}

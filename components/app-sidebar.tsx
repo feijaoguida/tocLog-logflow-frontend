@@ -19,18 +19,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar"
-import {
-  House,
-  Users,
-  ShoppingCart,
-  LifeBuoy,
-  Car,
-  Box,
-  Truck,
-  Settings,
-  LogOut,
-  ChevronRight // Added
-} from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { useAuth } from "@/context/auth-context"
@@ -76,14 +64,13 @@ export function AppSidebar() {
       {
           title: "Dashboard",
           url: "/dashboard",
-          icon: House,
+          icon: "dashboard",
       },
       {
           title: "Cadastros",
           url: "#",
-          icon: Box,
+          icon: "dataset",
           items: [
-              { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
               { title: "Departamentos", url: "/dashboard/rh/departments", permission: "rh.departments.view" },
               { title: "Design System", url: "/dashboard/cadastros/design-system", permission: "system.settings.view" },
               { title: "Filiais", url: "/dashboard/cadastros/branches", permission: "system.branches.view" },
@@ -93,11 +80,20 @@ export function AppSidebar() {
       {
           title: "Recursos Humanos",
           url: "/dashboard/rh",
-          icon: Users,
+          icon: "group",
           permission: "rh.view",
           items: [
+              { title: "Dashboard / Analytics", url: "/dashboard/rh/analytics", permission: "rh.view" },
               { title: "Intranet", url: "/dashboard/rh" },
+              { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
               { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
+              { title: "Atividades", url: "/dashboard/rh/activities", permission: "rh.activities.view" },
+              { title: "Prestação de Contas", url: "/dashboard/rh/expenses", permission: "rh.expenses.view" },
+              { title: "Movimentação do Colaborador", url: "/dashboard/rh/movements", permission: "rh.movements.view" },
+              { title: "Feedbacks", url: "/dashboard/feedbacks", permission: "feedback.own.view" },
+              { title: "Dashboard de Feedbacks", url: "/dashboard/rh/feedbacks/dashboard", permission: "rh.feedbacks.dashboard.view" },
+              { title: "Configurações", url: "/dashboard/rh/settings", permission: "rh.feedbacks.settings.manage" },
+              { title: "Atestados", url: "/dashboard/rh/certificates" },
               { title: "Org. Chart", url: "/dashboard/rh/org-chart" },
               { title: "Gestão de Salas", url: "/dashboard/rh/salas", permission: "rh.rooms.view" },
               { title: "Agenda de Salas", url: "/dashboard/rh/agendas" }, // Accessible to all
@@ -106,7 +102,7 @@ export function AppSidebar() {
       {
           title: "Compras",
           url: "/dashboard/compras",
-          icon: ShoppingCart,
+          icon: "shopping_cart",
           permission: "procurement.requests.view", // Base permission for module
           items: [
               { title: "Dashboard", url: "/dashboard/compras" },
@@ -121,7 +117,7 @@ export function AppSidebar() {
       {
           title: "Gestão de Frotas",
           url: "/dashboard/fleet",
-          icon: Car,
+          icon: "local_shipping",
           permission: "fleet.vehicles.view",
           items: [
               { title: "Veículos", url: "/dashboard/fleet" },
@@ -133,7 +129,7 @@ export function AppSidebar() {
       {
           title: "Helpdesk",
           url: "/dashboard/helpdesk",
-          icon: LifeBuoy,
+          icon: "support_agent",
           permission: "helpdesk.ticket.view.own", // Everyone (User) has this
           items: [
               { title: "Meus Chamados", url: "/dashboard/helpdesk" },
@@ -143,9 +139,25 @@ export function AppSidebar() {
           ]
       },
       {
+          title: "Ajuda",
+          url: "/dashboard/help",
+          icon: "help",
+      },
+      {
+          title: "Frota Externa",
+          url: "#",
+          icon: "map",
+          permission: "externalfleet.view", 
+          items: [
+              { title: "Motoristas", url: "/dashboard/external-fleet/drivers", permission: "externalfleet.drivers.view" },
+              { title: "Montagem Carga", url: "/dashboard/external-fleet/planning", permission: "externalfleet.planning.view" },
+              { title: "Rastreamento", url: "/dashboard/external-fleet/tracking", permission: "externalfleet.tracking.view" },
+          ]
+      },
+      {
         title: "Logística",
         url: "#",
-        icon: Truck,
+        icon: "warehouse",
         permission: "logistics.pallets.view", 
         items: [
             { title: "Paletes", url: "/dashboard/logistics/pallets", permission: "logistics.pallets.view" },
@@ -192,14 +204,14 @@ export function AppSidebar() {
   return (
     <Sidebar 
         collapsible="icon" 
-        className="glass border-r-0 transition-all duration-300"
+        className="bg-sidebar border-r border-sidebar-border transition-all duration-300"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Truck className="h-5 w-5" />
+              <span className="material-symbols-outlined text-lg">local_shipping</span>
             </div>
             <span className="truncate font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">TocLog</span>
         </div>
@@ -227,7 +239,7 @@ export function AppSidebar() {
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton asChild tooltip={item.title} onClick={handleItemClick}>
                                     <Link href={item.url}>
-                                    <item.icon />
+                                    <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
                                     <span>{item.title}</span>
                                     </Link>
                                 </SidebarMenuButton>
@@ -249,9 +261,9 @@ export function AppSidebar() {
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton tooltip={item.title}>
-                                        <item.icon />
+                                        <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
                                         <span>{item.title}</span>
-                                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                        <span className="material-symbols-outlined ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90">chevron_right</span>
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
@@ -277,18 +289,18 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-         <SidebarMenu>
+        <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Configurações">
                     <Link href="/dashboard/settings">
-                        <Settings />
+                        <span className="material-symbols-outlined text-[20px]">settings</span>
                         <span>Configurações</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
                 <SidebarMenuButton onClick={logout} tooltip="Sair">
-                    <LogOut />
+                    <span className="material-symbols-outlined text-[20px]">logout</span>
                     <span>Sair</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>

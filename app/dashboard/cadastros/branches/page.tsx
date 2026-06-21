@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Plus, Pencil, Trash2, Loader2, Search } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { getApiErrorMessage } from "@/lib/api-error"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { useSettings } from "@/context/settings-context"
@@ -132,7 +133,7 @@ export default function BranchesPage() {
             fetchData() 
         } catch (error) {
             console.error(error)
-            toast.error("Erro ao salvar filial.")
+            toast.error(getApiErrorMessage(error, "Erro ao salvar filial."))
         } finally {
             setSubmitLoading(false)
         }
@@ -146,7 +147,7 @@ export default function BranchesPage() {
             toast.success("Filial excluída.")
         } catch (error) {
             console.error(error)
-            toast.error("Erro ao excluir. Verifique se existem departamentos ou funcionários vinculados.")
+            toast.error(getApiErrorMessage(error, "Erro ao excluir. Verifique se existem departamentos ou funcionários vinculados."))
         }
     }
 

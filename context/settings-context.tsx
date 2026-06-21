@@ -2,6 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
+import {
+    DEFAULT_THEME_PALETTE,
+    type ThemeMode,
+    type ThemePaletteId,
+} from '@/lib/theme-system'
 
 interface SettingsContextType {
     accordionMode: boolean
@@ -10,22 +15,28 @@ interface SettingsContextType {
     setCollapseOnClick: (value: boolean) => void
     itemsPerPage: number
     setItemsPerPage: (value: number) => void
-    theme: string | undefined
-    setTheme: (theme: string) => void
+    themeMode: ThemeMode
+    setThemeMode: (theme: ThemeMode) => void
+    themePalette: ThemePaletteId
+    setThemePalette: (palette: ThemePaletteId) => void
+    resolvedTheme: string | undefined
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-    const { theme, setTheme } = useTheme()
+    const { theme, setTheme, resolvedTheme } = useTheme()
     
     // State
     const [accordionMode, setAccordionModeState] = useState(true)
     const [collapseOnClick, setCollapseOnClickState] = useState(false)
     const [itemsPerPage, setItemsPerPageState] = useState(10)
+    const [themeMode, setThemeModeState] = useState<ThemeMode>('system')
+    const [themePalette, setThemePaletteState] = useState<ThemePaletteId>(DEFAULT_THEME_PALETTE)
     const [mounted, setMounted] = useState(false)
 
-    // Load from LocalStorage
+    // Load from LocalStorage on mount to preserve per-browser preferences.
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         const storedAccordion = localStorage.getItem('settings_accordion_mode')
         if (storedAccordion !== null) setAccordionModeState(storedAccordion === 'true')
@@ -35,9 +46,31 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const storedItems = localStorage.getItem('settings_items_per_page')
         if (storedItems !== null) setItemsPerPageState(Number(storedItems))
+
+        const storedThemeMode = localStorage.getItem('settings_theme_mode') as ThemeMode | null
+        if (storedThemeMode === 'light' || storedThemeMode === 'dark' || storedThemeMode === 'system') {
+            setThemeModeState(storedThemeMode)
+            setTheme(storedThemeMode)
+        } else if (theme === 'light' || theme === 'dark' || theme === 'system') {
+            setThemeModeState(theme)
+        }
+
+        const storedThemePalette = localStorage.getItem('settings_theme_palette') as ThemePaletteId | null
+        if (storedThemePalette) {
+            setThemePaletteState(storedThemePalette)
+            document.documentElement.dataset.palette = storedThemePalette
+        } else {
+            document.documentElement.dataset.palette = DEFAULT_THEME_PALETTE
+        }
         
         setMounted(true)
-    }, [])
+    }, [setTheme, theme])
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    useEffect(() => {
+        if (!mounted) return
+        document.documentElement.dataset.palette = themePalette
+    }, [mounted, themePalette])
 
     // Save to LocalStorage
     const setAccordionMode = (value: boolean) => {
@@ -55,6 +88,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('settings_items_per_page', String(value))
     }
 
+    const handleThemeMode = (value: ThemeMode) => {
+        setThemeModeState(value)
+        localStorage.setItem('settings_theme_mode', value)
+        setTheme(value)
+    }
+
+    const handleThemePalette = (value: ThemePaletteId) => {
+        setThemePaletteState(value)
+        localStorage.setItem('settings_theme_palette', value)
+        document.documentElement.dataset.palette = value
+    }
+
     if (!mounted) {
         return null // or a loader
     }
@@ -64,7 +109,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             accordionMode, setAccordionMode,
             collapseOnClick, setCollapseOnClick,
             itemsPerPage, setItemsPerPage,
-            theme, setTheme
+            themeMode,
+            setThemeMode: handleThemeMode,
+            themePalette,
+            setThemePalette: handleThemePalette,
+            resolvedTheme,
         }}>
             {children}
         </SettingsContext.Provider>

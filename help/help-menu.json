@@ -1,0 +1,534 @@
+{
+  "homeSlug": "overview",
+  "sections": [
+    {
+      "id": "help-center",
+      "title": "Central de Ajuda",
+      "description": "Visão geral da base, estrutura e manutenção futura.",
+      "items": [
+        {
+          "title": "Visão Geral do Sistema",
+          "slug": "overview",
+          "file": "modules/overview.md",
+          "summary": "Resumo das áreas do produto, cobertura da ajuda e pontos pendentes de validação.",
+          "route": "/dashboard/help",
+          "platform": "shared",
+          "status": "ready"
+        },
+        {
+          "title": "Como Adicionar Novas Páginas",
+          "slug": "guides/adding-pages",
+          "file": "modules/guides/adding-pages.md",
+          "summary": "Passo a passo para criar novos artigos, imagens e itens de menu.",
+          "route": "/dashboard/help/guides/adding-pages",
+          "platform": "shared",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-admin",
+      "title": "Web · Dashboard e Administração",
+      "description": "Páginas gerais do dashboard e áreas administrativas.",
+      "items": [
+        {
+          "title": "Dashboard Principal",
+          "slug": "web/dashboard",
+          "file": "modules/web/dashboard.md",
+          "summary": "Painel inicial com widgets e visão executiva.",
+          "route": "/dashboard",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Usuários",
+          "slug": "web/users",
+          "file": "modules/web/users.md",
+          "summary": "Gestão de contas, filiais e perfis de acesso.",
+          "route": "/dashboard/users",
+          "platform": "web",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Configurações",
+          "slug": "web/settings",
+          "file": "modules/web/settings.md",
+          "summary": "Preferências visuais e parâmetros centrais do dashboard.",
+          "route": "/dashboard/settings",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Filiais",
+          "slug": "web/branches",
+          "file": "modules/web/branches.md",
+          "summary": "Cadastro e manutenção das filiais do grupo.",
+          "route": "/dashboard/cadastros/branches",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Controle de Permissões",
+          "slug": "web/permissions",
+          "file": "modules/web/permissions.md",
+          "summary": "Perfis, permissões agrupadas e governança de acesso.",
+          "route": "/dashboard/cadastros/permissions",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Design System",
+          "slug": "web/design-system",
+          "file": "modules/web/design-system.md",
+          "summary": "Referência viva do padrão visual usado no frontend.",
+          "route": "/dashboard/cadastros/design-system",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-rh",
+      "title": "Web · Recursos Humanos",
+      "description": "Operações de intranet, cadastro e rotinas do RH.",
+      "items": [
+        {
+          "title": "Intranet",
+          "slug": "web/rh/intranet",
+          "file": "modules/web/rh-intranet.md",
+          "summary": "Feed interno com perfil, stories, comunicados e widgets rápidos.",
+          "route": "/dashboard/rh",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Analytics de RH",
+          "slug": "web/rh/analytics",
+          "file": "modules/web/rh-analytics.md",
+          "summary": "Indicadores de headcount, férias pendentes e efetividade gerencial.",
+          "route": "/dashboard/rh/analytics",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Feedbacks",
+          "slug": "web/rh/feedbacks",
+          "file": "modules/web/rh-feedbacks.md",
+          "summary": "Caixa operacional do modulo com thread, status e aviso de visibilidade do RH.",
+          "route": "/dashboard/feedbacks",
+          "platform": "web",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Dashboard de Feedbacks",
+          "slug": "web/rh/feedback-dashboard",
+          "file": "modules/web/rh-feedback-dashboard.md",
+          "summary": "Painel gerencial do RH com KPIs do modulo e surveys.",
+          "route": "/dashboard/rh/feedbacks/dashboard",
+          "platform": "web",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Configurações de RH",
+          "slug": "web/rh/settings",
+          "file": "modules/web/rh-settings.md",
+          "summary": "Governanca de roteamento e visibilidade para o modulo de feedback.",
+          "route": "/dashboard/rh/settings",
+          "platform": "web",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Funcionários",
+          "slug": "web/rh/employees",
+          "file": "modules/web/rh-employees.md",
+          "summary": "Listagem, cadastro, edição e ficha individual de colaboradores.",
+          "route": "/dashboard/rh/employees",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Departamentos",
+          "slug": "web/rh/departments",
+          "file": "modules/web/rh-departments.md",
+          "summary": "Organiza setores, filiais e gestor responsável.",
+          "route": "/dashboard/rh/departments",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Férias",
+          "slug": "web/rh/vacations",
+          "file": "modules/web/rh-vacations.md",
+          "summary": "Solicitação, aprovação, rejeição e cancelamento com justificativa.",
+          "route": "/dashboard/rh/vacations",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Atividades",
+          "slug": "web/rh/activities",
+          "file": "modules/web/rh-activities.md",
+          "summary": "Registro diário, visão do time e catálogo de atividades.",
+          "route": "/dashboard/rh/activities",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Prestação de Contas",
+          "slug": "web/rh/expenses",
+          "file": "modules/web/rh-expenses.md",
+          "summary": "Lançamentos de despesas com comprovante e filtro por período.",
+          "route": "/dashboard/rh/expenses",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Movimentação do Colaborador",
+          "slug": "web/rh/movements",
+          "file": "modules/web/rh-movements.md",
+          "summary": "Ledger de mudanças de salário, função, férias e estrutura.",
+          "route": "/dashboard/rh/movements",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Atestados",
+          "slug": "web/rh/certificates",
+          "file": "modules/web/rh-certificates.md",
+          "summary": "Gestão de atestados e decisões associadas ao afastamento.",
+          "route": "/dashboard/rh/certificates",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Gestão de Salas",
+          "slug": "web/rh/rooms",
+          "file": "modules/web/rh-rooms.md",
+          "summary": "Cadastro de salas e recursos de reunião.",
+          "route": "/dashboard/rh/salas",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Agenda de Salas",
+          "slug": "web/rh/agendas",
+          "file": "modules/web/rh-agendas.md",
+          "summary": "Reserva de salas com horário, objetivo e participante.",
+          "route": "/dashboard/rh/agendas",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-procurement",
+      "title": "Web · Compras",
+      "description": "Fluxos de requisição, aprovação, cotação e cadastro de suprimentos.",
+      "items": [
+        {
+          "title": "Dashboard de Compras",
+          "slug": "web/compras/dashboard",
+          "file": "modules/web/compras-dashboard.md",
+          "summary": "Painel executivo com atalhos e indicadores do fluxo de compras.",
+          "route": "/dashboard/compras",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Pedidos",
+          "slug": "web/compras/pedidos",
+          "file": "modules/web/compras-pedidos.md",
+          "summary": "Criação, acompanhamento e detalhamento de pedidos de compra.",
+          "route": "/dashboard/compras/pedidos",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Aprovações",
+          "slug": "web/compras/aprovacoes",
+          "file": "modules/web/compras-aprovacoes.md",
+          "summary": "Fila de análise para aprovar ou reprovar solicitações.",
+          "route": "/dashboard/compras/aprovacoes",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Cotações",
+          "slug": "web/compras/cotacoes",
+          "file": "modules/web/compras-cotacoes.md",
+          "summary": "Comparação de fornecedores e geração de ordem de compra.",
+          "route": "/dashboard/compras/cotacoes",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Ordens de Compra",
+          "slug": "web/compras/ordens",
+          "file": "modules/web/compras-ordens.md",
+          "summary": "Consulta e atualização do status das ordens emitidas.",
+          "route": "/dashboard/compras/ordens",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Produtos",
+          "slug": "web/compras/produtos",
+          "file": "modules/web/compras-produtos.md",
+          "summary": "Catálogo de itens com categoria, unidade e busca.",
+          "route": "/dashboard/compras/cadastros/produtos",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Fornecedores",
+          "slug": "web/compras/fornecedores",
+          "file": "modules/web/compras-fornecedores.md",
+          "summary": "Base de fornecedores com contato, CNPJ e dados de apoio.",
+          "route": "/dashboard/compras/cadastros/fornecedores",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-fleet",
+      "title": "Web · Gestão de Frotas",
+      "description": "Operações da frota interna de veículos.",
+      "items": [
+        {
+          "title": "Veículos",
+          "slug": "web/fleet/vehicles",
+          "file": "modules/web/fleet-vehicles.md",
+          "summary": "Inventário, status e acesso ao detalhe de cada veículo.",
+          "route": "/dashboard/fleet",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Checklists",
+          "slug": "web/fleet/checklists",
+          "file": "modules/web/fleet-checklists.md",
+          "summary": "Inspeções operacionais e abertura de novo checklist.",
+          "route": "/dashboard/fleet/checklists",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Manutenções",
+          "slug": "web/fleet/maintenance",
+          "file": "modules/web/fleet-maintenance.md",
+          "summary": "Controle de serviços, datas e descrições de manutenção.",
+          "route": "/dashboard/fleet/maintenance",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Dashboard de Frotas",
+          "slug": "web/fleet/metrics",
+          "file": "modules/web/fleet-metrics.md",
+          "summary": "Métricas operacionais da frota e manutenção futura.",
+          "route": "/dashboard/fleet/metrics",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-helpdesk",
+      "title": "Web · Helpdesk",
+      "description": "Abertura, acompanhamento e resposta de chamados.",
+      "items": [
+        {
+          "title": "Chamados de Helpdesk",
+          "slug": "web/helpdesk",
+          "file": "modules/web/helpdesk.md",
+          "summary": "Lista de chamados, abertura de ticket e detalhe com mensagens.",
+          "route": "/dashboard/helpdesk",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-logistics",
+      "title": "Web · Logística",
+      "description": "Controle de paletes e patrimônio.",
+      "items": [
+        {
+          "title": "Paletes",
+          "slug": "web/logistics/pallets",
+          "file": "modules/web/logistics-pallets.md",
+          "summary": "Movimentação, origem, destino e observações de paletes.",
+          "route": "/dashboard/logistics/pallets",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Patrimônio",
+          "slug": "web/logistics/assets",
+          "file": "modules/web/logistics-assets.md",
+          "summary": "Cadastro e transferência de ativos patrimoniais.",
+          "route": "/dashboard/logistics/assets",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-external-fleet",
+      "title": "Web · Frota Externa",
+      "description": "Cadastros e operação da frota terceirizada.",
+      "items": [
+        {
+          "title": "Motoristas",
+          "slug": "web/external-fleet/drivers",
+          "file": "modules/web/external-drivers.md",
+          "summary": "Cadastro de motoristas com documento, contato e status.",
+          "route": "/dashboard/external-fleet/drivers",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Montagem de Carga",
+          "slug": "web/external-fleet/planning",
+          "file": "modules/web/external-planning.md",
+          "summary": "Planejamento de mercadorias, viagens, cidade, veículo e motorista.",
+          "route": "/dashboard/external-fleet/planning",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Rastreamento",
+          "slug": "web/external-fleet/tracking",
+          "file": "modules/web/external-tracking.md",
+          "summary": "Acompanhamento de viagens e checkpoints no mapa.",
+          "route": "/dashboard/external-fleet/tracking",
+          "platform": "web",
+          "status": "pending-validation"
+        }
+      ]
+    },
+    {
+      "id": "mobile-employee",
+      "title": "Mobile · Colaborador",
+      "description": "Fluxos principais do app mobile para o colaborador.",
+      "items": [
+        {
+          "title": "Intranet Mobile",
+          "slug": "mobile/employee/intranet",
+          "file": "modules/mobile/employee-intranet.md",
+          "summary": "Home do colaborador com feed, destaques e acesso rápido.",
+          "route": "/(employee)",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Atividades Mobile",
+          "slug": "mobile/employee/activities",
+          "file": "modules/mobile/employee-activities.md",
+          "summary": "Registro de atividades pelo colaborador no celular.",
+          "route": "/(employee)/activities",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Prestação de Contas Mobile",
+          "slug": "mobile/employee/expenses",
+          "file": "modules/mobile/employee-expenses.md",
+          "summary": "Lançamento de despesa com anexo de imagem ou PDF no app.",
+          "route": "/(employee)/expenses",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Atestados Mobile",
+          "slug": "mobile/employee/certificates",
+          "file": "modules/mobile/employee-certificates.md",
+          "summary": "Envio de atestados com contexto e arquivo anexo.",
+          "route": "/(employee)/certificates",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Férias Mobile",
+          "slug": "mobile/employee/vacations",
+          "file": "modules/mobile/employee-vacations.md",
+          "summary": "Consulta e solicitação de férias no app do colaborador.",
+          "route": "/(employee)/vacations",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Salas Mobile",
+          "slug": "mobile/employee/rooms",
+          "file": "modules/mobile/employee-rooms.md",
+          "summary": "Reservas de salas e acompanhamento das agendas.",
+          "route": "/(employee)/rooms",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Pedidos Mobile",
+          "slug": "mobile/employee/orders",
+          "file": "modules/mobile/employee-orders.md",
+          "summary": "Pedidos simples de compra pelo celular.",
+          "route": "/(employee)/orders",
+          "platform": "mobile",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Helpdesk Mobile",
+          "slug": "mobile/employee/helpdesk",
+          "file": "modules/mobile/employee-helpdesk.md",
+          "summary": "Abertura e acompanhamento de chamados no app.",
+          "route": "/(employee)/helpdesk",
+          "platform": "mobile",
+          "status": "ready"
+        },
+        {
+          "title": "Feedbacks Mobile",
+          "slug": "mobile/employee/feedbacks",
+          "file": "modules/mobile/employee-feedbacks.md",
+          "summary": "Caixa mobile do colaborador com feedback para empresa e 1 para 1.",
+          "route": "/(employee)/feedback",
+          "platform": "mobile",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Pesquisas Mobile",
+          "slug": "mobile/employee/surveys",
+          "file": "modules/mobile/employee-surveys.md",
+          "summary": "Surveys curtas e NPS respondidas pelo colaborador no app.",
+          "route": "/(employee)/surveys",
+          "platform": "mobile",
+          "status": "pending-validation"
+        },
+        {
+          "title": "Perfil e Mais",
+          "slug": "mobile/employee/profile",
+          "file": "modules/mobile/employee-profile.md",
+          "summary": "Acesso ao perfil e atalhos da aba Mais.",
+          "route": "/(employee)/profile",
+          "platform": "mobile",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "mobile-driver",
+      "title": "Mobile · Motorista",
+      "description": "Rotas localizadas do app de motorista.",
+      "items": [
+        {
+          "title": "Operação do Motorista",
+          "slug": "mobile/driver/operations",
+          "file": "modules/mobile/driver-operations.md",
+          "summary": "Home, explore e detalhe de viagem por identificador.",
+          "route": "/(driver)",
+          "platform": "mobile",
+          "status": "pending-validation"
+        }
+      ]
+    }
+  ]
+}

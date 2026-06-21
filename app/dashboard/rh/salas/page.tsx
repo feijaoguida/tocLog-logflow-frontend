@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { MenuFunctionHeader } from "@/components/layout/menu-function-header"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -102,16 +103,16 @@ export default function RoomsManagementPage() {
     }
 
     return (
-        <div className="space-y-6 p-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Gestão de Salas</h1>
-                    <p className="text-muted-foreground">Cadastre e gerencie as salas de reunião da empresa.</p>
-                </div>
-                <Button onClick={() => setIsOpen(true)} className="gap-2">
-                    <Plus className="w-4 h-4" /> Nova Sala
-                </Button>
-            </div>
+        <div className="app-page">
+            <MenuFunctionHeader
+                title="Recursos Humanos > Gestao de Salas"
+                description="Cadastre e gerencie as salas de reuniao da empresa, com capacidade, itens disponiveis e status operacional."
+                actions={
+                    <Button onClick={() => setIsOpen(true)} className="gap-2">
+                        <Plus className="w-4 h-4" /> Nova Sala
+                    </Button>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rooms.map(room => (
@@ -255,4 +256,3 @@ export default function RoomsManagementPage() {
         </div>
     )
 }
-
