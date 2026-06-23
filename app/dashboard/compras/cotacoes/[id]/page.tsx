@@ -194,7 +194,7 @@ export default function QuotationDetailPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    {quote.status === 'OPEN' && (
+                                    {quote.status === 'PENDING' && (
                                         <>
                                             <Button size="sm" variant="outline" onClick={() => openEdit(quote)}><DollarSign className="h-4 w-4 mr-2"/> Preços</Button>
                                             <Button size="sm" variant="default" onClick={() => handleWin(quote.id)} disabled={Number(quote.totalValue) === 0}>

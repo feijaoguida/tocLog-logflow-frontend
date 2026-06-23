@@ -110,6 +110,7 @@ export function AppSidebar() {
               { title: "Aprovações", url: "/dashboard/compras/aprovacoes", permission: "procurement.requests.approve" },
               { title: "Cotações", url: "/dashboard/compras/cotacoes", permission: "procurement.quotations.view" },
               { title: "Ordens de Compra", url: "/dashboard/compras/ordens", permission: "procurement.orders.view" },
+              { title: "Configurações", url: "/dashboard/compras/configuracoes", permission: "procurement.settings.manage" },
               { title: "Produtos", url: "/dashboard/compras/cadastros/produtos", permission: "procurement.products.view" },
               { title: "Fornecedores", url: "/dashboard/compras/cadastros/fornecedores", permission: "procurement.suppliers.view" },
           ]

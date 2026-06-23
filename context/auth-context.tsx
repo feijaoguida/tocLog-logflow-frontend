@@ -10,6 +10,12 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
   'rh.expenses.manage': ['rh.employees.edit'],
   'rh.movements.view': ['rh.employees.view'],
   'rh.movements.manage': ['rh.employees.edit'],
+  'procurement.requests.view': [
+    'procurement.requests.view.own',
+    'procurement.requests.view.department',
+    'procurement.requests.view.company',
+  ],
+  'procurement.requests.approve': ['procurement.requests.approve.department'],
   'vacation.request.for_others': ['vacation.manage'],
   'vacation.approve.manager': ['vacation.manage'],
   'vacation.approve.hr': ['vacation.manage'],

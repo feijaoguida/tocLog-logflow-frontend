@@ -271,6 +271,15 @@
           "status": "ready"
         },
         {
+          "title": "Configurações",
+          "slug": "web/compras/configuracoes",
+          "file": "modules/web/compras-configuracoes.md",
+          "summary": "Governança configurável de aprovação e parâmetros operacionais de compras.",
+          "route": "/dashboard/compras/configuracoes",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
           "title": "Produtos",
           "slug": "web/compras/produtos",
           "file": "modules/web/compras-produtos.md",
