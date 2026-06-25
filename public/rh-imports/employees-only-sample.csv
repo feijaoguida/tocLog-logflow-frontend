@@ -1,0 +1,3 @@
+email,name,cpf,role,status,branchName,departmentName,admissionDate,registration,currentSalary,directManagerEmail
+joao.silva@toclog.com.br,Joao da Silva,12345678911,Analista de RH,ACTIVE,Matriz - São Paulo,Recursos Humanos,2026-01-10,RH-001,4500.00,ana.rh@toclog.com.br
+maria.oliveira@toclog.com.br,Maria Oliveira,12345678912,Assistente de Compras,ACTIVE,Filial - Rio de Janeiro,Compras,2026-02-15,CMP-014,3200.00,carlos.compras@toclog.com.br

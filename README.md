@@ -33,7 +33,7 @@ Este é o frontend web do LogFlow2, uma aplicação React construída com Next.j
     ```bash
     npm run dev
     ```
-    Acesse em `http://localhost:3000`.
+    Acesse em `http://localhost:4000`.
 
 4.  **Build para Produção:**
     ```bash

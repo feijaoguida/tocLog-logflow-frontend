@@ -1,0 +1,3 @@
+email,name,cpf,role,status,branchName,departmentName,departmentDescription,departmentActive,departmentHeadManagerEmail,departmentHeadManagerCpf,admissionDate,registration,currentSalary
+beatriz.santos@toclog.com.br,Beatriz Santos,12345678921,Coordenadora de Facilities,ACTIVE,Matriz - São Paulo,Facilities,Gestao de infraestrutura e servicos,true,beatriz.santos@toclog.com.br,12345678921,2026-03-01,FAC-001,6200.00
+luiz.pereira@toclog.com.br,Luiz Pereira,12345678922,Analista de Facilities,ACTIVE,Matriz - São Paulo,Facilities,Gestao de infraestrutura e servicos,true,beatriz.santos@toclog.com.br,12345678921,2026-03-10,FAC-002,3800.00

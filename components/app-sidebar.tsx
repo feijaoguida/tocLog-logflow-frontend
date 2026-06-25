@@ -19,7 +19,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useRouter } from "next/navigation"
 
 import { useAuth } from "@/context/auth-context"
 import React from "react" // Added
@@ -30,7 +29,6 @@ import { Skeleton } from "@/components/ui/skeleton" // Added
 import { useSettings } from "@/context/settings-context"
 
 export function AppSidebar() {
-  const router = useRouter()
   const { hasPermission, logout, isLoading } = useAuth()
   const { setOpen, isMobile, setOpenMobile } = useSidebar()
   const { accordionMode, collapseOnClick } = useSettings()
@@ -86,6 +84,7 @@ export function AppSidebar() {
               { title: "Dashboard / Analytics", url: "/dashboard/rh/analytics", permission: "rh.view" },
               { title: "Intranet", url: "/dashboard/rh" },
               { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
+              { title: "Importações", url: "/dashboard/rh/imports", permission: "rh.view" },
               { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
               { title: "Atividades", url: "/dashboard/rh/activities", permission: "rh.activities.view" },
               { title: "Prestação de Contas", url: "/dashboard/rh/expenses", permission: "rh.expenses.view" },
@@ -137,6 +136,7 @@ export function AppSidebar() {
               { title: "Novo Chamado", url: "/dashboard/helpdesk/new", permission: "helpdesk.ticket.create" },
               { title: "Atendimento", url: "/dashboard/helpdesk/queue", permission: "helpdesk.ticket.view.all" }, // For Agents
               { title: "Dashboard", url: "/dashboard/helpdesk/metrics", permission: "helpdesk.dashboard.view" }, // For Managers
+              { title: "Configurações", url: "/dashboard/helpdesk/configuracoes", permission: "helpdesk.settings.manage" },
           ]
       },
       {

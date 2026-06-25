@@ -1,0 +1,3 @@
+branchName,departmentName,departmentDescription,departmentActive,headManagerEmail,headManagerCpf
+Matriz - São Paulo,Recursos Humanos,Departamento responsavel por pessoas e cultura,true,ana.rh@toclog.com.br,12345678901
+Filial - Rio de Janeiro,Compras,Central de compras da unidade RJ,true,carlos.compras@toclog.com.br,12345678902
