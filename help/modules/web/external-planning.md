@@ -1,30 +1,31 @@
-# Montagem de Carga
+# Planejamento legado da Frota Externa
 
-## O que esta funcionalidade faz
+## O que esta funcionalidade faz hoje
 
-Apoia o planejamento da frota externa com mercadorias, cidade, veiculo e motorista.
+Esta rota foi mantida como ponte de migração. O planejamento operacional saiu da Frota Externa e foi movido para o módulo `Cargas e Rotas`.
 
 ## Quando usar
 
-- Ao montar uma nova viagem.
-- Ao organizar itens da carga.
-- Ao vincular destino, veiculo e motorista da operacao.
+- Ao acessar um link antigo salvo nos favoritos.
+- Ao orientar equipes que ainda conhecem o nome anterior da funcionalidade.
+- Ao redirecionar a operação para o módulo novo.
 
 ## Passo a passo de uso
 
 1. Acesse ` /dashboard/external-fleet/planning `.
-2. Cadastre mercadorias e dados da viagem.
-3. Escolha cidade, veiculo e motorista.
-4. Revise volumes, peso e tipo antes de concluir.
+2. Leia o aviso de migração exibido na tela.
+3. Se o seu perfil tiver permissão, use os atalhos exibidos para ` /dashboard/shipments `, ` /dashboard/shipments/routes `, ` /dashboard/external-fleet/drivers ` ou ` /dashboard/external-fleet/vehicles `.
+4. Se a tela mostrar `Acesso restrito`, solicite o perfil correto antes de tentar operar o módulo novo.
 
-## Campos e elementos da tela
+## O que mudou
 
-| Campo | Explicacao |
+| Antes | Agora |
 | --- | --- |
-| Tipo da mercadoria | Classificacao da carga |
-| Peso e volume | Dimensoes operacionais do item |
-| Cidade | Destino da operacao |
-| Veiculo / motorista | Recursos vinculados a viagem |
+| Mercadorias e fretes na Frota Externa | Cargas e rotas em `shipments` |
+| Mistura de parceiro com operação | Separação entre governança e logística |
+| Planejamento na área de terceiros | Planejamento em `Cargas e Rotas` |
+| Ponte com atalhos fixos | Ponte com CTAs condicionados à permissão do perfil |
+| Permissão implícita nos botões | Resumo explícito do que está disponível ou indisponível para o perfil antes dos atalhos |
 
 ## Prints sugeridos
 
@@ -33,10 +34,12 @@ Apoia o planejamento da frota externa com mercadorias, cidade, veiculo e motoris
 
 ## Dicas de uso
 
-- Revise peso e volume para evitar composicao incorreta.
-- Valide disponibilidade do veiculo e do motorista antes de fechar.
+- Use `Frota Externa` apenas para cadastro, homologação e gestão de parceiros.
+- Use `Cargas e Rotas` para operação logística, alocação e execução.
+- Use o bloco `Atalhos liberados para este perfil` para conferir rapidamente se os CTAs novos respeitam o recorte real do usuário antes de navegar.
+- Se o perfil não tiver acesso aos módulos novos, a página deve mostrar apenas `Acesso restrito`, sem abrir atalhos indevidos.
 
 ## Boas praticas
 
-- Registrar a carga de forma detalhada.
-- Confirmar coerencia entre rota, cidade e recurso designado.
+- Não volte a abrir novas operações na rota antiga.
+- Atualize treinamentos internos para apontar o módulo novo.

@@ -1,254 +1,433 @@
 'use client'
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/context/auth-context"
-import { Vehicle } from "@/types/fleet"
-import { api } from "@/lib/api"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Textarea } from "@/components/ui/textarea"
-import { Suspense } from "react"
-import { CheckCircle2, ChevronRight, AlertTriangle, Truck } from "lucide-react"
+import Link from 'next/link'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AlertTriangle, CheckCircle2, ChevronRight, FileCheck, ShieldAlert } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
+import { WorkspaceInlineAlert } from '@/components/layout/workspace-inline-alert'
+import { WorkspaceStateCard } from '@/components/layout/workspace-state-card'
+import { useAuth } from '@/context/auth-context'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
+import { getApiErrorMessage } from '@/lib/api-error'
+import type { Vehicle } from '@/types/fleet'
 
 export const dynamic = 'force-dynamic'
 
+type ChecklistExecutionRecord = {
+  id: string
+  type: string
+  km: number
+  vehicle?: {
+    id: string
+    plate: string
+    model: string
+  } | null
+  items: Array<{
+    id: string
+    itemId: string
+    name: string
+    status: 'OK' | 'NOK' | 'NA'
+    observation?: string | null
+  }>
+}
+
+const CHECKLIST_TYPE_OPTIONS = [
+  { value: 'DELIVERY', label: 'Saída / Entrega' },
+  { value: 'RECEIVEMENT', label: 'Retorno / Recebimento' },
+  { value: 'MAINTENANCE_EXIT', label: 'Saída p/ manutenção' },
+]
+
 export default function NewChecklistPageWrapper() {
-    return (
-        <Suspense fallback={<div>Carregando...</div>}>
-            <NewChecklistPageContent />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={<ChecklistLoadingState />}>
+      <NewChecklistPageContent />
+    </Suspense>
+  )
 }
 
 function NewChecklistPageContent() {
-    const { isAuthenticated } = useAuth()
-    const router = useRouter()
-    const searchParams = useSearchParams()
-    
-    // Step Control
-    const [step, setStep] = useState(1)
-    const [loading, setLoading] = useState(false)
+  const { hasPermission } = useAuth()
+  const canExecuteChecklists = hasPermission('fleet.checklists.execute')
 
-    // Data Selection
-    const [vehicles, setVehicles] = useState<Vehicle[]>([])
-    const [selectedVehicleId, setSelectedVehicleId] = useState<string>(searchParams.get('vehicleId') || '')
-    const [checklistType, setChecklistType] = useState<string>('DELIVERY')
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-    // Execution Draft
-    const [executionId, setExecutionId] = useState<string | null>(null)
-    const [executionData, setExecutionData] = useState<any>(null) // Holds items
-    const [currentKm, setCurrentKm] = useState<number>(0)
-    
-    // Items State
-    const [itemsStatus, setItemsStatus] = useState<Record<string, string>>({}) // itemId -> status
-    const [observations, setObservations] = useState('')
+  const [loadingVehicles, setLoadingVehicles] = useState(true)
+  const [refreshingVehicles, setRefreshingVehicles] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [vehicleCatalogError, setVehicleCatalogError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1)
 
-    // Fetch Vehicles
-    useEffect(() => {
-        if(!isAuthenticated) return
-        api.get('/fleet/vehicles').then(res => setVehicles(res.data)).catch(console.error)
-    }, [isAuthenticated])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState(searchParams.get('vehicleId') || '')
+  const [checklistType, setChecklistType] = useState('DELIVERY')
 
-    // Step 1: Start Checklist (Create Draft)
-    const handleStart = async () => {
-         setLoading(true)
-         try {
-             const res = await api.post('/fleet/checklists/start', {
-                 vehicleId: selectedVehicleId,
-                 type: checklistType,
-             })
-             setExecutionId(res.data.id)
-             setExecutionData(res.data)
-             
-             // Initialize items map
-             const initialStatus: Record<string, string> = {}
-             res.data.items.forEach((item: any) => {
-                 initialStatus[item.itemId] = 'OK' // item.itemId here is probably execution item ID or ref. 
-                 // Backend service:
-                 // create: template.items.map(item => ({ itemId: item.id ... }))
-                 // Response includes { id: "exec_item_id", itemId: "tmpl_item_id", name: "...", status: "OK" }
-                 // We need to submit "items: [{ itemId: ..., status: ... }]"
-                 // Service logic: "Try to find by ID (if DTO has execution item ID) ... checklistExecutionItem.updateMany ... where itemId: item.itemId"
-                 // My service logic was ambiguous. It tries to match `itemId` from DTO to... `itemId` column in ExecItem? Or `id` column?
-                 // "Matching template item ref? Or ID."
-                 // Let's use the `checklistExecutionItem.itemId` (Template Item ID) as the key if that's what backend expects, 
-                 // OR `id` (Unique Execution Item ID) if backend was `where: { id: item.itemId }`.
-                 // Looking at Service again: `updateMany ... where: { checklistId: id, itemId: item.itemId }`.
-                 // `itemId` in schema is the relation to Template Item.
-                 // So we should send the Template Item ID.
-                 
-                 initialStatus[item.itemId] = 'OK' 
-             })
-             setItemsStatus(initialStatus)
-             setCurrentKm(res.data.km)
+  const [executionId, setExecutionId] = useState<string | null>(null)
+  const [executionData, setExecutionData] = useState<ChecklistExecutionRecord | null>(null)
+  const [currentKm, setCurrentKm] = useState(0)
+  const [observations, setObservations] = useState('')
+  const [itemsStatus, setItemsStatus] = useState<Record<string, 'OK' | 'NOK'>>({})
 
-             setStep(2)
-         } catch (error: any) {
-             alert(error.response?.data?.message || 'Erro ao iniciar checklist')
-         } finally {
-             setLoading(false)
-         }
+  useEffect(() => {
+    if (!canExecuteChecklists) {
+      setLoadingVehicles(false)
+      return
     }
 
-    // Submit
-    const handleSubmit = async () => {
-        if (!executionId) return
-        setLoading(true)
-        
-        // Prepare Items
-        const itemsPayload = Object.entries(itemsStatus).map(([tmplItemId, status]) => ({
-            itemId: tmplItemId,
-            status,
-            observation: '' // TODO: Add per-item obs
-        }))
+    void loadVehicles()
+  }, [canExecuteChecklists])
 
-        try {
-            await api.post(`/fleet/checklists/${executionId}/submit`, {
-                km: Number(currentKm),
-                observations,
-                items: itemsPayload
-            })
-            router.push('/dashboard/fleet/checklists')
-        } catch (error: any) {
-             alert(error.response?.data?.message || 'Erro ao finalizar checklist')
-        } finally {
-            setLoading(false)
-        }
+  async function loadVehicles(showLoadingState = true) {
+    if (showLoadingState) {
+      setLoadingVehicles(true)
+    } else {
+      setRefreshingVehicles(true)
     }
 
-    if (step === 1) {
-        return (
-            <div className="max-w-md mx-auto py-8 px-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Iniciar Checklist</CardTitle>
-                        <CardDescription>Selecione o veículo e o tipo de inspeção.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Veículo</Label>
-                            <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {vehicles.map(v => (
-                                        <SelectItem key={v.id} value={v.id}>{v.plate} - {v.model}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Tipo</Label>
-                             <Select value={checklistType} onValueChange={setChecklistType}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="DELIVERY">Saída / Entrega</SelectItem>
-                                    <SelectItem value="RECEIVEMENT">Retorno / Recebimento</SelectItem>
-                                    <SelectItem value="MAINTENANCE_EXIT">Saída p/ Manutenção</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button className="w-full" onClick={handleStart} disabled={!selectedVehicleId || loading}>
-                            {loading ? 'Iniciando...' : 'Iniciar Inspeção'} <ChevronRight className="ml-2 h-4 w-4" />
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </div>
-        )
+    try {
+      setLoadError(null)
+      setVehicleCatalogError(null)
+      const { data } = await api.get<Vehicle[]>('/fleet/vehicles')
+      setVehicles(data)
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Não foi possível carregar os veículos da frota.')
+      if (showLoadingState && vehicles.length === 0) {
+        setLoadError(message)
+      } else {
+        setVehicleCatalogError(message)
+      }
+      toast.error(message)
+    } finally {
+      if (showLoadingState) {
+        setLoadingVehicles(false)
+      } else {
+        setRefreshingVehicles(false)
+      }
+    }
+  }
+
+  async function handleStartChecklist() {
+    if (!selectedVehicleId) {
+      toast.error('Selecione um veículo para iniciar a inspeção.')
+      return
     }
 
+    setSubmitting(true)
+    try {
+      const { data } = await api.post<ChecklistExecutionRecord>('/fleet/checklists/start', {
+        vehicleId: selectedVehicleId,
+        type: checklistType,
+      })
+
+      setExecutionId(data.id)
+      setExecutionData(data)
+      setCurrentKm(data.km)
+      setItemsStatus(
+        data.items.reduce<Record<string, 'OK' | 'NOK'>>((accumulator, item) => {
+          accumulator[item.itemId] = item.status === 'NOK' ? 'NOK' : 'OK'
+          return accumulator
+        }, {}),
+      )
+      setStep(2)
+      toast.success('Checklist iniciado. Continue com a inspeção.')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível iniciar o checklist.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleSubmitChecklist() {
+    if (!executionId || !executionData) {
+      return
+    }
+
+    if (!Number.isFinite(currentKm) || currentKm < 0) {
+      toast.error('Informe uma quilometragem válida para concluir o checklist.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await api.post(`/fleet/checklists/${executionId}/submit`, {
+        km: Number(currentKm),
+        observations: observations.trim(),
+        items: executionData.items.map((item) => ({
+          itemId: item.itemId,
+          status: itemsStatus[item.itemId] ?? 'OK',
+          observation: '',
+        })),
+      })
+      toast.success('Checklist finalizado com sucesso.')
+      router.push('/dashboard/fleet/checklists')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível concluir o checklist.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const selectedVehicle = useMemo(
+    () => vehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null,
+    [selectedVehicleId, vehicles],
+  )
+
+  if (!canExecuteChecklists) {
     return (
-        <div className="max-w-lg mx-auto py-8 px-4 space-y-6">
-             <div className="flex items-center justify-between">
-                 <div>
-                    <h2 className="text-xl font-bold">Checklist em Andamento</h2>
-                    <p className="text-sm text-muted-foreground">{executionData?.vehicle?.plate} • {checklistType}</p>
-                 </div>
-                 <Badge variant="outline" className="h-8">Passo 2 de 2</Badge>
-             </div>
-
-             <Card>
-                 <CardHeader>
-                     <CardTitle>Atualização de KM</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                     <div className="space-y-2">
-                         <Label>Quilometragem Atual</Label>
-                         <Input 
-                            type="number" 
-                            value={currentKm} 
-                            onChange={(e) => setCurrentKm(Number(e.target.value))} 
-                         />
-                         <p className="text-xs text-muted-foreground">Anterior: {executionData?.km}</p>
-                     </div>
-                 </CardContent>
-             </Card>
-
-             <Card>
-                 <CardHeader>
-                     <CardTitle>Itens de Inspeção</CardTitle>
-                 </CardHeader>
-                 <CardContent className="space-y-6">
-                     {executionData?.items?.map((item: any) => (
-                         <div key={item.id} className="flex items-center justify-between border-b pb-4 last:pb-0 last:border-0">
-                             <div className="grid gap-1">
-                                 <span className="font-medium">{item.name}</span>
-                                 <span className="text-xs text-muted-foreground">Categoria: Geral</span>
-                             </div>
-                             <div className="flex gap-2">
-                                 {/* Status Toggles */}
-                                 <Button 
-                                    size="sm" 
-                                    variant={itemsStatus[item.itemId] === 'OK' ? 'default' : 'outline'}
-                                    className={itemsStatus[item.itemId] === 'OK' ? 'bg-green-600 hover:bg-green-700' : ''}
-                                    onClick={() => setItemsStatus(prev => ({ ...prev, [item.itemId]: 'OK' }))}
-                                 >
-                                     OK
-                                 </Button>
-                                 <Button 
-                                    size="sm" 
-                                    variant={itemsStatus[item.itemId] === 'NOK' ? 'destructive' : 'outline'}
-                                    onClick={() => setItemsStatus(prev => ({ ...prev, [item.itemId]: 'NOK' }))}
-                                 >
-                                     <AlertTriangle className="h-4 w-4" />
-                                 </Button>
-                             </div>
-                         </div>
-                     ))}
-                 </CardContent>
-             </Card>
-
-             <Card>
-                 <CardHeader>
-                     <CardTitle>Observações Finais</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                     <Textarea 
-                        placeholder="Alguma avaria ou observação importante?" 
-                        value={observations}
-                        onChange={(e) => setObservations(e.target.value)}
-                     />
-                 </CardContent>
-                 <CardFooter>
-                     <Button className="w-full" size="lg" onClick={handleSubmit} disabled={loading}>
-                         {loading ? 'Finalizando...' : 'Finalizar Checklist'} <CheckCircle2 className="ml-2 h-4 w-4" />
-                     </Button>
-                 </CardFooter>
-             </Card>
-        </div>
+      <WorkspaceStateCard title="Acesso restrito">
+        <p>Este perfil não pode iniciar checklists da frota interna.</p>
+      </WorkspaceStateCard>
     )
+  }
+
+  return (
+    <div className="app-page">
+      <MenuFunctionHeader
+        title="Frota > Checklists > Novo"
+        description="Fluxo guiado para iniciar e concluir um checklist operacional da frota interna."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="rounded-full px-4 py-2">
+              Passo {step} de 2
+            </Badge>
+            <Button variant="outline" size="sm" onClick={() => void loadVehicles(false)} disabled={loadingVehicles || refreshingVehicles}>
+              {refreshingVehicles ? 'Atualizando...' : 'Atualizar leitura'}
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard/fleet/checklists">Voltar</Link>
+            </Button>
+          </div>
+        }
+      />
+
+      {loadError ? (
+        <WorkspaceStateCard
+          title="Falha de leitura"
+          tone="danger"
+          actions={
+            <Button variant="outline" onClick={() => void loadVehicles(false)} disabled={refreshingVehicles}>
+              {refreshingVehicles ? 'Atualizando...' : 'Tentar novamente'}
+            </Button>
+          }
+        >
+          <p>{loadError}</p>
+        </WorkspaceStateCard>
+      ) : null}
+
+      {step === 1 ? (
+        <Card className="app-section-card max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-xl">Selecionar contexto</CardTitle>
+            <CardDescription>
+              Escolha o veículo e o tipo de checklist antes de abrir a inspeção.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingVehicles ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+              </div>
+            ) : (
+              <>
+                {vehicleCatalogError ? (
+                  <WorkspaceInlineAlert
+                    title="Falha ao atualizar os veículos da frota"
+                    description={vehicleCatalogError}
+                    hint="A última lista válida foi preservada para você continuar a inspeção sem perder o contexto."
+                  />
+                ) : null}
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleId">Veículo</Label>
+                  <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
+                    <SelectTrigger id="vehicleId">
+                      <SelectValue placeholder="Selecione um veículo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicles.map((vehicle) => (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          {vehicle.plate} • {vehicle.model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="checklistType">Tipo do checklist</Label>
+                  <Select value={checklistType} onValueChange={setChecklistType}>
+                    <SelectTrigger id="checklistType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHECKLIST_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                  {selectedVehicle ? (
+                    <>
+                      <p className="font-medium text-foreground">{selectedVehicle.plate}</p>
+                      <p>{selectedVehicle.model}</p>
+                      <p className="mt-2">KM atual informada na frota: {selectedVehicle.currentKm.toLocaleString('pt-BR')} km</p>
+                    </>
+                  ) : (
+                    'Selecione um veículo para revisar o contexto antes de iniciar.'
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+          <CardFooter className="justify-end">
+            <Button onClick={handleStartChecklist} disabled={loadingVehicles || submitting || !selectedVehicleId}>
+              {submitting ? 'Iniciando...' : 'Iniciar inspeção'}
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
+        </Card>
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+          <Card className="app-section-card">
+            <CardHeader>
+              <CardTitle className="text-xl">Itens da inspeção</CardTitle>
+              <CardDescription>
+                Revise os itens do checklist, registre a quilometragem e finalize o fluxo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-2xl border p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+                  <FileCheck className="h-4 w-4" />
+                  {executionData?.vehicle?.plate || selectedVehicle?.plate || 'Veículo selecionado'}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentKm">Quilometragem atual</Label>
+                    <Input
+                      id="currentKm"
+                      type="number"
+                      min="0"
+                      value={currentKm}
+                      onChange={(event) => setCurrentKm(Number(event.target.value))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Valor de abertura: {executionData?.km?.toLocaleString('pt-BR') || 0} km
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="observations">Observações finais</Label>
+                    <Textarea
+                      id="observations"
+                      value={observations}
+                      onChange={(event) => setObservations(event.target.value)}
+                      placeholder="Avarias, ressalvas ou orientações importantes."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {executionData?.items.map((item) => {
+                  const currentStatus = itemsStatus[item.itemId] ?? 'OK'
+
+                  return (
+                    <div key={item.id} className="flex flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          O item começa como `OK`, mas pode ser marcado como `NOK` antes do fechamento.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={currentStatus === 'OK' ? 'default' : 'outline'}
+                          className={currentStatus === 'OK' ? 'bg-green-600 hover:bg-green-700' : ''}
+                          onClick={() =>
+                            setItemsStatus((current) => ({ ...current, [item.itemId]: 'OK' }))
+                          }
+                        >
+                          OK
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={currentStatus === 'NOK' ? 'destructive' : 'outline'}
+                          onClick={() =>
+                            setItemsStatus((current) => ({ ...current, [item.itemId]: 'NOK' }))
+                          }
+                        >
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          NOK
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button onClick={handleSubmitChecklist} disabled={submitting}>
+                {submitting ? 'Finalizando...' : 'Finalizar checklist'}
+                <CheckCircle2 className="ml-2 h-4 w-4" />
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card className="app-section-card">
+            <CardHeader>
+              <CardTitle className="text-xl">Resumo do fluxo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl border p-4">
+                <p className="font-medium text-foreground">Tipo selecionado</p>
+                <p>{CHECKLIST_TYPE_OPTIONS.find((option) => option.value === checklistType)?.label || checklistType}</p>
+              </div>
+              <div className="rounded-2xl border p-4">
+                <p className="font-medium text-foreground">Itens no checklist</p>
+                <p>{executionData?.items.length || 0} itens carregados para inspeção</p>
+              </div>
+              <div className="rounded-2xl border p-4">
+                <p className="font-medium text-foreground">Impacto operacional</p>
+                <p>
+                  Ao finalizar, o checklist pode atualizar KM e status do veículo conforme o tipo selecionado.
+                </p>
+              </div>
+              <div className="flex items-start gap-2 rounded-2xl border border-dashed p-4">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Este fluxo já respeita o recorte por tenant do veículo no backend e não deve abrir inspeções fora da empresa atual.
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
 }
 
-function Badge({ children, variant, className }: any) {
-    return <div className={`badge ${className}`}>{children}</div>
+function ChecklistLoadingState() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-24 w-full rounded-3xl" />
+      <Skeleton className="h-[420px] w-full rounded-3xl" />
+    </div>
+  )
 }

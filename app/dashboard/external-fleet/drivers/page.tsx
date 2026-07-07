@@ -1,209 +1,391 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { User, CheckCircle, XCircle, Truck, Plus, Pencil } from 'lucide-react';
-import { api } from '@/lib/api';
-import { getApiErrorMessage } from '@/lib/api-error';
-import { toast } from 'sonner';
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { CheckCircle, Eye, Pencil, Plus, ShieldAlert, Truck, XCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
-export default function ExternalDrivers() {
-  const [drivers, setDrivers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
+import { WorkspaceStateCard } from '@/components/layout/workspace-state-card'
+import { useAuth } from '@/context/auth-context'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { api } from '@/lib/api'
+import { getApiErrorMessage } from '@/lib/api-error'
 
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDriver, setEditingDriver] = useState<any>(null);
-  const [formData, setFormData] = useState({ nome: '', documento: '', telefone: '', email: '' });
+type DriverRecord = {
+  id: string
+  nome: string
+  documento: string
+  telefone: string
+  email?: string | null
+  cnhNumber?: string | null
+  cnhCategory?: string | null
+  cnhExpiresAt?: string | null
+  rntrcCode?: string | null
+  rntrcStatus?: string | null
+  rntrcExpiresAt?: string | null
+  notes?: string | null
+  status: 'ATIVO' | 'PENDENTE_APROVACAO' | 'BLOQUEADO'
+  vehicles?: { id: string }[]
+}
 
-  const fetchDrivers = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get('/external-fleet/drivers');
-      setDrivers(data);
-    } catch (error) {
-      toast.error('Erro ao buscar motoristas.');
-    } finally {
-       setLoading(false);
-    }
-  };
+export default function ExternalDriversPage() {
+  const { hasPermission } = useAuth()
+  const [drivers, setDrivers] = useState<DriverRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const canViewDrivers = hasPermission('external-fleet.drivers.view')
+  const canManageDrivers = hasPermission('external-fleet.drivers.manage')
 
   useEffect(() => {
-    fetchDrivers();
-  }, []);
-
-  const handleApprove = async (id: string) => {
-    try {
-      await api.patch(`/external-fleet/drivers/${id}/approve`);
-      toast.success('Motorista aprovado!');
-      fetchDrivers();
-    } catch {
-      toast.error('Erro ao aprovar');
+    if (!canViewDrivers) {
+      setLoading(false)
+      return
     }
-  }
 
-  const handleBlock = async (id: string) => {
-    try {
-      if (!confirm('Deseja realmente inativar este motorista?')) return;
-      await api.patch(`/external-fleet/drivers/${id}/block`);
-      toast.success('Motorista inativado!');
-      fetchDrivers();
-    } catch {
-      toast.error('Erro ao inativar');
+    void loadDrivers()
+  }, [canViewDrivers])
+
+  async function loadDrivers(showLoadingState = true) {
+    if (showLoadingState) {
+      setLoading(true)
+    } else {
+      setRefreshing(true)
     }
-  }
 
-  const handleSave = async () => {
     try {
-      if (editingDriver) {
-        await api.patch(`/external-fleet/drivers/${editingDriver.id}`, formData);
-        toast.success('Motorista atualizado com sucesso!');
+      setLoadError(null)
+      const { data } = await api.get<DriverRecord[]>('/external-fleet/drivers')
+      setDrivers(data)
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Não foi possível carregar os motoristas parceiros.')
+      setLoadError(message)
+      setDrivers([])
+      toast.error(message)
+    } finally {
+      if (showLoadingState) {
+        setLoading(false)
       } else {
-        await api.post('/external-fleet/drivers', formData);
-        toast.success('Motorista criado com sucesso!');
+        setRefreshing(false)
       }
-      setIsModalOpen(false);
-      setEditingDriver(null);
-      setFormData({ nome: '', documento: '', telefone: '', email: '' });
-      fetchDrivers();
-    } catch (err: any) {
-      toast.error(getApiErrorMessage(err, 'Erro ao salvar motorista'));
     }
   }
 
-  const openCreateModal = () => {
-    setEditingDriver(null);
-    setFormData({ nome: '', documento: '', telefone: '', email: '' });
-    setIsModalOpen(true);
-  }
-
-  const openEditModal = (driver: any) => {
-    setEditingDriver(driver);
-    setFormData({ nome: driver.nome, documento: driver.documento, telefone: driver.telefone, email: driver.email || '' });
-    setIsModalOpen(true);
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'ATIVO': return <Badge className="bg-green-600">Ativo</Badge>;
-      case 'PENDENTE_APROVACAO': return <Badge variant="secondary">Pendente</Badge>;
-      case 'BLOQUEADO': return <Badge variant="destructive">Inativo / Bloqueado</Badge>;
-      default: return <Badge>{status}</Badge>;
+  async function handleApprove(id: string) {
+    try {
+      await api.patch(`/external-fleet/drivers/${id}/approve`)
+      toast.success('Motorista parceiro aprovado.')
+      await loadDrivers(false)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível aprovar o motorista parceiro.'))
     }
   }
+
+  async function handleBlock(id: string) {
+    try {
+      await api.patch(`/external-fleet/drivers/${id}/block`)
+      toast.success('Motorista parceiro bloqueado.')
+      await loadDrivers(false)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível bloquear o motorista parceiro.'))
+    }
+  }
+
+  function getStatusBadge(status: DriverRecord['status']) {
+    switch (status) {
+      case 'ATIVO':
+        return <Badge className="bg-green-600">Ativo</Badge>
+      case 'PENDENTE_APROVACAO':
+        return <Badge variant="secondary">Pendente</Badge>
+      case 'BLOQUEADO':
+        return <Badge variant="destructive">Bloqueado</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  function getComplianceBadge(driver: DriverRecord) {
+    const issues = getComplianceIssues(driver)
+
+    if (issues.length === 0) {
+      return <Badge className="bg-green-600">Pronto para rota</Badge>
+    }
+
+    if (issues.length === 1) {
+      return <Badge variant="secondary">1 pendência</Badge>
+    }
+
+    return <Badge variant="destructive">{issues.length} pendências</Badge>
+  }
+
+  const activeDrivers = drivers.filter((driver) => driver.status === 'ATIVO').length
+  const pendingDrivers = drivers.filter((driver) => driver.status === 'PENDENTE_APROVACAO').length
+  const compliantDrivers = drivers.filter((driver) => getComplianceIssues(driver).length === 0).length
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 w-full max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Motoristas Terceirizados</h1>
-          <p className="text-muted-foreground">Gerencie o cadastro de motoristas e veículos externos.</p>
-        </div>
-        <Button onClick={openCreateModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Motorista
-        </Button>
+    <div className="app-page">
+      <MenuFunctionHeader
+        title="Frota Externa > Motoristas"
+        description="Governança de parceiros com contato, homologação e sinais de compliance para alocação em cargas e rotas."
+        actions={
+          <div className="flex items-center gap-2">
+            {canManageDrivers ? (
+              <Button asChild>
+                <Link href="/dashboard/external-fleet/drivers/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo motorista
+                </Link>
+              </Button>
+            ) : (
+              <Badge variant="outline" className="rounded-full px-4 py-2">
+                Modo leitura
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={() => void loadDrivers(false)} disabled={loading || refreshing}>
+              {refreshing ? 'Atualizando...' : 'Atualizar leitura'}
+            </Button>
+          </div>
+        }
+      />
+
+      {!canViewDrivers ? (
+        <WorkspaceStateCard title="Acesso restrito">
+          <p>Este perfil não pode visualizar a governança de motoristas parceiros.</p>
+        </WorkspaceStateCard>
+      ) : (
+        <>
+      {loadError ? (
+        <WorkspaceStateCard
+          title="Falha de leitura"
+          tone="danger"
+          actions={
+            <Button variant="outline" onClick={() => void loadDrivers(false)} disabled={refreshing}>
+              {refreshing ? 'Atualizando...' : 'Tentar novamente'}
+            </Button>
+          }
+        >
+          <p>{loadError}</p>
+        </WorkspaceStateCard>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="app-section-card">
+          <CardHeader>
+            <CardDescription>Total de parceiros</CardDescription>
+            <CardTitle className="text-3xl">{drivers.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="app-section-card">
+          <CardHeader>
+            <CardDescription>Prontos para operar</CardDescription>
+            <CardTitle className="text-3xl">{compliantDrivers}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="app-section-card">
+          <CardHeader>
+            <CardDescription>Ativos / pendentes</CardDescription>
+            <CardTitle className="text-3xl">
+              {activeDrivers} <span className="text-base text-muted-foreground">ativos</span>
+            </CardTitle>
+            <CardDescription>{pendingDrivers} aguardando aprovação</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
 
-      <Card>
+      <Card className="app-section-card">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="w-5 h-5"/> Lista de Motoristas
-          </CardTitle>
-          <CardDescription>Aprove, gerencie ou inative motoristas autônomos.</CardDescription>
+          <CardTitle className="text-xl">Motoristas parceiros</CardTitle>
+          <CardDescription>
+            A tela agora centraliza CPF, contato, validade da CNH e situação do RNTRC para sustentar as regras configuráveis de `shipments`.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Identificação</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Veículos</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
-              ) : drivers.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Nenhum motorista cadastrado.</TableCell></TableRow>
-              ) : (
-                drivers.map(driver => (
-                  <TableRow key={driver.id}>
-                    <TableCell>
-                      <div className="font-medium">{driver.nome}</div>
-                      <div className="text-xs text-muted-foreground">CPF: {driver.documento.slice(0,3)}.{driver.documento.slice(3,6)}.{driver.documento.slice(6,9)}-{driver.documento.slice(9,11)}</div>
-                    </TableCell>
-                    <TableCell>{driver.telefone}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-muted-foreground" />
-                        {driver.vehicles?.length || 0} vinculados
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(driver.status)}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button size="icon" variant="outline" onClick={() => openEditModal(driver)} title="Editar">
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      
-                      {driver.status === 'PENDENTE_APROVACAO' && (
-                        <Button size="icon" variant="outline" className="text-green-600" onClick={() => handleApprove(driver.id)} title="Aprovar">
-                           <CheckCircle className="w-4 h-4"/>
-                        </Button>
-                      )}
-                      {driver.status !== 'BLOQUEADO' && (
-                        <Button size="icon" variant="outline" className="text-destructive" onClick={() => handleBlock(driver.id)} title="Inativar">
-                           <XCircle className="w-4 h-4"/>
-                        </Button>
-                      )}
+          <div className="rounded-2xl border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Parceiro</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Compliance</TableHead>
+                  <TableHead>Veículos</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell colSpan={6}>
+                        <Skeleton className="h-8 w-full rounded-xl" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : drivers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      Nenhum motorista parceiro cadastrado.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  drivers.map((driver) => {
+                    const complianceIssues = getComplianceIssues(driver)
+
+                    return (
+                      <TableRow key={driver.id}>
+                        <TableCell>
+                          <div className="font-medium">{driver.nome}</div>
+                          <div className="text-xs text-muted-foreground">
+                            CPF: {formatCpf(driver.documento)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{driver.telefone}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {driver.email || 'Sem email cadastrado'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <div>{getComplianceBadge(driver)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              CNH: {driver.cnhExpiresAt ? formatDate(driver.cnhExpiresAt) : 'não informada'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              RNTRC: {driver.rntrcCode ? `${driver.rntrcCode} · ${driver.rntrcStatus || 'sem status'}` : 'não informado'}
+                            </div>
+                            {complianceIssues.length > 0 ? (
+                              <div className="flex items-start gap-2 text-xs text-amber-700">
+                                <ShieldAlert className="mt-0.5 h-3.5 w-3.5" />
+                                <span>{complianceIssues[0]}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-muted-foreground" />
+                            {driver.vehicles?.length || 0} vinculados
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(driver.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              asChild
+                              size="icon"
+                              variant="outline"
+                              title="Visualizar motorista parceiro"
+                            >
+                              <Link href={`/dashboard/external-fleet/drivers/${driver.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            {driver.status === 'PENDENTE_APROVACAO' ? (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="text-green-600"
+                                disabled={!canManageDrivers}
+                                onClick={() => void handleApprove(driver.id)}
+                                title="Aprovar motorista parceiro"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                            {driver.status !== 'BLOQUEADO' ? (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="text-destructive"
+                                disabled={!canManageDrivers}
+                                onClick={() => void handleBlock(driver.id)}
+                                title="Bloquear motorista parceiro"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                            {canManageDrivers ? (
+                              <Button
+                                asChild
+                                size="icon"
+                                variant="outline"
+                                title="Editar motorista parceiro"
+                              >
+                                <Link href={`/dashboard/external-fleet/drivers/${driver.id}/edit`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                disabled
+                                title="Edição indisponível para este perfil"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingDriver ? 'Editar Motorista' : 'Novo Motorista'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="nome">Nome Completo</Label>
-              <Input id="nome" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} placeholder="João da Silva" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="documento">CPF (Somente números)</Label>
-              <Input id="documento" value={formData.documento} onChange={e => setFormData({...formData, documento: e.target.value})} placeholder="12345678901" maxLength={11} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="telefone">Telefone</Label>
-              <Input id="telefone" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} placeholder="11912345678" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email (Opcional)</Label>
-              <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="joao@email.com" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave}>Salvar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </>
+      )}
     </div>
   )
+}
+
+function formatCpf(value: string) {
+  if (value.length !== 11) {
+    return value
+  }
+
+  return `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9, 11)}`
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return 'não informado'
+  }
+
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(value))
+}
+
+function getComplianceIssues(driver: DriverRecord) {
+  const issues: string[] = []
+  const now = Date.now()
+
+  if (!driver.cnhExpiresAt) {
+    issues.push('Validade da CNH não informada.')
+  } else if (new Date(driver.cnhExpiresAt).getTime() <= now) {
+    issues.push('CNH vencida.')
+  }
+
+  if (!driver.rntrcCode) {
+    issues.push('RNTRC não informado.')
+  } else if (driver.rntrcStatus !== 'ATIVO') {
+    issues.push('RNTRC sem situação ATIVO.')
+  } else if (driver.rntrcExpiresAt && new Date(driver.rntrcExpiresAt).getTime() <= now) {
+    issues.push('RNTRC vencido.')
+  }
+
+  if (driver.status !== 'ATIVO') {
+    issues.push('Parceiro ainda não está ativo para operação.')
+  }
+
+  return issues
 }

@@ -20,6 +20,11 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
   'vacation.approve.manager': ['vacation.manage'],
   'vacation.approve.hr': ['vacation.manage'],
   'vacation.cancel.hr': ['vacation.manage'],
+  'external-fleet.drivers.view': ['external-fleet.drivers.manage'],
+  'external-fleet.vehicles.view': ['external-fleet.vehicles.manage'],
+  'integrations.view': ['integrations.manage'],
+  'shipments.routes.view': ['shipments.routes.assign', 'shipments.routes.create'],
+  'shipments.cargo.view': ['shipments.cargo.create'],
 }
 
 

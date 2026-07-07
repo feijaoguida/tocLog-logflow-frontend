@@ -15,7 +15,7 @@ Esta area organiza a ajuda operacional do LogFlow2 em paginas separadas por func
 
 | Area | Cobertura inicial |
 | --- | --- |
-| Web | Dashboard, RH, Compras, Frotas, Helpdesk, Logistica, Frota Externa e Administracao |
+| Web | Dashboard, RH, Compras, Frotas, Helpdesk, Logistica, Frota Externa, Cargas e Rotas e Administracao |
 | Mobile | App do colaborador e rotas localizadas do app do motorista |
 | Ajuda | Guia de manutencao da base e placeholders de prints |
 
@@ -41,5 +41,4 @@ Esta area organiza a ajuda operacional do LogFlow2 em paginas separadas por func
 ## Pendente de validacao
 
 - O menu lateral do dashboard referencia itens como `Org. Chart`, `Helpdesk > Atendimento` e `Helpdesk > Dashboard`, mas essas rotas nao apareceram como paginas implementadas na varredura atual.
-- Existe rota web `external-fleet/freights`, porem ela nao aparece no menu lateral atual; confirmar se ela deve entrar na documentacao operacional.
 - O app do motorista tem sinais de estrutura parcial e deve ser validado em simulador antes de virar material final de treinamento.

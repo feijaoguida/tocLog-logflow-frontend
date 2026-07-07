@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://162.215.222.208:4000/:path*',
-        // destination: 'http://localhost:3000/:path*',
+        // destination: 'http://162.215.222.208:4000/:path*',
+        destination: 'http://localhost:3000/:path*',
       },
     ]
   },

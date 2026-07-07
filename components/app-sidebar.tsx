@@ -28,6 +28,21 @@ import { Skeleton } from "@/components/ui/skeleton" // Added
 
 import { useSettings } from "@/context/settings-context"
 
+type MenuItem = {
+  title: string
+  url: string
+  permission?: string
+  items?: MenuItem[]
+}
+
+type MenuGroup = {
+  title: string
+  url: string
+  icon: string
+  permission?: string
+  items?: MenuItem[]
+}
+
 export function AppSidebar() {
   const { hasPermission, logout, isLoading } = useAuth()
   const { setOpen, isMobile, setOpenMobile } = useSidebar()
@@ -57,12 +72,70 @@ export function AppSidebar() {
     }
   }
 
+  const filterMenuItems = (items: MenuItem[]): MenuItem[] =>
+    items
+      .map((item) => ({
+        ...item,
+        items: item.items ? filterMenuItems(item.items) : undefined,
+      }))
+      .filter((item) => {
+        const hasVisibleChildren = Boolean(item.items?.length)
+        const hasItemPermission = !item.permission || hasPermission(item.permission)
+
+        if (hasVisibleChildren) return true
+        if (hasItemPermission && item.url !== "#") return true
+
+        return false
+      })
+
+  const renderSubItems = (items: MenuItem[], depth = 0) =>
+    items.map((sub) => {
+      const hasNestedItems = Boolean(sub.items?.length)
+
+      if (!hasNestedItems) {
+        return (
+          <SidebarMenuSubItem key={`${depth}-${sub.title}`}>
+            <SidebarMenuSubButton asChild onClick={handleItemClick}>
+              <Link href={sub.url}>
+                <span>{sub.title}</span>
+              </Link>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        )
+      }
+
+      return (
+        <SidebarMenuSubItem key={`${depth}-${sub.title}`}>
+          <Collapsible defaultOpen className="group/submenu">
+            <CollapsibleTrigger asChild>
+              <SidebarMenuSubButton>
+                <span>{sub.title}</span>
+                <span className="material-symbols-outlined ml-auto text-sm transition-transform duration-200 group-data-[state=open]/submenu:rotate-90">
+                  chevron_right
+                </span>
+              </SidebarMenuSubButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub className="ml-2 mt-1">
+                {renderSubItems(sub.items ?? [], depth + 1)}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </Collapsible>
+        </SidebarMenuSubItem>
+      )
+    })
+
   // Menu Definition with Permissions
-  const menuGroups = [
+  const menuGroups: MenuGroup[] = [
       {
           title: "Dashboard",
           url: "/dashboard",
           icon: "dashboard",
+      },
+      {
+          title: "Intranet",
+          url: "/dashboard/rh",
+          icon: "home",
       },
       {
           title: "Cadastros",
@@ -82,20 +155,25 @@ export function AppSidebar() {
           permission: "rh.view",
           items: [
               { title: "Dashboard / Analytics", url: "/dashboard/rh/analytics", permission: "rh.view" },
-              { title: "Intranet", url: "/dashboard/rh" },
               { title: "Funcionários", url: "/dashboard/rh/employees", permission: "rh.employees.view" },
               { title: "Importações", url: "/dashboard/rh/imports", permission: "rh.view" },
-              { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
-              { title: "Atividades", url: "/dashboard/rh/activities", permission: "rh.activities.view" },
-              { title: "Prestação de Contas", url: "/dashboard/rh/expenses", permission: "rh.expenses.view" },
               { title: "Movimentação do Colaborador", url: "/dashboard/rh/movements", permission: "rh.movements.view" },
-              { title: "Feedbacks", url: "/dashboard/feedbacks", permission: "feedback.own.view" },
               { title: "Dashboard de Feedbacks", url: "/dashboard/rh/feedbacks/dashboard", permission: "rh.feedbacks.dashboard.view" },
               { title: "Configurações", url: "/dashboard/rh/settings", permission: "rh.feedbacks.settings.manage" },
-              { title: "Atestados", url: "/dashboard/rh/certificates" },
               { title: "Org. Chart", url: "/dashboard/rh/org-chart" },
-              { title: "Gestão de Salas", url: "/dashboard/rh/salas", permission: "rh.rooms.view" },
               { title: "Agenda de Salas", url: "/dashboard/rh/agendas" }, // Accessible to all
+              {
+                  title: "Cadastros e Solicitações",
+                  url: "#",
+                  items: [
+                      { title: "Férias", url: "/dashboard/rh/vacations", permission: "vacation.view" },
+                      { title: "Atividades", url: "/dashboard/rh/activities", permission: "rh.activities.view" },
+                      { title: "Prestação de Contas", url: "/dashboard/rh/expenses", permission: "rh.expenses.view" },
+                      { title: "Feedbacks", url: "/dashboard/feedbacks", permission: "feedback.own.view" },
+                      { title: "Atestados", url: "/dashboard/rh/certificates" },
+                      { title: "Gestão de Salas", url: "/dashboard/rh/salas", permission: "rh.rooms.view" },
+                  ],
+              },
           ]
       },
       {
@@ -145,14 +223,34 @@ export function AppSidebar() {
           icon: "help",
       },
       {
+          title: "Integrações",
+          url: "/dashboard/integrations",
+          icon: "sync",
+          permission: "integrations.view",
+          items: [
+              { title: "Conexões e Eventos", url: "/dashboard/integrations", permission: "integrations.view" },
+          ]
+      },
+      {
           title: "Frota Externa",
           url: "#",
           icon: "map",
-          permission: "externalfleet.view", 
+          permission: "external-fleet.drivers.view", 
           items: [
-              { title: "Motoristas", url: "/dashboard/external-fleet/drivers", permission: "externalfleet.drivers.view" },
-              { title: "Montagem Carga", url: "/dashboard/external-fleet/planning", permission: "externalfleet.planning.view" },
-              { title: "Rastreamento", url: "/dashboard/external-fleet/tracking", permission: "externalfleet.tracking.view" },
+              { title: "Motoristas", url: "/dashboard/external-fleet/drivers", permission: "external-fleet.drivers.view" },
+              { title: "Veículos", url: "/dashboard/external-fleet/vehicles", permission: "external-fleet.vehicles.view" },
+          ]
+      },
+      {
+          title: "Cargas e Rotas",
+          url: "/dashboard/shipments",
+          icon: "route",
+          permission: "shipments.cargo.view",
+          items: [
+              { title: "Cargas", url: "/dashboard/shipments", permission: "shipments.cargo.view" },
+              { title: "Rotas", url: "/dashboard/shipments/routes", permission: "shipments.routes.view" },
+              { title: "Rastreamento", url: "/dashboard/shipments/tracking", permission: "shipments.routes.view" },
+              { title: "Configurações", url: "/dashboard/shipments/settings", permission: "shipments.settings.manage" },
           ]
       },
       {
@@ -167,11 +265,12 @@ export function AppSidebar() {
       },
   ]
 
-  const filteredGroups = menuGroups.filter(group => {
-      // 1. Filter sub-items first
-      if (group.items) {
-          group.items = group.items.filter(item => !item.permission || hasPermission(item.permission));
-      }
+  const filteredGroups = menuGroups
+      .map((group) => ({
+          ...group,
+          items: group.items ? filterMenuItems(group.items) : undefined,
+      }))
+      .filter(group => {
 
       const hasVisibleItems = group.items && group.items.length > 0;
       // Check if user has explicit permission for the group (or if none is required)
@@ -269,15 +368,7 @@ export function AppSidebar() {
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                     <SidebarMenuSub>
-                                        {item.items?.map(sub => (
-                                            <SidebarMenuSubItem key={sub.title}>
-                                                <SidebarMenuSubButton asChild onClick={handleItemClick}>
-                                                    <Link href={sub.url}>
-                                                        <span>{sub.title}</span>
-                                                    </Link>
-                                                </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                        ))}
+                                        {renderSubItems(item.items ?? [])}
                                     </SidebarMenuSub>
                                 </CollapsibleContent>
                             </SidebarMenuItem>

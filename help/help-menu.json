@@ -59,6 +59,15 @@
           "status": "ready"
         },
         {
+          "title": "Integrações",
+          "slug": "web/integrations",
+          "file": "modules/web/integrations.md",
+          "summary": "Conexões, eventos e logs técnicos das integrações por empresa.",
+          "route": "/dashboard/integrations",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
           "title": "Filiais",
           "slug": "web/branches",
           "file": "modules/web/branches.md",
@@ -386,7 +395,7 @@
     {
       "id": "web-external-fleet",
       "title": "Web · Frota Externa",
-      "description": "Cadastros e operação da frota terceirizada.",
+      "description": "Cadastros e governança da frota terceirizada, com avisos de migração do fluxo operacional.",
       "items": [
         {
           "title": "Motoristas",
@@ -398,22 +407,83 @@
           "status": "ready"
         },
         {
-          "title": "Montagem de Carga",
+          "title": "Veículos",
+          "slug": "web/external-fleet/vehicles",
+          "file": "modules/web/external-vehicles.md",
+          "summary": "Governança de veículos parceiros com capacidade, vínculo e status.",
+          "route": "/dashboard/external-fleet/vehicles",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Fretes legados",
+          "slug": "web/external-fleet/freights",
+          "file": "modules/web/external-freights.md",
+          "summary": "Ponte de migração dos fretes antigos para Cargas e Rotas, com atalhos condicionados por permissão.",
+          "route": "/dashboard/external-fleet/freights",
+          "platform": "web",
+          "status": "migration"
+        },
+        {
+          "title": "Planejamento legado",
           "slug": "web/external-fleet/planning",
           "file": "modules/web/external-planning.md",
-          "summary": "Planejamento de mercadorias, viagens, cidade, veículo e motorista.",
+          "summary": "Ponte de migração para o novo módulo de Cargas e Rotas, com CTAs coerentes com a permissão do perfil.",
           "route": "/dashboard/external-fleet/planning",
+          "platform": "web",
+          "status": "migration"
+        },
+        {
+          "title": "Rastreamento legado",
+          "slug": "web/external-fleet/tracking",
+          "file": "modules/web/external-tracking.md",
+          "summary": "Aviso de migração do rastreamento antigo para o novo fluxo de rotas, respeitando o acesso real do perfil.",
+          "route": "/dashboard/external-fleet/tracking",
+          "platform": "web",
+          "status": "migration"
+        }
+      ]
+    },
+    {
+      "id": "web-shipments",
+      "title": "Web · Cargas e Rotas",
+      "description": "Operação logística de cargas, rotas e rastreamento no domínio shipments.",
+      "items": [
+        {
+          "title": "Cargas",
+          "slug": "web/shipments/cargo",
+          "file": "modules/web/shipments-cargo.md",
+          "summary": "Cadastro e acompanhamento das cargas operacionais.",
+          "route": "/dashboard/shipments",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Rotas",
+          "slug": "web/shipments/routes",
+          "file": "modules/web/shipments-routes.md",
+          "summary": "Criação e alocação das rotas operacionais.",
+          "route": "/dashboard/shipments/routes",
           "platform": "web",
           "status": "ready"
         },
         {
           "title": "Rastreamento",
-          "slug": "web/external-fleet/tracking",
-          "file": "modules/web/external-tracking.md",
-          "summary": "Acompanhamento de viagens e checkpoints no mapa.",
-          "route": "/dashboard/external-fleet/tracking",
+          "slug": "web/shipments/tracking",
+          "file": "modules/web/shipments-tracking.md",
+          "summary": "Acompanhamento web das rotas ativas com último ping conhecido.",
+          "route": "/dashboard/shipments/tracking",
           "platform": "web",
-          "status": "pending-validation"
+          "status": "ready"
+        },
+        {
+          "title": "Configurações",
+          "slug": "web/shipments/settings",
+          "file": "modules/web/shipments-settings.md",
+          "summary": "Governança operacional das regras do domínio shipments por empresa.",
+          "route": "/dashboard/shipments/settings",
+          "platform": "web",
+          "status": "ready"
         }
       ]
     },
