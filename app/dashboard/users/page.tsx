@@ -1,332 +1,273 @@
 'use client'
 
-import { useEffect, useState } from "react"
-import { api } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Pencil, Trash2, Loader2, Search, UserCog } from "lucide-react"
-import { toast } from "sonner"
-import { RoleGate } from "@/components/auth/role-gate"
-import { getApiErrorMessage } from "@/lib/api-error"
-import _ from "lodash"
+import { useEffect, useMemo, useState } from 'react'
+import _ from 'lodash'
+import { Loader2, Pencil, Search, ShieldCheck, UserCog } from 'lucide-react'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import { getApiErrorMessage } from '@/lib/api-error'
+import { useAuth } from '@/context/auth-context'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-interface Employee {
+type Permission = {
   id: string
-  user: { name: string; email: string }
-  role?: { id: string; name: string }
-  branch: { name: string }
-  department?: { name: string }
-  specificPermissions?: { slug: string }[] 
+  slug: string
+  description: string
+  group: string
+}
+
+type UserRecord = {
+  id: string
+  name: string
+  email: string
+  accessType: 'EMPLOYEE' | 'EXTERNAL_DRIVER' | 'COMPANY_ADMIN' | 'SAAS_ADMIN'
+  employees: Array<{
+    id: string
+    role: { id: string; name: string; permissions: Permission[] } | null
+  }>
+  externalDriver?: { id: string; status: string } | null
+  directPermissionGrants: Array<{
+    id: string
+    permission: Permission
+    grantedBy?: { id: string; name: string } | null
+  }>
+}
+
+const accessTypeLabels: Record<UserRecord['accessType'], string> = {
+  EMPLOYEE: 'Funcionário',
+  EXTERNAL_DRIVER: 'Motorista externo',
+  COMPANY_ADMIN: 'Administrador da empresa',
+  SAAS_ADMIN: 'Administrador SaaS',
 }
 
 export default function UsersPage() {
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const { hasPermission } = useAuth()
+  const canView = hasPermission('system.users.view')
+  const canManage = hasPermission('system.users.manage')
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null)
+  const [directSlugs, setDirectSlugs] = useState<string[]>([])
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  
-  // Lists
-  const [roles, setRoles] = useState<any[]>([])
-  const [permissions, setPermissions] = useState<any[]>([])
-  const [branches, setBranches] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
 
-  // Modal State
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  
-  // Form State
-  const [formData, setFormData] = useState({
-      name: '',
-      email: '',
-      password: '',
-      branchId: '',
-      roleId: '',
-      specificPermissionSlugs: [] as string[]
-  })
-  
-  const [createLoading, setCreateLoading] = useState(false)
-
-  const fetchEmployees = async () => {
+  const load = async () => {
+    if (!canView) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
-      const { data } = await api.get('/employees')
-      setEmployees(data)
-    } catch (error) { console.error(error) } 
-    finally { setLoading(false) }
-  }
-
-  const fetchAuxData = async () => {
-      try {
-          const [rolesRes, permsRes, branchesRes] = await Promise.all([
-              api.get('/roles'),
-              api.get('/roles/permissions'),
-               // Assuming logic for branches endpoint, if not fetching departments/branches TODO
-               // For now hardcoding or assuming similar structure if endpoint missing
-               // Let's assume we can get branches, or skip for now if endpoint not verified.
-               // We will mock branches if endpoint fails
-               Promise.resolve({ data: [{id: 'bd3ee54e-2c46-4c77-80ea-0adfdd2b1305', name: 'Matriz - SP'}] }) 
-          ])
-
-          setRoles(rolesRes.data)
-          setPermissions(permsRes.data)
-          // @ts-ignore
-          setBranches(branchesRes.data)
-
-      } catch(e) {}
-  }
-
-  useEffect(() => {
-    fetchEmployees()
-    fetchAuxData()
-  }, [])
-
-  const handleOpenDialog = (emp?: Employee) => {
-      if (emp) {
-          setEditingId(emp.id)
-          setFormData({
-              name: emp.user.name,
-              email: emp.user.email,
-              password: '', // Leave empty to not change
-              branchId: emp.branch?.name === 'Matriz - SP' ? 'bd3ee54e-2c46-4c77-80ea-0adfdd2b1305' : 'bd3ee54e-2c46-4c77-80ea-0adfdd2b1305', // Mock
-              roleId: emp.role?.id || '',
-              specificPermissionSlugs: [] // Need to populate if fetching specific perms enabled in backend findOne
-          })
-          // If we want specific perms, we need to fetch specific user details?
-          // List endpoint might not return specificPermissions for perf.
-          // Let's assume user edit fetches details.
-          fetchEmployeeDetails(emp.id)
-      } else {
-          setEditingId(null)
-          setFormData({
-              name: '', email: '', password: '', 
-              branchId: branches[0]?.id || '', 
-              roleId: '', 
-              specificPermissionSlugs: []
-          })
-      }
-      setIsDialogOpen(true)
-  }
-
-  const fetchEmployeeDetails = async (id: string) => {
-      try {
-           const { data } = await api.get(`/employees/${id}`)
-           // Assuming specificPermissions returns object with slug
-           if(data.specificPermissions) {
-               setFormData(prev => ({ ...prev, specificPermissionSlugs: data.specificPermissions.map((p: any) => p.slug) }))
-           }
-      } catch(e) {}
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreateLoading(true)
-    try {
-      const url = editingId 
-        ? `/employees/${editingId}`
-        : `/employees`
-      
-      const method = editingId ? 'patch' : 'post'
-
-      const body: any = {
-          name: formData.name,
-          email: formData.email,
-          branchId: formData.branchId, // Required
-          roleId: formData.roleId,
-          specificPermissionSlugs: formData.specificPermissionSlugs
-      }
-      if(formData.password && !editingId) body.password = formData.password 
-      
-      // @ts-ignore
-      await api[method](url, body)
-
-      setIsDialogOpen(false)
-      fetchEmployees()
-      toast.success(editingId ? "Usuário atualizado" : "Usuário criado")
+      const [usersResponse, permissionsResponse] = await Promise.all([
+        api.get<UserRecord[]>('/users'),
+        api.get<Permission[]>('/roles/permissions'),
+      ])
+      setUsers(usersResponse.data)
+      setPermissions(permissionsResponse.data)
     } catch (error) {
-        toast.error(getApiErrorMessage(error, "Erro ao salvar usuário."))
+      toast.error(getApiErrorMessage(error, 'Não foi possível carregar os usuários.'))
     } finally {
-        setCreateLoading(false)
+      setLoading(false)
     }
   }
 
-  // Permission Grouping
-  const groupedPerms = _.groupBy(permissions, 'group')
-  const sortedGroups = Object.keys(groupedPerms).sort()
+  useEffect(() => {
+    void load()
+  }, [canView])
 
-  const togglePerm = (slug: string) => {
-      setFormData(prev => {
-          if(prev.specificPermissionSlugs.includes(slug)) {
-              return { ...prev, specificPermissionSlugs: prev.specificPermissionSlugs.filter(s => s !== slug) }
-          }
-          return { ...prev, specificPermissionSlugs: [...prev.specificPermissionSlugs, slug] }
-      })
+  const openPermissions = (user: UserRecord) => {
+    setSelectedUser(user)
+    setDirectSlugs(user.directPermissionGrants.map((grant) => grant.permission.slug))
   }
 
-  const filteredUsers = employees.filter(emp => 
-    emp.user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    emp.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const inheritedSlugs = useMemo(
+    () => new Set(selectedUser?.employees[0]?.role?.permissions.map((item) => item.slug) ?? []),
+    [selectedUser],
+  )
+  const effectiveSlugs = useMemo(
+    () => new Set([...inheritedSlugs, ...directSlugs]),
+    [inheritedSlugs, directSlugs],
+  )
+  const groupedPermissions = useMemo(
+    () => _.groupBy(permissions, 'group'),
+    [permissions],
+  )
+  const filteredUsers = users.filter((user) =>
+    `${user.name} ${user.email}`.toLowerCase().includes(search.toLowerCase()),
   )
 
-  return (
-    <RoleGate allowedRoles={['ADMIN', 'MANAGER']}>
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Gerenciamento de Usuários</h1>
-          <Button className="gap-2" onClick={() => handleOpenDialog()}>
-                <Plus className="h-4 w-4" /> Novo Usuário
-          </Button>
-        </div>
+  const toggleDirectPermission = (slug: string) => {
+    if (!canManage || inheritedSlugs.has(slug)) return
+    setDirectSlugs((current) =>
+      current.includes(slug)
+        ? current.filter((item) => item !== slug)
+        : [...current, slug],
+    )
+  }
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-             <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-                 <DialogHeader>
-                     <DialogTitle>{editingId ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
-                     <DialogDescription>Gerencie dados, perfil e permissões específicas.</DialogDescription>
-                 </DialogHeader>
-                 <form onSubmit={handleSubmit}>
-                     <Tabs defaultValue="access" className="w-full">
-                         <TabsList className="grid w-full grid-cols-2">
-                             <TabsTrigger value="access">Acesso & Perfil</TabsTrigger>
-                             <TabsTrigger value="permissions">Permissões Específicas</TabsTrigger>
-                         </TabsList>
-                         
-                         <TabsContent value="access" className="space-y-4 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Nome Completo</Label>
-                                    <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Email</Label>
-                                    <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Filial</Label>
-                                    <Select value={formData.branchId} onValueChange={v => setFormData({...formData, branchId: v})}>
-                                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Perfil (Role)</Label>
-                                    <Select value={formData.roleId} onValueChange={v => setFormData({...formData, roleId: v})}>
-                                        <SelectTrigger><SelectValue placeholder="Selecione o perfil..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {roles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                         </TabsContent>
+  const savePermissions = async () => {
+    if (!selectedUser) return
+    try {
+      setSaving(true)
+      await api.put(`/users/${selectedUser.id}/permissions`, {
+        permissionSlugs: directSlugs,
+      })
+      toast.success('Concessões individuais atualizadas.')
+      setSelectedUser(null)
+      await load()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível salvar as concessões.'))
+    } finally {
+      setSaving(false)
+    }
+  }
 
-                         <TabsContent value="permissions" className="py-4">
-                             <div className="space-y-4">
-                                 <div className="bg-yellow-50 p-3 rounded border border-yellow-200 text-sm text-yellow-800">
-                                     As permissões abaixo são <strong>adicionais</strong> às do perfil selecionado.
-                                 </div>
-                                 <div className="grid grid-cols-2 gap-4">
-                                     {sortedGroups.map(group => (
-                                         <Card key={group} className="shadow-none border">
-                                             <CardHeader className="py-3 px-4 bg-slate-50">
-                                                 <CardTitle className="text-sm font-medium">{group}</CardTitle>
-                                             </CardHeader>
-                                             <CardContent className="p-0">
-                                                 {groupedPerms[group].map(perm => (
-                                                     <div key={perm.id} className="flex items-start space-x-2 p-3 border-b last:border-0 hover:bg-slate-50 transition-colors">
-                                                         <Checkbox 
-                                                            id={`spec-${perm.id}`} 
-                                                            checked={formData.specificPermissionSlugs.includes(perm.slug)}
-                                                            onCheckedChange={() => togglePerm(perm.slug)}
-                                                         />
-                                                         <label htmlFor={`spec-${perm.id}`} className="text-xs leading-tight cursor-pointer">
-                                                             <span className="font-medium block">{perm.description}</span>
-                                                             <span className="text-[10px] text-muted-foreground">{perm.slug}</span>
-                                                         </label>
-                                                     </div>
-                                                 ))}
-                                             </CardContent>
-                                         </Card>
-                                     ))}
-                                 </div>
-                             </div>
-                         </TabsContent>
-                     </Tabs>
-
-                     <DialogFooter className="mt-4">
-                         <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                         <Button type="submit" disabled={createLoading}>
-                             {createLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar"}
-                         </Button>
-                     </DialogFooter>
-                 </form>
-             </DialogContent>
-        </Dialog>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Colaboradores</CardTitle>
-            <div className="relative pt-2">
-              <Search className="absolute left-2.5 top-5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar usuário..."
-                className="pl-8 sm:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-              {loading ? <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /> : (
-                  <Table>
-                      <TableHeader>
-                      <TableRow>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Perfil</TableHead>
-                          <TableHead>Filial</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                      {filteredUsers.map((emp) => (
-                          <TableRow key={emp.id}>
-                          <TableCell>
-                              <div className="font-medium">{emp.user.name}</div>
-                              <div className="text-xs text-muted-foreground">{emp.user.email}</div>
-                          </TableCell>
-                          <TableCell>
-                              {emp.role ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                                      {emp.role.name}
-                                  </span>
-                              ) : <span className="text-muted-foreground">-</span>}
-                          </TableCell>
-                          <TableCell>{emp.branch?.name}</TableCell>
-                          <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(emp)}>
-                                  <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="text-red-500" onClick={() => {}}>
-                                  <Trash2 className="h-4 w-4" />
-                              </Button>
-                          </TableCell>
-                          </TableRow>
-                      ))}
-                      </TableBody>
-                  </Table>
-              )}
+  if (!canView) {
+    return (
+      <div className="app-page">
+        <Card className="app-section-card">
+          <CardContent className="flex min-h-48 flex-col items-center justify-center gap-2 text-center">
+            <UserCog className="h-8 w-8 text-muted-foreground" />
+            <h1 className="text-lg font-semibold">Acesso restrito</h1>
+            <p className="text-sm text-muted-foreground">Você não possui permissão para visualizar usuários.</p>
           </CardContent>
         </Card>
       </div>
-    </RoleGate>
+    )
+  }
+
+  return (
+    <div className="app-page">
+      <div className="app-page-header">
+        <div>
+          <p className="app-kicker">Cadastros</p>
+          <h1 className="app-title">Usuários e exceções de acesso</h1>
+          <p className="app-description">Consulte o perfil herdado e conceda acessos adicionais sem alterar o escopo da conta.</p>
+        </div>
+      </div>
+
+      <Card className="app-section-card">
+        <CardHeader className="gap-3">
+          <CardTitle>Contas no seu escopo</CardTitle>
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou e-mail" className="pl-9" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Tipo de acesso</TableHead>
+                  <TableHead>Perfil</TableHead>
+                  <TableHead>Concessões diretas</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </TableCell>
+                    <TableCell>{accessTypeLabels[user.accessType]}</TableCell>
+                    <TableCell>{user.employees[0]?.role?.name ?? 'Sem perfil funcional'}</TableCell>
+                    <TableCell>{user.directPermissionGrants.length}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openPermissions(user)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Revisar acesso
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Acesso de {selectedUser?.name}</DialogTitle>
+            <DialogDescription>
+              Permissões herdadas ficam bloqueadas. Marque somente as exceções adicionais necessárias.
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs defaultValue="direct">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="direct">Concessões individuais</TabsTrigger>
+              <TabsTrigger value="effective">Resultado efetivo ({effectiveSlugs.size})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="direct" className="space-y-4 pt-4">
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                A concessão adiciona capacidade ao perfil; ela não libera dados de outra empresa ou grupo.
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {Object.keys(groupedPermissions).sort().map((group) => (
+                  <Card key={group} className="shadow-none">
+                    <CardHeader className="border-b py-3"><CardTitle className="text-sm">{group}</CardTitle></CardHeader>
+                    <CardContent className="divide-y p-0">
+                      {groupedPermissions[group].map((item) => {
+                        const inherited = inheritedSlugs.has(item.slug)
+                        return (
+                          <label key={item.id} className="flex cursor-pointer items-start gap-3 p-3">
+                            <Checkbox
+                              checked={inherited || directSlugs.includes(item.slug)}
+                              disabled={!canManage || inherited}
+                              onCheckedChange={() => toggleDirectPermission(item.slug)}
+                            />
+                            <span className="min-w-0 text-sm">
+                              <span className="block font-medium">{item.description}</span>
+                              <span className="block text-xs text-muted-foreground">{item.slug}{inherited ? ' · herdada do perfil' : ''}</span>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="effective" className="pt-4">
+              <div className="grid gap-2 md:grid-cols-2">
+                {[...effectiveSlugs].sort().map((slug) => (
+                  <div key={slug} className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    <span>{slug}</span>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
+            <Button disabled={!canManage || saving} onClick={savePermissions}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar concessões
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

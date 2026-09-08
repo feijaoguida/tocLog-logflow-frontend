@@ -2,40 +2,23 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api'
 
-const PERMISSION_ALIASES: Record<string, string[]> = {
-  'rh.activities.view': ['rh.view'],
-  'rh.activities.manage': ['rh.employees.edit'],
-  'rh.expenses.view': ['rh.view'],
-  'rh.expenses.manage': ['rh.employees.edit'],
-  'rh.movements.view': ['rh.employees.view'],
-  'rh.movements.manage': ['rh.employees.edit'],
-  'procurement.requests.view': [
-    'procurement.requests.view.own',
-    'procurement.requests.view.department',
-    'procurement.requests.view.company',
-  ],
-  'procurement.requests.approve': ['procurement.requests.approve.department'],
-  'vacation.request.for_others': ['vacation.manage'],
-  'vacation.approve.manager': ['vacation.manage'],
-  'vacation.approve.hr': ['vacation.manage'],
-  'vacation.cancel.hr': ['vacation.manage'],
-  'external-fleet.drivers.view': ['external-fleet.drivers.manage'],
-  'external-fleet.vehicles.view': ['external-fleet.vehicles.manage'],
-  'integrations.view': ['integrations.manage'],
-  'shipments.routes.view': ['shipments.routes.assign', 'shipments.routes.create'],
-  'shipments.cargo.view': ['shipments.cargo.create'],
-}
-
-
-interface User {
+export interface User {
   id: string
   name: string
   email: string
   role: { name: string } | string
-  companyId?: string
-  employeeId?: string
-  permissions?: string[]
+  accessType: 'EMPLOYEE' | 'EXTERNAL_DRIVER' | 'COMPANY_ADMIN' | 'SAAS_ADMIN'
+  companyId?: string | null
+  groupId?: string | null
+  allowedCompanyIds?: string[] | null
+  employeeId?: string | null
+  externalDriverId?: string | null
+  roleId?: string | null
+  permissions: string[]
+  inheritedPermissions?: string[]
+  directPermissions?: string[]
   avatarUrl?: string
 }
 
@@ -46,6 +29,7 @@ interface AuthContextType {
   login: (token: string, userData: User) => void
   logout: () => void
   hasPermission: (permission: string) => boolean
+  refreshProfile: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -58,12 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
         try {
+            const token = localStorage.getItem('token')
             const storedUser = localStorage.getItem('user')
             if (storedUser) {
                 setUser(JSON.parse(storedUser))
             }
+            if (token) {
+              const { data } = await api.get<User>('/auth/profile')
+              localStorage.setItem('user', JSON.stringify(data))
+              setUser(data)
+            }
         } catch (error) {
             console.error("Auth check failed", error)
+            localStorage.removeItem('user')
+            localStorage.removeItem('token')
+            setUser(null)
         } finally {
             setIsLoading(false)
         }
@@ -76,7 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(userData))
     setUser(userData)
-    router.push('/dashboard')
+    router.push(
+      userData.accessType === 'SAAS_ADMIN'
+        ? '/dashboard/users'
+        : '/dashboard',
+    )
   }
 
   const logout = () => {
@@ -87,23 +84,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login')
   }
 
+  const refreshProfile = async () => {
+    try {
+      const { data } = await api.get<User>('/auth/profile')
+      localStorage.setItem('user', JSON.stringify(data))
+      setUser(data)
+      return data
+    } catch {
+      logout()
+      return null
+    }
+  }
+
   const hasPermission = (permission: string) => {
       if (!user) return false
       
-      // Admin bypass
-      const roleName = typeof user.role === 'string' ? user.role : user.role?.name;
-      if (roleName === 'ADMIN') return true;
-
       const permissions = user.permissions || []
-      if (permissions.includes(permission)) return true
-
-      return (PERMISSION_ALIASES[permission] || []).some((alias) =>
-        permissions.includes(alias),
-      )
+      return permissions.includes(permission)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasPermission, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

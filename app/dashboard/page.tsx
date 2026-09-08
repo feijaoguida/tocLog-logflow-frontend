@@ -15,10 +15,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user?.employeeId) {
        fetchViews(user.employeeId)
-    } else if (user?.id && !loading) {
-       // Fallback if employeeId isn't on user object directly (depends on AuthContext)
-       // Usually we might need to fetch employee profile first.
-       // For now assuming existing flow
+    } else if (user?.id) {
+       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
@@ -44,8 +42,22 @@ export default function DashboardPage() {
   }, [views])
 
   if (!user) return <div className="p-8">Carregando usuário...</div>
-  // User might not have employeeId if they are just User. Adjust logic if needed.
-  // Assuming user context has basic info.
+  if (!user.employeeId) {
+      return (
+          <div className="container mx-auto max-w-3xl pt-8">
+              <div className="rounded-xl border bg-white p-8 shadow-sm">
+                  <h1 className="text-2xl font-bold tracking-tight">
+                      {user.accessType === 'SAAS_ADMIN' ? 'Backoffice SaaS' : 'Acesso externo'}
+                  </h1>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                      {user.accessType === 'SAAS_ADMIN'
+                          ? 'Use a área de Usuários para a administração global. As demais telas de backoffice serão adicionadas em ciclos próprios.'
+                          : 'O acesso do motorista externo é realizado pelo aplicativo mobile e limitado às rotas atribuídas.'}
+                  </p>
+              </div>
+          </div>
+      )
+  }
   
   if (loading) {
       return (

@@ -145,7 +145,7 @@ export function AppSidebar() {
               { title: "Departamentos", url: "/dashboard/rh/departments", permission: "rh.departments.view" },
               { title: "Design System", url: "/dashboard/cadastros/design-system", permission: "system.settings.view" },
               { title: "Filiais", url: "/dashboard/cadastros/branches", permission: "system.branches.view" },
-              { title: "Controle Permissões", url: "/dashboard/cadastros/permissions", permission: "system.users.view" },
+              { title: "Controle Permissões", url: "/dashboard/cadastros/permissions", permission: "system.profiles.view" },
           ]
       },
       {

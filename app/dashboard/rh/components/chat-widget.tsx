@@ -18,7 +18,7 @@ interface Message {
 }
 
 interface User {
-    id: string // userId
+    id: string // employeeId
     name: string
     email: string
 }
@@ -52,13 +52,13 @@ export function ChatWidget() {
     const fetchMyProfile = async () => {
         try {
             const { data } = await api.get('/auth/profile')
-            setMyUserId(data.userId)
+            setMyUserId(data.employeeId)
         } catch {}
     }
 
     const fetchUsers = async () => {
         try {
-            const { data } = await api.get('/users')
+            const { data } = await api.get('/chat/recipients')
             setUsers(data)
         } catch {}
     }
@@ -66,7 +66,7 @@ export function ChatWidget() {
     const fetchMessages = async (otherUserId: string) => {
         if(!myUserId) return
         try {
-            const { data } = await api.get(`/chat?userId1=${myUserId}&userId2=${otherUserId}`)
+            const { data } = await api.get(`/chat?userId2=${otherUserId}`)
             setMessages(data.reverse())
         } catch {}
     }
@@ -76,7 +76,6 @@ export function ChatWidget() {
         try {
             await api.post('/chat', {
                 content: newMessage,
-                senderId: myUserId,
                 receiverId: activeUser.id
             })
             setNewMessage("")

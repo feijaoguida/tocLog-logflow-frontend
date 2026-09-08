@@ -13,6 +13,7 @@ import { useSettings } from "@/context/settings-context"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { formatCPF } from "@/components/employee-form"
+import { useAuth } from "@/context/auth-context"
 
 // Interfaces
 interface Employee {
@@ -45,10 +46,8 @@ interface Employee {
 
 export default function EmployeesPage() {
   const router = useRouter()
+  const { hasPermission } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
-  
-  // Roles and Permissions base
-  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -60,13 +59,8 @@ export default function EmployeesPage() {
   const loadData = async () => {
       try {
           setIsLoading(true)
-          const [empRes, profileRes] = await Promise.all([
-              api.get('/employees'),
-              api.get('/auth/profile')
-          ])
-          
+          const empRes = await api.get('/employees')
           setEmployees(empRes.data)
-          setCurrentUserProfile(profileRes.data)
       } catch (error) {
           console.error("Erro ao carregar dados:", error)
           toast.error("Erro ao carregar funcionários.")
@@ -96,8 +90,9 @@ export default function EmployeesPage() {
       } catch(e) { toast.error("Erro ao excluir") }
   }
 
-  // Logic updated to check role instead of employee relationship
-  const canManage = currentUserProfile?.role === 'ADMIN' || currentUserProfile?.role === 'MANAGER'
+  const canCreate = hasPermission('rh.employees.create')
+  const canEdit = hasPermission('rh.employees.edit')
+  const canDelete = hasPermission('rh.employees.delete')
   
   const filtered = employees.filter(e => 
       e.user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -119,7 +114,7 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Funcionários</h1>
           
-          {canManage && (
+          {canCreate && (
             <Button className="gap-2" onClick={() => router.push('/dashboard/rh/employees/new')}>
                 <span className="material-symbols-outlined text-[18px]">add</span> Novo Funcionário
             </Button>
@@ -198,19 +193,21 @@ export default function EmployeesPage() {
                                       </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {canManage && (
-                                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-green-600 hover:bg-green-50" onClick={() => handleViewClick(emp)}>
                                                   <span className="material-symbols-outlined text-[18px]">visibility</span>
                                               </Button>
+                                              {canEdit && (
                                               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleEditClick(emp)}>
                                                   <span className="material-symbols-outlined text-[18px]">edit</span>
                                               </Button>
+                                              )}
+                                              {canDelete && (
                                               <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(emp.id)}>
                                                   <span className="material-symbols-outlined text-[18px]">delete</span>
                                               </Button>
-                                          </div>
-                                    )}
+                                              )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -256,19 +253,17 @@ export default function EmployeesPage() {
                                 </div>
                             </div>
 
-                            {canManage && (
-                              <div className="flex gap-2 pt-4 border-t border-slate-200">
+                            <div className="flex gap-2 pt-4 border-t border-slate-200">
                                    <Button variant="outline" size="sm" className="flex-1 bg-white hover:text-green-700 hover:bg-green-50" onClick={() => handleViewClick(emp)}>
                                       <span className="material-symbols-outlined text-[16px] mr-2">visibility</span> Ver
                                   </Button>
-                                   <Button variant="outline" size="sm" className="flex-1 bg-white hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEditClick(emp)}>
+                                  {canEdit && <Button variant="outline" size="sm" className="flex-1 bg-white hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEditClick(emp)}>
                                       <span className="material-symbols-outlined text-[16px] mr-2">edit</span> Editar
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="bg-white text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(emp.id)}>
+                                  </Button>}
+                                  {canDelete && <Button variant="outline" size="sm" className="bg-white text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(emp.id)}>
                                       <span className="material-symbols-outlined text-[16px]">delete</span>
-                                  </Button>
+                                  </Button>}
                               </div>
-                            )}
                         </CardContent>
                     </Card>
                 ))}

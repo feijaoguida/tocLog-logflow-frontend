@@ -74,9 +74,37 @@ const WIDGET_COLORS = [
     { name: 'Vermelho Claro', value: '#fef2f2' },
 ]
 
+const WIDGET_PERMISSIONS: Partial<Record<WidgetType, string>> = {
+    HR_STATS: 'rh.view',
+    RH_VACATIONS: 'vacation.view',
+    RH_ROOMS: 'rh.rooms.view',
+    PURCHASE_PENDING: 'procurement.requests.view',
+    PURCHASE_SUMS: 'procurement.orders.view',
+    PURCHASE_RECENT_ORDERS: 'procurement.requests.view.own',
+    PURCHASE_REQ_STATUS: 'procurement.requests.view',
+    PURCHASE_QUOTE_STATUS: 'procurement.quotations.view',
+    PURCHASE_PO_STATUS: 'procurement.orders.view',
+    PURCHASE_NEW_PRODUCTS: 'procurement.products.view',
+    FLEET_STATUS: 'fleet.dashboard.view',
+    FLEET_LIST: 'fleet.vehicles.view',
+    FLEET_CHECKLISTS: 'fleet.checklists.view',
+    HD_MY_TICKETS: 'helpdesk.ticket.view.own',
+    HD_RECENT_ALL: 'helpdesk.ticket.view.all',
+    HD_TOP_AGENTS: 'helpdesk.dashboard.view',
+    HD_TOP_REQUESTERS: 'helpdesk.dashboard.view',
+    HD_CATEGORIES: 'helpdesk.dashboard.view',
+    LOG_PALLETS: 'logistics.pallets.view',
+    LOG_ASSETS: 'logistics.assets.view',
+    FEED: 'feed.view',
+}
+
 export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChanged }: DashboardEngineProps) {
     const { hasPermission } = useAuth()
-    const canManageDashboard = hasPermission('dashboard.manage') || hasPermission('system.settings.view') // Fallback or specific permission
+    const canManageDashboard = hasPermission('dashboard.manage')
+    const canUseWidget = useCallback((type: WidgetType) => {
+        const permission = WIDGET_PERMISSIONS[type]
+        return !permission || hasPermission(permission)
+    }, [hasPermission])
 
     const [views, setViews] = useState<DashboardView[]>(initialViews)
     const [currentViewId, setCurrentViewId] = useState<string>(initialViews.length > 0 ? initialViews[0].id : '')
@@ -126,7 +154,11 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
 
     // Helper to fetch data safely
     const fetchWidgetData = useCallback(async (layout: any[]) => {
-        const types = [...new Set(layout.map((item: any) => item.i.split('-')[0]))]
+        const types = [...new Set(
+            layout
+                .map((item: any) => item.i.split('-')[0] as WidgetType)
+                .filter(canUseWidget)
+        )]
         if (types.length === 0) return
         
         const query = types.join(',')
@@ -138,7 +170,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                })
            })
            .catch(e => console.error("Widget data fetch error", e))
-    }, [])
+    }, [canUseWidget])
 
     useEffect(() => {
         if (!currentView) return
@@ -265,7 +297,6 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
          try {
             const { data: newView } = await api.post('/dashboard/views', {
                 name: newViewName,
-                employeeId: currentEmployeeId,
                 layout: [] // Start empty
             })
 
@@ -370,7 +401,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="max-h-[300px] overflow-y-auto w-[250px]">
-                                            {Object.values(WIDGET_REGISTRY).map(w => (
+                                            {Object.values(WIDGET_REGISTRY).filter(w => canUseWidget(w.id)).map(w => (
                                                 <DropdownMenuItem key={w.id} onSelect={() => handleAddWidget(w.id as WidgetType)}>
                                                     {w.name}
                                                 </DropdownMenuItem>
@@ -419,6 +450,7 @@ export function DashboardEngine({ initialViews, currentEmployeeId, onViewsChange
                         >
                             {(displayLayouts.lg || []).map((item: any) => {
                                 const type = item.i.split('-')[0] as WidgetType
+                                if (!canUseWidget(type)) return null
                                 const widgetDef = WIDGET_REGISTRY[type]
                                 const WidgetComponent = widgetDef?.component
                                 const config = widgetConfig[item.i] || {}

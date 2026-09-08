@@ -39,8 +39,6 @@ export function IntranetFeed({ profile, employees }: IntranetFeedProps) {
         try {
             await api.post('/feed', {
                 content,
-                authorId: profile.id, // Ensure profile.id matches what backend expects (profile ID vs user ID)
-                tenantId: profile.branchId,
                 type,
                 mediaUrls,
                 eventDate,
@@ -57,7 +55,7 @@ export function IntranetFeed({ profile, employees }: IntranetFeedProps) {
     const handleLike = async (postId: string) => {
         if (!profile) return
         try {
-            await api.post(`/feed/${postId}/like`, { authorId: profile.id })
+            await api.post(`/feed/${postId}/like`)
             // Optimistic update handled in child, but good to refresh or update state here too for consistency
         } catch (error) {
             toast.error("Erro ao curtir")
@@ -67,7 +65,7 @@ export function IntranetFeed({ profile, employees }: IntranetFeedProps) {
     const handleComment = async (postId: string, content: string) => {
         if (!profile) return
         try {
-            await api.post(`/feed/${postId}/comments`, { authorId: profile.id, content })
+            await api.post(`/feed/${postId}/comments`, { content })
             toast.success("Comentário enviado")
             fetchFeed()
         } catch (error) {

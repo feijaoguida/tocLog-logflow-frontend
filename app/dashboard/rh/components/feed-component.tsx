@@ -13,16 +13,17 @@ import { FeedComposer } from './feed-composer'
 import { StoriesComponent } from './stories-component'
 import { FeedbackWidget } from './feedback-widget'
 import { api } from "@/lib/api"
+import { useAuth } from '@/context/auth-context'
 
 export function FeedComponent() {
+    const { hasPermission } = useAuth()
     const [posts, setPosts] = useState<FeedPost[]>([])
     const [loading, setLoading] = useState(false)
     const [myProfile, setMyProfile] = useState<Profile | null>(null)
     const [employees, setEmployees] = useState<EmployeeOption[]>([])
 
-    const fetchFeed = async (tenantId?: string) => {
-        const feedUrl = tenantId ? `/feed?tenantId=${tenantId}` : `/feed`;
-        const { data } = await api.get(feedUrl)
+    const fetchFeed = async (_tenantId?: string) => {
+        const { data } = await api.get('/feed')
         setPosts(data)
     }
 
@@ -39,7 +40,7 @@ export function FeedComponent() {
              // 2. Employees
              const { data: allEmployees } = await api.get('/employees')
              
-             const me = allEmployees.find((e: any) => e.userId === user.userId);
+             const me = allEmployees.find((e: any) => e.id === user.employeeId);
              if(me) setMyProfile({ ...me })
              
              setEmployees(allEmployees.filter((e: any) => e.status === 'ACTIVE'))
@@ -56,8 +57,6 @@ export function FeedComponent() {
         try {
             await api.post('/feed', {
                 content,
-                authorId: myProfile.id,
-                tenantId: myProfile.branchId,
                 type,
                 mediaUrls,
                 eventDate,
@@ -107,14 +106,14 @@ export function FeedComponent() {
         }));
 
         try {
-            await api.post(`/feed/${postId}/like`, { authorId: myProfile.id })
+            await api.post(`/feed/${postId}/like`)
         } catch(e) { toast.error("Erro ao curtir"); fetchFeed(myProfile.branchId); }
     }
 
     const handleComment = async (postId: string, content: string) => {
         if(!myProfile) return;
         try {
-            await api.post(`/feed/${postId}/comments`, { authorId: myProfile.id, content })
+            await api.post(`/feed/${postId}/comments`, { content })
             toast.success("Comentário enviado")
             fetchFeed(myProfile.branchId)
         } catch(e) { toast.error("Erro ao comentar") }
@@ -126,8 +125,7 @@ export function FeedComponent() {
         return p.role?.name || '';
     }
 
-    const roleName = getRoleName(myProfile);
-    const canManage = (roleName === 'ADMIN' || roleName === 'MANAGER');
+    const canManage = hasPermission('feed.manage');
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
