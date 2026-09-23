@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -15,9 +13,11 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { uploadHelpdeskFile, type HelpdeskContext } from '../operations'
 
 type CatalogItem = {
   id: string
@@ -48,7 +48,14 @@ export default function NewTicketPage() {
   const [description, setDescription] = useState('')
   const [attachment, setAttachment] = useState<File | null>(null)
 
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  const [uploadId, setUploadId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [canCreate, setCanCreate] = useState(false)
+  const lock = useRef(false)
+
   useEffect(() => {
+    api.get<HelpdeskContext>('/helpdesk/context').then(({ data }) => setCanCreate(data.capabilities.createTicket)).catch(() => setCanCreate(false))
     void fetchCatalog()
   }, [])
 
@@ -74,44 +81,33 @@ export default function NewTicketPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (lock.current || !canCreate) return
 
     if (!selectedService) {
       toast.error('Selecione um serviço do catálogo antes de continuar.')
       return
     }
 
-    setSubmitting(true)
+    lock.current = true; setSubmitting(true); setError('')
+    let ticketId = createdId
     try {
-      const { data } = await api.post('/helpdesk/tickets', {
-        subject,
-        description,
-        serviceCatalogItemId: selectedService.id,
-        categoryId: selectedService.ticketCategory?.id,
-        priority: selectedService.defaultPriority,
-      })
-
-      if (attachment) {
-        const formData = new FormData()
-        formData.append('file', attachment)
-        const upload = await api.post('/uploads/helpdesk', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+      if (!ticketId) {
+        const { data } = await api.post('/helpdesk/tickets', {
+          subject, description, serviceCatalogItemId: selectedService.id,
+          categoryId: selectedService.ticketCategory?.id, priority: selectedService.defaultPriority,
         })
-
-        await api.post(`/helpdesk/tickets/${data.id}/attachments`, {
-          fileName: attachment.name,
-          fileUrl: upload.data.url,
-          mimeType: attachment.type || 'application/octet-stream',
-          size: attachment.size,
-        })
+        ticketId = data.id; setCreatedId(ticketId)
       }
-
+      if (attachment) {
+        const uploaded = uploadId ?? await uploadHelpdeskFile(attachment)
+        setUploadId(uploaded)
+        await api.post(`/helpdesk/tickets/${ticketId}/attachments`, { uploadId: uploaded })
+      }
       toast.success('Chamado aberto com sucesso.')
-      router.push('/dashboard/helpdesk')
+      router.push(`/dashboard/helpdesk/${ticketId}`)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Não foi possível abrir o chamado.'))
-    } finally {
-      setSubmitting(false)
-    }
+      setError(ticketId ? 'Chamado criado; o anexo falhou. Tente reenviar o anexo ou abra o chamado sem ele.' : getApiErrorMessage(error, 'Não foi possível abrir o chamado.'))
+    } finally { lock.current = false; setSubmitting(false) }
   }
 
   return (
@@ -125,6 +121,8 @@ export default function NewTicketPage() {
         </p>
       </section>
 
+      {error && <p role="alert">{error}</p>}
+      {createdId && <Button variant="outline" onClick={() => router.push(`/dashboard/helpdesk/${createdId}`)}>Abrir chamado criado sem reenviar anexo</Button>}
       <form className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]" onSubmit={handleSubmit}>
         <section className="app-section-card space-y-4">
           <div className="space-y-1">
@@ -139,6 +137,7 @@ export default function NewTicketPage() {
             <Label htmlFor="subject">Assunto</Label>
             <Input
               id="subject"
+              disabled={!!createdId}
               placeholder="Ex: preciso consultar o status de um pedido de compra"
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
@@ -150,6 +149,7 @@ export default function NewTicketPage() {
             <Label htmlFor="description">Descrição detalhada</Label>
             <Textarea
               id="description"
+              disabled={!!createdId}
               className="min-h-[180px]"
               placeholder="Descreva o contexto, o impacto e o que precisa do atendimento."
               value={description}
@@ -164,7 +164,7 @@ export default function NewTicketPage() {
               id="attachment"
               type="file"
               accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx"
-              onChange={(event) => setAttachment(event.target.files?.[0] || null)}
+              onChange={(event) => { setAttachment(event.target.files?.[0] || null); setUploadId(null) }}
             />
             <p className="text-xs text-muted-foreground">
               Use quando precisar enviar comprovante, captura de tela ou documento de apoio.
@@ -175,8 +175,8 @@ export default function NewTicketPage() {
             <Button type="button" variant="ghost" onClick={() => router.back()}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={submitting || !selectedService}>
-              {submitting ? 'Abrindo...' : 'Abrir chamado'}
+            <Button type="submit" disabled={submitting || !selectedService || !canCreate}>
+              {submitting ? 'Enviando...' : createdId ? 'Reenviar anexo' : 'Abrir chamado'}
             </Button>
           </div>
         </section>
@@ -199,49 +199,27 @@ export default function NewTicketPage() {
               Nenhum serviço configurado para sua empresa neste momento.
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                O primeiro serviço disponível é selecionado automaticamente. Se precisar, você
-                pode trocar antes de abrir o chamado.
-              </div>
-              {catalog.map((item) => {
-                const isSelected = item.id === selectedServiceId
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedServiceId(item.id)}
-                    className={`w-full rounded-2xl border p-4 text-left transition ${
-                      isSelected
-                        ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-border bg-card hover:border-primary/40'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="font-semibold">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {item.description || 'Sem descrição cadastrada.'}
-                        </div>
-                      </div>
-                      <Badge variant="outline">
-                        {PRIORITY_LABELS[item.defaultPriority] || item.defaultPriority}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>Departamento: {item.department?.name || 'Não informado'}</span>
-                      <span>Fila: {item.queue?.name || 'Não informada'}</span>
-                      <span>Categoria: {item.ticketCategory?.name || 'Não informada'}</span>
-                    </div>
-                    {item.approvalMode === 'REQUIRED' ? (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        <AlertCircle className="h-4 w-4" />
-                        Este serviço exige aprovação antes do atendimento.
-                      </div>
-                    ) : null}
-                  </button>
-                )
-              })}
+            <div className="field-stack">
+              <Label htmlFor="service-catalog">Serviço</Label>
+              <Select
+                value={selectedServiceId}
+                onValueChange={setSelectedServiceId}
+                disabled={!!createdId}
+              >
+                <SelectTrigger id="service-catalog">
+                  <SelectValue placeholder="Selecione um serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalog.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O primeiro serviço disponível é selecionado automaticamente. Você pode trocar antes de abrir o chamado.
+              </p>
             </div>
           )}
 

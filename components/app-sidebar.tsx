@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar"
 
 import { useAuth } from "@/context/auth-context"
+import { api } from "@/lib/api"
 import React from "react" // Added
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible" // Added
 import { Skeleton } from "@/components/ui/skeleton" // Added
@@ -44,9 +45,19 @@ type MenuGroup = {
 }
 
 export function AppSidebar() {
-  const { hasPermission, logout, isLoading } = useAuth()
+  const { user, hasPermission, logout, isLoading } = useAuth()
   const { setOpen, isMobile, setOpenMobile } = useSidebar()
   const { accordionMode, collapseOnClick } = useSettings()
+
+  const [helpdeskCapabilities, setHelpdeskCapabilities] = React.useState<Record<string, boolean>>({})
+  React.useEffect(() => {
+    let active = true
+    if (!user) return
+    api.get('/helpdesk/context').then(({ data }) => {
+      if (active) setHelpdeskCapabilities(data.capabilities ?? {})
+    }).catch(() => { if (active) setHelpdeskCapabilities({}) })
+    return () => { active = false }
+  }, [user])
 
   const [openGroup, setOpenGroup] = React.useState<string | null>(null)
 
@@ -80,7 +91,15 @@ export function AppSidebar() {
       }))
       .filter((item) => {
         const hasVisibleChildren = Boolean(item.items?.length)
-        const hasItemPermission = !item.permission || hasPermission(item.permission)
+        const capability: Record<string, boolean | undefined> = {
+          '/dashboard/helpdesk': helpdeskCapabilities.myTickets,
+          '/dashboard/helpdesk/new': helpdeskCapabilities.createTicket,
+          '/dashboard/helpdesk/queue': helpdeskCapabilities.queues,
+          '/dashboard/helpdesk/approvals': helpdeskCapabilities.approvals || helpdeskCapabilities.settings,
+          '/dashboard/helpdesk/metrics': helpdeskCapabilities.dashboard,
+          '/dashboard/helpdesk/configuracoes': helpdeskCapabilities.settings || helpdeskCapabilities.manageQueues,
+        }
+        const hasItemPermission = item.url in capability ? Boolean(capability[item.url]) : !item.permission || hasPermission(item.permission)
 
         if (hasVisibleChildren) return true
         if (hasItemPermission && item.url !== "#") return true
@@ -212,6 +231,7 @@ export function AppSidebar() {
           items: [
               { title: "Meus Chamados", url: "/dashboard/helpdesk" },
               { title: "Novo Chamado", url: "/dashboard/helpdesk/new", permission: "helpdesk.ticket.create" },
+              { title: "Minhas aprovações", url: "/dashboard/helpdesk/approvals" },
               { title: "Atendimento", url: "/dashboard/helpdesk/queue", permission: "helpdesk.ticket.view.all" }, // For Agents
               { title: "Dashboard", url: "/dashboard/helpdesk/metrics", permission: "helpdesk.dashboard.view" }, // For Managers
               { title: "Configurações", url: "/dashboard/helpdesk/configuracoes", permission: "helpdesk.settings.manage" },

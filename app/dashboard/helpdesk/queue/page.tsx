@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Filter, Inbox, Search, ShieldCheck, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { isAxiosError } from 'axios'
+import { SlaStatus, type Sla } from '../operations'
 
 import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useAuth } from '@/context/auth-context'
+import { TicketIndicatorsView, type TicketIndicators } from '../indicators'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -37,7 +40,11 @@ type QueueOption = {
 }
 
 type QueueTicket = {
+  indicators?: TicketIndicators
   id: string
+  version: number
+  allowedActions: string[]
+  sla?: Sla | null
   code: number
   subject: string
   status: string
@@ -122,11 +129,13 @@ export default function HelpdeskQueuePage() {
   const [onlyMine, setOnlyMine] = useState(false)
   const [unassignedOnly, setUnassignedOnly] = useState(false)
 
-  const canManage = hasPermission('helpdesk.ticket.manage')
+  const canViewMetrics = hasPermission('helpdesk.dashboard.view')
+  const canViewQueues = hasPermission('helpdesk.queue.view')
+  const actionLock = useRef(false)
 
   useEffect(() => {
     void loadQueueContext()
-  }, [queueId, status, onlyMine, unassignedOnly])
+  }, [queueId, status, onlyMine, unassignedOnly, canViewMetrics, canViewQueues])
 
   async function loadQueueContext() {
     setLoading(true)
@@ -139,16 +148,16 @@ export default function HelpdeskQueuePage() {
       if (onlyMine) query.set('onlyMine', 'true')
       if (unassignedOnly) query.set('unassignedOnly', 'true')
 
-      const [{ data: queueData }, { data: ticketsData }, { data: summaryData }] =
-        await Promise.all([
-          api.get<QueueOption[]>('/helpdesk/queues'),
-          api.get<QueueTicket[]>(`/helpdesk/queue/tickets?${query.toString()}`),
-          api.get<HelpdeskSummary>('/helpdesk/metrics/summary'),
-        ])
-
-      setQueues(queueData)
-      setTickets(ticketsData)
-      setSummary(summaryData)
+      const ticketsRequest = api.get<QueueTicket[]>(`/helpdesk/queue/tickets?${query.toString()}`)
+        .then(({ data }) => setTickets(data))
+        .finally(() => setLoading(false))
+      const queuesRequest = canViewQueues
+        ? api.get<QueueOption[]>('/helpdesk/queues').then(({ data }) => setQueues(data)).catch(() => {})
+        : Promise.resolve()
+      const metricsRequest = canViewMetrics
+        ? api.get<HelpdeskSummary>('/helpdesk/metrics/summary').then(({ data }) => setSummary(data)).catch(() => setSummary(null))
+        : Promise.resolve(setSummary(null))
+      await Promise.all([ticketsRequest, queuesRequest, metricsRequest])
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, 'Não foi possível carregar a fila operacional.'),
@@ -164,14 +173,18 @@ export default function HelpdeskQueuePage() {
     successMessage: string,
     payload?: Record<string, unknown>,
   ) {
+    if (actionLock.current) return
+    actionLock.current = true
     setActingTicketId(ticketId)
     try {
-      await api.post(endpoint, payload ?? {})
+      await api.post(endpoint, { ...payload, expectedVersion: tickets.find(t => t.id === ticketId)?.version })
       toast.success(successMessage)
       await loadQueueContext()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Não foi possível executar a ação.'))
+      toast.error(isAxiosError(error) && error.response?.status === 409 ? 'Chamado atualizado; a lista será recarregada.' : getApiErrorMessage(error, 'Não foi possível executar a ação.'))
+      if (isAxiosError(error) && [403, 409].includes(error.response?.status ?? 0)) await loadQueueContext()
     } finally {
+      actionLock.current = false
       setActingTicketId(null)
     }
   }
@@ -185,7 +198,8 @@ export default function HelpdeskQueuePage() {
   }
 
   async function handleResolve(ticketId: string) {
-    const reason = window.prompt('Deseja registrar uma observação de resolução?') ?? ''
+    const reason = window.prompt('Informe o resumo público da resolução:')
+    if (!reason?.trim()) return
     await runAction(ticketId, `/helpdesk/tickets/${ticketId}/resolve`, 'Chamado resolvido.', {
       reason: reason.trim() || undefined,
     })
@@ -225,7 +239,7 @@ export default function HelpdeskQueuePage() {
         </p>
       </MenuFunctionHeader>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {canViewMetrics && summary ? <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="app-section-card">
           <CardHeader className="p-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Visíveis</CardTitle>
@@ -244,7 +258,7 @@ export default function HelpdeskQueuePage() {
         </Card>
         <Card className="app-section-card">
           <CardHeader className="p-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">SLA vencido</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">SLA resolução violado</CardTitle>
           </CardHeader>
           <CardContent className="p-0 pt-3 text-3xl font-semibold">
             {summary?.totals.overdueResolution ?? 0}
@@ -258,7 +272,7 @@ export default function HelpdeskQueuePage() {
             {summary?.totals.pendingMyApprovals ?? 0}
           </CardContent>
         </Card>
-      </section>
+      </section> : null}
 
       <section className="app-section-card space-y-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -358,13 +372,9 @@ export default function HelpdeskQueuePage() {
               </TableHeader>
               <TableBody>
                 {tickets.map((ticket) => {
-                  const canPickup = !ticket.assignee?.user?.name && ticket.status !== 'WAITING_APPROVAL'
-                  const canApprove = ticket.status === 'WAITING_APPROVAL'
-                  const isResolved = ticket.status === 'RESOLVED'
-                  const isOverdue =
-                    Boolean(ticket.resolutionDueDate) &&
-                    !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(ticket.status) &&
-                    new Date(ticket.resolutionDueDate || '').getTime() < Date.now()
+                  const canPickup = ticket.allowedActions?.includes('pickup')
+                  const canApprove = ticket.allowedActions?.includes('approve')
+                  const isOverdue = ticket.indicators?.overdueResolution ?? false
 
                   return (
                     <TableRow
@@ -384,9 +394,10 @@ export default function HelpdeskQueuePage() {
                       <TableCell>{ticket.requester?.user?.name || 'Solicitante'}</TableCell>
                       <TableCell>{ticket.assignee?.user?.name || 'Não atribuído'}</TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(ticket.status) as any}>
+                        <Badge variant={getStatusVariant(ticket.status)}>
                           {STATUS_LABELS[ticket.status] || ticket.status}
                         </Badge>
+                          <TicketIndicatorsView indicators={ticket.indicators} />
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
@@ -396,7 +407,7 @@ export default function HelpdeskQueuePage() {
                       <TableCell>
                         <div className="space-y-1">
                           <div>
-                            {ticket.resolutionDueDate
+                            {ticket.sla ? <SlaStatus sla={ticket.sla} /> : ticket.resolutionDueDate
                               ? new Date(ticket.resolutionDueDate).toLocaleDateString('pt-BR')
                               : 'Sem meta'}
                           </div>
@@ -413,7 +424,7 @@ export default function HelpdeskQueuePage() {
                           {canPickup ? (
                             <Button
                               size="sm"
-                              disabled={actingTicketId === ticket.id}
+                              disabled={actingTicketId !== null}
                               onClick={() =>
                                 void runAction(
                                   ticket.id,
@@ -431,7 +442,7 @@ export default function HelpdeskQueuePage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                disabled={actingTicketId === ticket.id}
+                                disabled={actingTicketId !== null}
                                 onClick={() =>
                                   void runAction(
                                     ticket.id,
@@ -446,29 +457,29 @@ export default function HelpdeskQueuePage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                disabled={actingTicketId === ticket.id}
+                                disabled={actingTicketId !== null}
                                 onClick={() => void handleReject(ticket.id)}
                               >
                                 Reprovar
                               </Button>
                             </>
                           ) : null}
-                          {!canApprove && !isResolved ? (
+                          {ticket.allowedActions?.includes('resolve') ? (
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={actingTicketId === ticket.id}
+                              disabled={actingTicketId !== null}
                               onClick={() => void handleResolve(ticket.id)}
                             >
                               <CheckCircle2 className="mr-2 h-4 w-4" />
                               Resolver
                             </Button>
                           ) : null}
-                          {isResolved || canManage ? (
+                          {ticket.allowedActions?.includes('close') ? (
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={actingTicketId === ticket.id}
+                              disabled={actingTicketId !== null}
                               onClick={() => void handleClose(ticket.id)}
                             >
                               Fechar

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { GovernanceFields, QueueGovernance, CategoryEditor, GOVERNANCE_DEFAULTS, type Governance, type GovernanceContext, type Category } from './governance'
 
 import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
-type HelpdeskSettingsRecord = {
+type HelpdeskSettingsRecord = Governance & {
   allowMultipleOpenTickets: boolean
   globalOpenLimit: number
   duplicateWindowHours: number
@@ -34,7 +35,7 @@ type HelpdeskSettingsRecord = {
 type HelpdeskOverview = {
   settings: HelpdeskSettingsRecord
   departments: Array<{ id: string; name: string }>
-  categories: Array<{ id: string; name: string; companyId?: string | null }>
+  categories: Category[]
   queues: Array<{
     id: string
     name: string
@@ -53,6 +54,9 @@ type HelpdeskOverview = {
     description?: string | null
     departmentId: string
     queueId: string
+    slaResponseHours?: number | null
+    slaResolveHours?: number | null
+    regularizationRequired?: boolean
     ticketCategoryId?: string | null
     defaultPriority: string
     approvalMode: string
@@ -88,6 +92,8 @@ type CatalogFormState = {
   departmentId: string
   queueId: string
   ticketCategoryId: string
+  slaResponseHours: string
+  slaResolveHours: string
   defaultPriority: string
   approvalMode: string
   active: boolean
@@ -116,6 +122,8 @@ const EMPTY_CATALOG_FORM: CatalogFormState = {
   departmentId: '',
   queueId: '',
   ticketCategoryId: 'none',
+  slaResponseHours: '',
+  slaResolveHours: '',
   defaultPriority: 'MEDIUM',
   approvalMode: 'NONE',
   active: true,
@@ -127,6 +135,8 @@ const EMPTY_CATALOG_FORM: CatalogFormState = {
 }
 
 export default function HelpdeskSettingsPage() {
+  const [context, setContext] = useState<GovernanceContext | null>(null)
+  const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [savingSettings, setSavingSettings] = useState(false)
   const [runningAutoClose, setRunningAutoClose] = useState(false)
@@ -134,6 +144,7 @@ export default function HelpdeskSettingsPage() {
   const [savingCatalog, setSavingCatalog] = useState(false)
   const [overview, setOverview] = useState<HelpdeskOverview | null>(null)
   const [settings, setSettings] = useState<HelpdeskSettingsRecord>({
+    ...GOVERNANCE_DEFAULTS,
     allowMultipleOpenTickets: true,
     globalOpenLimit: 5,
     duplicateWindowHours: 24,
@@ -150,9 +161,13 @@ export default function HelpdeskSettingsPage() {
   async function loadOverview() {
     setLoading(true)
     try {
+      setLoadError('')
+      const { data: access } = await api.get<GovernanceContext>('/helpdesk/context')
+      setContext(access)
+      if (!access.capabilities.settings) { setOverview(null); return }
       const { data } = await api.get<HelpdeskOverview>('/helpdesk/admin/overview')
       setOverview(data)
-      setSettings(data.settings)
+      setSettings({ ...GOVERNANCE_DEFAULTS, ...data.settings })
       if (!queueForm.departmentId && data.departments[0]) {
         setQueueForm((current) => ({ ...current, departmentId: data.departments[0].id }))
       }
@@ -165,6 +180,7 @@ export default function HelpdeskSettingsPage() {
         }))
       }
     } catch (error) {
+      setLoadError(getApiErrorMessage(error, 'Não foi possível carregar a governança do helpdesk.'))
       toast.error(
         getApiErrorMessage(error, 'Não foi possível carregar a governança do helpdesk.'),
       )
@@ -214,6 +230,8 @@ export default function HelpdeskSettingsPage() {
       departmentId: item.departmentId,
       queueId: item.queueId,
       ticketCategoryId: item.ticketCategoryId || 'none',
+      slaResponseHours: item.slaResponseHours == null ? '' : String(item.slaResponseHours),
+      slaResolveHours: item.slaResolveHours == null ? '' : String(item.slaResolveHours),
       defaultPriority: item.defaultPriority,
       approvalMode: item.approvalMode,
       active: item.active,
@@ -233,6 +251,15 @@ export default function HelpdeskSettingsPage() {
     setSavingSettings(true)
     try {
       const { data } = await api.patch<HelpdeskSettingsRecord>('/helpdesk/settings', {
+        agentScope: settings.agentScope,
+        openingApprovalMode: settings.openingApprovalMode,
+        firstResponseMode: settings.firstResponseMode,
+        startSlaAfterApproval: settings.startSlaAfterApproval,
+        pauseWhileWaitingUser: settings.pauseWhileWaitingUser,
+        pauseWhileWaitingThirdParty: settings.pauseWhileWaitingThirdParty,
+        reopenSlaMode: settings.reopenSlaMode,
+        cancelRequiresApproval: settings.cancelRequiresApproval,
+        fallbackApproverUserId: settings.fallbackApproverUserId,
         allowMultipleOpenTickets: settings.allowMultipleOpenTickets,
         globalOpenLimit: Number(settings.globalOpenLimit || 1),
         duplicateWindowHours: Number(settings.duplicateWindowHours || 1),
@@ -303,10 +330,15 @@ export default function HelpdeskSettingsPage() {
     }
   }
 
+  const validCatalog = (!catalogForm.active || !!overview?.categories.some(c => c.id === catalogForm.ticketCategoryId && c.active)) && [catalogForm.slaResponseHours, catalogForm.slaResolveHours].every(value => value === '' || (Number.isInteger(Number(value)) && Number(value) > 0))
+
   async function handleSaveCatalog() {
+    if (!validCatalog) { toast.error('Selecione categoria ativa e metas inteiras positivas ou herança.'); return }
     setSavingCatalog(true)
     try {
       const payload = {
+        slaResponseHours: catalogForm.slaResponseHours === '' ? null : Number(catalogForm.slaResponseHours),
+        slaResolveHours: catalogForm.slaResolveHours === '' ? null : Number(catalogForm.slaResolveHours),
         name: catalogForm.name,
         slug: catalogForm.slug || undefined,
         description: catalogForm.description || undefined,
@@ -343,6 +375,12 @@ export default function HelpdeskSettingsPage() {
     }
   }
 
+  if (!loading && !context?.capabilities.settings) return <div className="app-page">
+    <MenuFunctionHeader title="Helpdesk > Gestão de filas" description="Administre somente as filas sob sua responsabilidade." />
+    {loadError ? <p role="alert">{loadError}</p> : context?.capabilities.manageQueues ? <QueueGovernance context={context} /> : <p role="alert">Você não tem permissão para administrar o Helpdesk.</p>}
+    <Button variant="outline" onClick={() => void loadOverview()}>Atualizar</Button>
+  </div>
+
   return (
     <div className="app-page">
       <MenuFunctionHeader
@@ -360,6 +398,7 @@ export default function HelpdeskSettingsPage() {
         }
       />
 
+      {loadError && <p role="alert">{loadError}</p>}
       <Tabs defaultValue="settings" className="space-y-6">
         <TabsList className="grid w-full max-w-[720px] grid-cols-3">
           <TabsTrigger value="settings">Configurações</TabsTrigger>
@@ -381,6 +420,7 @@ export default function HelpdeskSettingsPage() {
                 </div>
               ) : (
                 <>
+                  <GovernanceFields value={settings} onChange={patch => setSettings(current => ({ ...current, ...patch }))} />
                   <div className="flex items-center justify-between rounded-2xl border border-border bg-muted/20 px-4 py-4">
                     <div className="space-y-1">
                       <p className="font-medium">Permitir múltiplos chamados abertos</p>
@@ -483,6 +523,7 @@ export default function HelpdeskSettingsPage() {
         </TabsContent>
 
         <TabsContent value="queues" className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          {context?.capabilities.manageQueues && <div className="xl:col-span-2"><QueueGovernance context={context} /></div>}
           <Card className="app-section-card">
             <CardHeader>
               <CardTitle className="text-xl">Filas configuradas</CardTitle>
@@ -592,21 +633,13 @@ export default function HelpdeskSettingsPage() {
                     }
                   />
                 </label>
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Preparar auto-atribuição</span>
-                  <Switch
-                    checked={queueForm.autoAssignEnabled}
-                    onCheckedChange={(value) =>
-                      setQueueForm((current) => ({ ...current, autoAssignEnabled: value }))
-                    }
-                  />
-                </label>
+                <p className="text-sm text-muted-foreground">A distribuição de chamados é manual.</p>
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => startQueueEdit()}>
                   Limpar
                 </Button>
-                <Button onClick={() => void handleSaveQueue()} disabled={savingQueue}>
+                <Button onClick={() => void handleSaveQueue()} disabled={savingQueue || !context?.capabilities.manageQueues}>
                   {savingQueue ? 'Salvando...' : queueForm.id ? 'Salvar fila' : 'Criar fila'}
                 </Button>
               </div>
@@ -615,6 +648,7 @@ export default function HelpdeskSettingsPage() {
         </TabsContent>
 
         <TabsContent value="catalog" className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          {context?.capabilities.catalog && <div className="xl:col-span-2"><CategoryEditor categories={overview?.categories ?? []} companyId={context.companyId} refresh={loadOverview} /></div>}
           <Card className="app-section-card">
             <CardHeader>
               <CardTitle className="text-xl">Catálogo de serviços</CardTitle>
@@ -639,7 +673,7 @@ export default function HelpdeskSettingsPage() {
                         {item.department?.name || 'Sem departamento'} · {item.queue?.name || 'Sem fila'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {item.ticketCategory?.name || 'Sem categoria vinculada'} · prioridade{' '}
+                        {item.ticketCategory?.name || 'Sem categoria vinculada'}{item.regularizationRequired ? ' · Regularização necessária' : ''} · prioridade{' '}
                         {item.defaultPriority}
                       </p>
                     </div>
@@ -663,6 +697,11 @@ export default function HelpdeskSettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">Metas em horas corridas. Deixe vazio para herdar da categoria; alterações afetam apenas novos chamados.</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="field-stack"><Label htmlFor="service-response">Primeira resposta — vazio para herdar</Label><Input id="service-response" type="number" min={1} step={1} placeholder="Herdar categoria" value={catalogForm.slaResponseHours} onChange={e => setCatalogForm(current => ({ ...current, slaResponseHours: e.target.value }))} /></div>
+                <div className="field-stack"><Label htmlFor="service-resolve">Resolução — vazio para herdar</Label><Input id="service-resolve" type="number" min={1} step={1} placeholder="Herdar categoria" value={catalogForm.slaResolveHours} onChange={e => setCatalogForm(current => ({ ...current, slaResolveHours: e.target.value }))} /></div>
+              </div>
               <div className="field-stack">
                 <Label htmlFor="catalog-name">Nome</Label>
                 <Input
@@ -885,7 +924,7 @@ export default function HelpdeskSettingsPage() {
                 <Button variant="outline" onClick={() => startCatalogEdit()}>
                   Limpar
                 </Button>
-                <Button onClick={() => void handleSaveCatalog()} disabled={savingCatalog}>
+                <Button onClick={() => void handleSaveCatalog()} disabled={savingCatalog || !validCatalog || !context?.capabilities.catalog}>
                   {savingCatalog ? 'Salvando...' : catalogForm.id ? 'Salvar serviço' : 'Criar serviço'}
                 </Button>
               </div>

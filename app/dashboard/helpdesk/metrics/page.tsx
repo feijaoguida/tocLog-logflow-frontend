@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { TicketIndicatorsView, type TicketIndicators } from '../indicators'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -30,7 +31,13 @@ type MetricsSummary = {
     overdueResolution: number
     assignedToMe: number
     pendingMyApprovals: number
+    waitingCancellation: number
+    approvalNeedsAssignment: number
+    historicalResolutionViolations: number
+    completedFirstResponse: number
+    completedResolution: number
   }
+  slaStateCounts: Record<string, number>
   statusCounts: Record<string, number>
   queues: Array<{
     queueId: string
@@ -52,6 +59,7 @@ type MetricsSummary = {
     priority: string
   }>
   recentTickets: Array<{
+    indicators?: TicketIndicators
     id: string
     code: number
     subject: string
@@ -172,7 +180,7 @@ export default function HelpdeskMetricsPage() {
               <CardHeader className="p-0">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Clock3 className="h-4 w-4" />
-                  SLA vencido
+                  SLA resolução violado
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 pt-3 text-3xl font-semibold">
@@ -190,6 +198,30 @@ export default function HelpdeskMetricsPage() {
                 {summary.totals.pendingMyApprovals}
               </CardContent>
             </Card>
+          </section>
+
+          <section aria-label="Estados de SLA e aprovações" className="grid gap-3 md:grid-cols-3">
+            {[
+              ['SLA em execução', summary.slaStateCounts.ACTIVE ?? 0],
+              ['SLA pausado', summary.slaStateCounts.PAUSED ?? 0],
+              ['SLA não iniciado', summary.slaStateCounts.NOT_STARTED ?? 0],
+              ['Primeira resposta cumprida', summary.totals.completedFirstResponse],
+              ['Resolução cumprida', summary.totals.completedResolution],
+              ['Violação em ciclo anterior', summary.totals.historicalResolutionViolations],
+              ['Abertura pendente', summary.totals.waitingApproval],
+              ['Cancelamento pendente', summary.totals.waitingCancellation],
+              ['Aprovação sem responsável', summary.totals.approvalNeedsAssignment],
+              ['SLA legado', summary.slaStateCounts.LEGACY ?? 0],
+            ].map(([label, count]) => (
+              <div key={label} className="rounded-2xl border border-border p-4">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="text-2xl font-semibold">{count}</p>
+              </div>
+            ))}
+            <p className="text-sm text-muted-foreground md:col-span-3">
+              Cumprido indica relógio encerrado; violações permanecem contabilizadas mesmo após pausa ou conclusão.
+              Ciclos anteriores são contabilizados separadamente. Dados legados preservam os prazos conhecidos.
+            </p>
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -212,7 +244,7 @@ export default function HelpdeskMetricsPage() {
                           <TableHead>Ativos</TableHead>
                           <TableHead>Sem resp.</TableHead>
                           <TableHead>Aprovação</TableHead>
-                          <TableHead>SLA vencido</TableHead>
+                          <TableHead>SLA resolução violado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -248,7 +280,7 @@ export default function HelpdeskMetricsPage() {
                       key={status}
                       className="flex items-center justify-between rounded-2xl border border-border bg-muted/20 px-4 py-3"
                     >
-                      <Badge variant={getStatusVariant(status) as any}>
+                      <Badge variant={getStatusVariant(status)}>
                         {STATUS_LABELS[status] || status}
                       </Badge>
                       <span className="text-lg font-semibold">{count}</span>
@@ -378,9 +410,10 @@ export default function HelpdeskMetricsPage() {
                         </TableCell>
                         <TableCell>{ticket.queue?.name || 'Sem fila'}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(ticket.status) as any}>
+                          <Badge variant={getStatusVariant(ticket.status)}>
                             {STATUS_LABELS[ticket.status] || ticket.status}
                           </Badge>
+                          <TicketIndicatorsView indicators={ticket.indicators} />
                         </TableCell>
                         <TableCell>{ticket.assignee?.name || 'Não atribuído'}</TableCell>
                         <TableCell>

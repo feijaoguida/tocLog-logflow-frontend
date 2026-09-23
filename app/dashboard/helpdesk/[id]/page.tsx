@@ -1,18 +1,17 @@
 'use client'
 
 import type { ChangeEvent } from 'react'
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, Send, ShieldCheck, UserCheck } from 'lucide-react'
+import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,9 +26,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { AttachmentDownload, SlaStatus, uploadHelpdeskFile, type Sla } from '../operations'
 
 type TicketDetails = {
   id: string
+  version: number
+  allowedActions: string[]
+  sla?: Sla | null
   code: number
   subject: string
   description: string
@@ -46,7 +49,7 @@ type TicketDetails = {
     requesterCanClose?: boolean
   } | null
   queue?: { id: string; name: string } | null
-  requester?: { id: string; user?: { name?: string } | null } | null
+  requester?: { id: string; user?: { id?: string; name?: string } | null } | null
   assignee?: { id: string; user?: { name?: string } | null } | null
   approvals?: Array<{
     id: string
@@ -104,11 +107,21 @@ function getStatusVariant(status: string) {
   return 'default'
 }
 
-export default function TicketDetailsPage({ params }: { params: { id: string } }) {
+export default function TicketDetailsPage() {
+  const params = useParams<{ id: string | string[] }>()
+  const id = params.id
+  if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id) || ['undefined', 'null'].includes(id)) {
+    return <div className="app-page" role="alert" aria-label="Erro do chamado">Identificador de chamado inválido.</div>
+  }
+  return <TicketDetailsContent key={id} ticketId={id} />
+}
+
+function TicketDetailsContent({ ticketId }: { ticketId: string }) {
   const router = useRouter()
-  const { user, hasPermission } = useAuth()
+  const { user } = useAuth()
   const [ticket, setTicket] = useState<TicketDetails | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [attachment, setAttachment] = useState<File | null>(null)
@@ -124,121 +137,102 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
   const [transferNote, setTransferNote] = useState('')
   const [closeReasonId, setCloseReasonId] = useState('none')
 
-  const isRequester = useMemo(
-    () => ticket?.requester?.id === user?.employeeId,
-    [ticket?.requester?.id, user?.employeeId],
-  )
-
-  const hasPendingApproval = useMemo(
-    () =>
-      Boolean(
-        ticket?.approvals?.some(
-          (approval) =>
-            approval.status === 'PENDING' && approval.approverId === user?.employeeId,
-        ),
-      ),
-    [ticket?.approvals, user?.employeeId],
-  )
-
-  useEffect(() => {
-    void fetchTicket()
-  }, [params.id])
-
-  useEffect(() => {
-    void loadOperationalSupportData()
-  }, [])
-
-  async function fetchTicket() {
+  const isRequester = ticket?.requester?.user?.id === user?.id
+  const can = (action: string) => ticket?.allowedActions?.includes(action) ?? false
+  const lock = useRef(false)
+  const [actionError, setActionError] = useState('')
+  const [reason, setReason] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
+  const [candidates, setCandidates] = useState<{ id: string; user: { name: string }; eligible: boolean }[]>([])
+  const [candidateCursor, setCandidateCursor] = useState<string | null>(null)
+  const [messageId, setMessageId] = useState<string | null>(null)
+  const [uploadId, setUploadId] = useState<string | null>(null)
+  const canTransfer = can('transfer')
+  const canAssign = can('assign')
+  const assignmentQueueId = ticket?.queue?.id
+  const fetchTicket = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
+    setLoadError(null)
     try {
-      const { data } = await api.get(`/helpdesk/tickets/${params.id}`)
-      setTicket(data)
+      const { data } = await api.get<TicketDetails>(`/helpdesk/tickets/${ticketId}`, { signal })
+      if (!signal?.aborted) setTicket(data)
     } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, 'Não foi possível carregar o chamado.'),
-      )
-      router.push('/dashboard/helpdesk')
+      if (signal?.aborted) return
+      const status = isAxiosError(error) ? error.response?.status : undefined
+      setLoadError(status === 404 ? 'Chamado não encontrado.' : status === 403
+        ? 'Você não tem permissão para acessar este chamado.'
+        : status === undefined ? 'Não foi possível conectar ao atendimento. Tente novamente.'
+        : getApiErrorMessage(error, 'Não foi possível carregar o chamado. Tente novamente.'))
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
-  }
+  }, [ticketId])
 
-  async function loadOperationalSupportData() {
-    try {
-      const [{ data: queues }, { data: reasons }] = await Promise.all([
-        api.get<QueueOption[]>('/helpdesk/queues'),
-        api.get<ActionReasons>('/helpdesk/action-reasons'),
-      ])
-      setQueueOptions(queues)
-      setActionReasons(reasons)
-    } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, 'Não foi possível carregar dados operacionais do chamado.'),
-      )
-    }
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchTicket(controller.signal)
+    return () => controller.abort()
+  }, [fetchTicket])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    if (canTransfer) void api.get<QueueOption[]>(`/helpdesk/tickets/${ticketId}/transfer-targets`, { signal: controller.signal })
+      .then(({ data }) => setQueueOptions(data)).catch(() => {})
+    if (canTransfer) void api.get<ActionReasons>('/helpdesk/action-reasons', { signal: controller.signal })
+      .then(({ data }) => setActionReasons(data)).catch(() => {})
+    if (canAssign && assignmentQueueId) void api.get(`/helpdesk/queues/${assignmentQueueId}/candidates`, { params: { purpose: 'ASSIGNEE' }, signal: controller.signal })
+      .then(({ data }) => { setCandidates(data.items); setCandidateCursor(data.nextCursor) }).catch(() => {})
+    return () => controller.abort()
+  }, [canTransfer, canAssign, assignmentQueueId, ticketId])
+
+  async function reportFailure(error: unknown) {
+    const status = isAxiosError(error) ? error.response?.status : undefined
+    setActionError(status === 409 ? 'O chamado foi atualizado. Dados recarregados; seu rascunho foi preservado.' : getApiErrorMessage(error, 'Não foi possível executar a ação.'))
+    if (status === 409 || status === 403) await fetchTicket()
   }
 
   async function handleSendMessage() {
-    if (!newMessage.trim()) return
-
-    setSending(true)
+    if (lock.current || !newMessage.trim() || ticket?.id !== ticketId || loadError) return
+    lock.current = true; setSending(true); setActionError('')
+    let savedMessage = messageId
     try {
-      const { data: message } = await api.post(`/helpdesk/tickets/${params.id}/messages`, {
-        content: newMessage,
-        internal: internalNote,
-      })
-
-      if (attachment) {
-        const formData = new FormData()
-        formData.append('file', attachment)
-        const upload = await api.post('/uploads/helpdesk', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+      if (!savedMessage) {
+        const { data } = await api.post(`/helpdesk/tickets/${ticketId}/messages`, {
+          content: newMessage, internal: can('internalNote') && (internalNote || !can('reply')), expectedVersion: ticket.version,
         })
-
-        await api.post(`/helpdesk/tickets/${params.id}/attachments`, {
-          fileName: attachment.name,
-          fileUrl: upload.data.url,
-          mimeType: attachment.type || 'application/octet-stream',
-          size: attachment.size,
-          messageId: message.id,
-        })
+        savedMessage = data.id; setMessageId(savedMessage)
       }
-
-      setNewMessage('')
-      setInternalNote(false)
-      setAttachment(null)
-      toast.success('Mensagem enviada.')
-      await fetchTicket()
+      if (attachment) {
+        const uploaded = uploadId ?? await uploadHelpdeskFile(attachment)
+        setUploadId(uploaded)
+        await api.post(`/helpdesk/tickets/${ticketId}/attachments`, { uploadId: uploaded, messageId: savedMessage })
+      }
+      setNewMessage(''); setInternalNote(false); setAttachment(null); setMessageId(null); setUploadId(null)
+      toast.success('Mensagem enviada.'); await fetchTicket()
     } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, 'Não foi possível enviar a mensagem.'),
-      )
-    } finally {
-      setSending(false)
-    }
+      await reportFailure(error)
+      if (savedMessage) setActionError('Mensagem enviada; o anexo falhou. Tente novamente para enviar somente o anexo.')
+    } finally { lock.current = false; setSending(false) }
   }
 
-  async function runAction(
-    endpoint: string,
-    successMessage: string,
-    payload?: Record<string, unknown>,
-  ) {
-    setActing(true)
+  async function runAction(endpoint: string, successMessage: string, payload?: Record<string, unknown>) {
+    if (lock.current || ticket?.id !== ticketId || loadError) return false
+    lock.current = true; setActing(true); setActionError('')
     try {
-      await api.post(endpoint, payload ?? {})
+      await api.post(endpoint, { ...payload, expectedVersion: ticket.version })
       toast.success(successMessage)
-      await fetchTicket()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Não foi possível executar a ação.'))
-    } finally {
-      setActing(false)
-    }
+      if (endpoint.endsWith('/transfer')) router.push('/dashboard/helpdesk/queue')
+      else await fetchTicket()
+      setReason('')
+      return true
+    } catch (error) { await reportFailure(error); return false }
+    finally { lock.current = false; setActing(false) }
   }
 
   async function handleReject() {
     const reason = window.prompt('Informe o motivo da reprovação deste chamado:')
     if (!reason?.trim()) return
-    await runAction(`/helpdesk/tickets/${params.id}/reject`, 'Chamado reprovado.', {
+    await runAction(`/helpdesk/tickets/${ticketId}/reject`, 'Chamado reprovado.', {
       reason,
     })
   }
@@ -249,12 +243,13 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
       return
     }
 
-    await runAction(`/helpdesk/tickets/${params.id}/transfer`, 'Chamado transferido.', {
+    const transferred = await runAction(`/helpdesk/tickets/${ticketId}/transfer`, 'Chamado transferido.', {
       toQueueId: transferQueueId,
       transferReasonId: transferReasonId !== 'none' ? transferReasonId : undefined,
       reason: transferNote.trim() || undefined,
     })
 
+    if (!transferred) return
     setTransferQueueId('none')
     setTransferReasonId('none')
     setTransferNote('')
@@ -264,8 +259,12 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
     return <div className="app-page text-sm text-muted-foreground">Carregando chamado...</div>
   }
 
-  if (!ticket) {
-    return null
+  if (loadError || !ticket) {
+    return <div className="app-page space-y-4">
+      <p role="alert" aria-label="Erro do chamado">{loadError || 'Chamado não encontrado.'}</p>
+      <Button onClick={() => void fetchTicket()}>Tentar novamente</Button>
+      <Button variant="outline" onClick={() => router.push('/dashboard/helpdesk')}>Voltar para chamados</Button>
+    </div>
   }
 
   return (
@@ -284,7 +283,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
               {isRequester ? 'você' : ticket.requester?.user?.name || 'solicitante'}
             </p>
           </div>
-          <Badge variant={getStatusVariant(ticket.status) as any}>
+          <Badge variant={getStatusVariant(ticket.status)}>
             {STATUS_LABELS[ticket.status] || ticket.status}
           </Badge>
         </div>
@@ -337,15 +336,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                       {message.attachments?.length ? (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {message.attachments.map((attachmentItem) => (
-                            <a
-                              key={attachmentItem.id}
-                              href={attachmentItem.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-full border border-border px-3 py-1 text-xs text-primary underline-offset-4 hover:underline"
-                            >
-                              {attachmentItem.name}
-                            </a>
+                            <AttachmentDownload key={attachmentItem.id} id={attachmentItem.id} name={attachmentItem.name} />
                           ))}
                         </div>
                       ) : null}
@@ -355,48 +346,49 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
               })}
             </div>
 
-            <Card>
+            {(can('reply') || can('internalNote')) && <Card>
               <CardContent className="space-y-4 pt-6">
+                {actionError && <p role="alert">{actionError}</p>}
                 <Textarea
                   className="min-h-[130px]"
                   placeholder="Digite uma atualização, dúvida ou resposta para o atendimento..."
+                  disabled={!!messageId}
                   value={newMessage}
                   onChange={(event) => setNewMessage(event.target.value)}
                 />
-                {hasPermission('helpdesk.ticket.manage') ||
-                hasPermission('helpdesk.ticket.view.all') ||
-                hasPermission('helpdesk.ticket.transfer') ? (
+                {can('internalNote') ? (
                   <label className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm">
                     <input
                       type="checkbox"
-                      checked={internalNote}
+                      disabled={!!messageId || !can('reply')}
+                      checked={internalNote || !can('reply')}
                       onChange={(event) => setInternalNote(event.target.checked)}
                     />
                     Registrar como nota interna visível apenas para a operação
                   </label>
                 ) : null}
-                <div className="field-stack">
+                {can('attach') && <div className="field-stack">
                   <Label htmlFor="message-attachment">Anexo opcional</Label>
                   <Input
                     id="message-attachment"
                     type="file"
                     accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx"
                     onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      setAttachment(event.target.files?.[0] || null)
+                      { setAttachment(event.target.files?.[0] || null); setUploadId(null) }
                     }
                   />
-                </div>
+                </div>}
                 <div className="flex justify-end">
                   <Button
                     onClick={handleSendMessage}
                     disabled={sending || !newMessage.trim()}
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    {sending ? 'Enviando...' : 'Responder'}
+                    {sending ? 'Enviando...' : messageId ? 'Reenviar anexo' : 'Responder'}
                   </Button>
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
           </div>
         </section>
 
@@ -439,7 +431,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
               <div>
                 <span className="text-muted-foreground">SLA de resolução</span>
                 <div className="font-medium">
-                  {ticket.resolutionDueDate || ticket.slaDueDate
+                  {ticket.sla ? <SlaStatus sla={ticket.sla} /> : ticket.resolutionDueDate || ticket.slaDueDate
                     ? new Date(ticket.resolutionDueDate || ticket.slaDueDate || '').toLocaleString('pt-BR')
                     : 'Não calculado'}
                 </div>
@@ -451,15 +443,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                     ticket.attachments
                       ?.filter((item) => !item.messageId)
                       .map((item) => (
-                        <a
-                          key={item.id}
-                          href={item.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-full border border-border px-3 py-1 text-xs text-primary underline-offset-4 hover:underline"
-                        >
-                          {item.name}
-                        </a>
+                        <AttachmentDownload key={item.id} id={item.id} name={item.name} />
                       ))
                   ) : (
                     <span className="font-medium">Sem anexos diretos</span>
@@ -477,14 +461,34 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
               </p>
             </div>
 
+            {actionError && <p role="alert">{actionError}</p>}
             <div className="flex flex-col gap-3">
-              {!ticket.assignee && ticket.queue ? (
+              {['resolve', 'reopen', 'cancel', 'waitUser', 'waitThirdParty', 'assign'].some(can) && <div className="field-stack">
+                <Label htmlFor="action-reason">Motivo ou resumo público</Label>
+                <Textarea id="action-reason" value={reason} onChange={e => setReason(e.target.value)} />
+              </div>}
+              {can('assign') && <div className="space-y-2">
+                <Label htmlFor="assign-employee">Responsável elegível</Label>
+                <select id="assign-employee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
+                  <option value="">Selecione</option>
+                  {candidates.filter(c => c.eligible).map(c => <option value={c.id} key={c.id}>{c.user.name}</option>)}
+                </select>
+                {candidateCursor && <Button disabled={acting} variant="outline" onClick={async () => {
+                  try { const { data } = await api.get(`/helpdesk/queues/${assignmentQueueId}/candidates`, { params: { purpose: 'ASSIGNEE', cursor: candidateCursor } }); setCandidates(current => [...current, ...data.items]); setCandidateCursor(data.nextCursor) }
+                  catch (e) { setActionError(getApiErrorMessage(e, 'Não foi possível carregar candidatos.')) }
+                }}>Mais responsáveis</Button>}
+                <Button disabled={acting || !assigneeId || (!!ticket.assignee && !reason.trim())} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/assign`, 'Responsável atualizado.', { assigneeId, reason: reason.trim() || undefined })}>Atribuir responsável</Button>
+              </div>}
+              {(['waitUser', 'waitThirdParty'] as const).filter(can).map(action => <Button key={action} disabled={acting || !reason.trim()} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/wait`, 'Espera registrada.', { target: action === 'waitUser' ? 'WAITING_USER' : 'WAITING_THIRD_PARTY', reason })}>{action === 'waitUser' ? 'Aguardar usuário' : 'Aguardar terceiro'}</Button>)}
+              {can('resume') && <Button disabled={acting} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/resume`, 'Atendimento retomado.')}>Retomar atendimento</Button>}
+              {can('cancel') && <Button disabled={acting || !reason.trim()} variant="outline" onClick={() => runAction(`/helpdesk/tickets/${ticketId}/cancel`, 'Cancelamento registrado; consulte o estado e as aprovações.', { reason })}>Solicitar cancelamento</Button>}
+              {can('pickup') ? (
                 <Button
                   variant="outline"
                   disabled={acting}
                   onClick={() =>
                     runAction(
-                      `/helpdesk/tickets/${params.id}/pickup`,
+                      `/helpdesk/tickets/${ticketId}/pickup`,
                       'Chamado assumido com sucesso.',
                     )
                   }
@@ -494,13 +498,13 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                 </Button>
               ) : null}
 
-              {hasPendingApproval ? (
+              {can('approve') ? (
                 <>
                   <Button
                     disabled={acting}
                     onClick={() =>
                       runAction(
-                        `/helpdesk/tickets/${params.id}/approve`,
+                        `/helpdesk/tickets/${ticketId}/approve`,
                         'Chamado aprovado.',
                       )
                     }
@@ -514,15 +518,15 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                 </>
               ) : null}
 
-              {ticket.assignee?.id === user?.employeeId ||
-              hasPermission('helpdesk.ticket.manage') ? (
+              {can('resolve') ? (
                 <Button
                   variant="outline"
-                  disabled={acting || ['RESOLVED', 'CLOSED', 'CANCELLED'].includes(ticket.status)}
+                  disabled={acting || !reason.trim()}
                   onClick={() =>
                     runAction(
-                      `/helpdesk/tickets/${params.id}/resolve`,
+                      `/helpdesk/tickets/${ticketId}/resolve`,
                       'Chamado marcado como resolvido.',
+                      { reason },
                     )
                   }
                 >
@@ -531,8 +535,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                 </Button>
               ) : null}
 
-              {(isRequester || hasPermission('helpdesk.ticket.manage')) &&
-              !['CLOSED', 'CANCELLED'].includes(ticket.status) ? (
+              {can('close') ? (
                 <div className="space-y-2">
                   <Label htmlFor="close-reason">Motivo de fechamento</Label>
                   <Select value={closeReasonId} onValueChange={setCloseReasonId}>
@@ -552,7 +555,7 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                     variant="outline"
                     disabled={acting}
                     onClick={() =>
-                      runAction(`/helpdesk/tickets/${params.id}/close`, 'Chamado fechado.', {
+                      runAction(`/helpdesk/tickets/${ticketId}/close`, 'Chamado fechado.', {
                         closeReasonId: closeReasonId !== 'none' ? closeReasonId : undefined,
                       })
                     }
@@ -562,21 +565,19 @@ export default function TicketDetailsPage({ params }: { params: { id: string } }
                 </div>
               ) : null}
 
-              {['RESOLVED', 'CLOSED'].includes(ticket.status) ? (
+              {can('reopen') ? (
                 <Button
                   variant="outline"
                   disabled={acting}
                   onClick={() =>
-                    runAction(`/helpdesk/tickets/${params.id}/reopen`, 'Chamado reaberto.')
+                    reason.trim() && runAction(`/helpdesk/tickets/${ticketId}/reopen`, 'Chamado reaberto.', { reason })
                   }
                 >
                   Reabrir chamado
                 </Button>
               ) : null}
 
-              {(hasPermission('helpdesk.ticket.transfer') ||
-                hasPermission('helpdesk.ticket.manage')) &&
-              ticket.queue ? (
+              {can('transfer') ? (
                 <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">
                   <div className="space-y-1">
                     <h3 className="text-sm font-semibold">Transferir atendimento</h3>

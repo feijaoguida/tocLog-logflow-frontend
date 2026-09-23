@@ -22,10 +22,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useAuth } from '@/context/auth-context'
+import { TicketIndicatorsView, type TicketIndicators } from './indicators'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
 type HelpdeskTicket = {
+  indicators?: TicketIndicators
   id: string
   code: number
   subject: string
@@ -82,7 +84,7 @@ export default function HelpdeskPage() {
   async function fetchTickets() {
     setLoading(true)
     try {
-      const { data } = await api.get('/helpdesk/tickets')
+      const { data } = await api.get('/helpdesk/tickets/my')
       setTickets(data)
     } catch (error) {
       toast.error(
@@ -170,10 +172,9 @@ export default function HelpdeskPage() {
 
       <section className="app-section-card space-y-4">
         <div className="space-y-1">
-          <h2 className="section-title">Meus chamados e escopos visíveis</h2>
+          <h2 className="section-title">Meus chamados</h2>
           <p className="text-sm text-muted-foreground">
-            A lista já respeita o escopo do seu perfil, incluindo chamados próprios,
-            subordinados ou filas onde você atua.
+            A lista mostra somente chamados abertos por você.
           </p>
         </div>
 
@@ -187,7 +188,7 @@ export default function HelpdeskPage() {
             <div className="space-y-1">
               <p className="text-lg font-semibold">Nenhum chamado encontrado</p>
               <p className="text-sm text-muted-foreground">
-                Quando você abrir ou participar de um atendimento, ele aparecerá aqui.
+                Quando você abrir um chamado, ele aparecerá aqui.
               </p>
             </div>
             {canCreateTicket ? (
@@ -232,9 +233,10 @@ export default function HelpdeskPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getStatusVariant(ticket.status) as any}>
+                      <Badge variant={getStatusVariant(ticket.status)}>
                         {STATUS_LABELS[ticket.status] || ticket.status}
                       </Badge>
+                          <TicketIndicatorsView indicators={ticket.indicators} />
                     </TableCell>
                     <TableCell>
                       {ticket.assignee?.user?.name || 'Não atribuído'}
