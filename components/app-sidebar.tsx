@@ -52,12 +52,18 @@ export function AppSidebar() {
   const [helpdeskCapabilities, setHelpdeskCapabilities] = React.useState<Record<string, boolean>>({})
   React.useEffect(() => {
     let active = true
-    if (!user) return
-    api.get('/helpdesk/context').then(({ data }) => {
+    if (!user?.id) return
+    const controller = new AbortController()
+    api.get('/helpdesk/context', { signal: controller.signal }).then(({ data }) => {
       if (active) setHelpdeskCapabilities(data.capabilities ?? {})
-    }).catch(() => { if (active) setHelpdeskCapabilities({}) })
-    return () => { active = false }
-  }, [user])
+    }).catch(() => {
+      if (active && !controller.signal.aborted) setHelpdeskCapabilities({})
+    })
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [user?.id])
 
   const [openGroup, setOpenGroup] = React.useState<string | null>(null)
 
