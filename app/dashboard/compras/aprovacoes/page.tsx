@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
@@ -46,6 +48,18 @@ export default function ApprovalsPage() {
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const [approveConfirm, setApproveConfirm] = useState<{
+    open: boolean
+    requestId: string | null
+    requestNumber: number | null
+  }>({
+    open: false,
+    requestId: null,
+    requestNumber: null,
+  })
 
   const fetchPending = async () => {
     try {
@@ -53,7 +67,7 @@ export default function ApprovalsPage() {
       const { data } = await api.get<PurchaseRequest[]>('/purchase-requests/pending')
       setRequests(data)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel carregar as aprovacoes.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível carregar as aprovações.'))
     } finally {
       setLoading(false)
     }
@@ -63,17 +77,16 @@ export default function ApprovalsPage() {
     fetchPending()
   }, [])
 
-  const handleApprove = async (id: string) => {
-    if (!confirm('Aprovar este pedido?')) {
-      return
-    }
+  const executeApprove = async () => {
+    if (!approveConfirm.requestId) return
 
     try {
-      await api.patch(`/purchase-requests/${id}/approve`)
+      await api.patch(`/purchase-requests/${approveConfirm.requestId}/approve`)
       toast.success('Pedido aprovado com sucesso.')
+      setApproveConfirm({ open: false, requestId: null, requestNumber: null })
       await fetchPending()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel aprovar o pedido.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível aprovar o pedido.'))
     }
   }
 
@@ -93,7 +106,7 @@ export default function ApprovalsPage() {
       setReason('')
       await fetchPending()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel reprovar o pedido.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível reprovar o pedido.'))
     } finally {
       setActionLoading(false)
     }
@@ -114,175 +127,206 @@ export default function ApprovalsPage() {
     })
   }, [requests, searchTerm])
 
-  const stats = useMemo(
-    () => ({
-      pending: requests.length,
-      totalItems: requests.reduce((total, request) => total + request.items.length, 0),
-      highValue: requests.filter((request) => Number(request.estimatedTotal || 0) >= 5000).length,
-    }),
-    [requests],
-  )
+  const paginatedRequests = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredRequests.slice(start, start + pageSize)
+  }, [filteredRequests, page, pageSize])
+
+  const metrics = useMemo(() => {
+    const totalEstimated = requests.reduce((total, request) => {
+      return total + Number(request.estimatedTotal || 0)
+    }, 0)
+
+    return {
+      count: requests.length,
+      totalEstimated,
+    }
+  }, [requests])
 
   return (
     <div className="app-page">
       <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Compras</p>
-          <h1 className="app-title">Aprovacoes Pendentes</h1>
-          <p className="app-subtitle">
-            Revise as solicitacoes do seu escopo, confirme a necessidade do pedido e
-            registre o motivo quando a reprovação for necessária.
-          </p>
+        <div className="space-y-3">
+          <div className="app-badge-row">
+            <span className="app-badge">Módulo de Compras</span>
+            <span className="app-badge app-badge-warning">Fila de Decisão</span>
+          </div>
+          <div className="space-y-1">
+            <h1 className="page-title">Aprovações de compras</h1>
+            <p className="page-description">
+              Revise as solicitações do seu escopo, confirme a necessidade do pedido e libere o fluxo para a área de cotação.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Pedidos aguardando decisao</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.pending}</p>
+      <section className="app-kpi-grid">
+        <Card className="app-kpi-card">
+          <CardContent className="space-y-2 p-0">
+            <p className="kpi-label">Pendentes de aprovação</p>
+            <p className="kpi-value">{metrics.count}</p>
+            <p className="text-xs text-muted-foreground">pedidos aguardando sua análise</p>
           </CardContent>
         </Card>
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Itens em analise</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.totalItems}</p>
-          </CardContent>
-        </Card>
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Pedidos acima de R$ 5 mil</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.highValue}</p>
+        <Card className="app-kpi-card">
+          <CardContent className="space-y-2 p-0">
+            <p className="kpi-label">Volume total estimado</p>
+            <p className="kpi-value">
+              R${' '}
+              {metrics.totalEstimated.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+              })}
+            </p>
+            <p className="text-xs text-muted-foreground">soma das solicitações em fila</p>
           </CardContent>
         </Card>
       </section>
 
       <Card className="app-section-card">
-        <CardHeader className="pb-3">
-          <div className="app-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Fila de aprovacoes</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Consulte o solicitante, departamento, valor estimado e itens principais antes
-                de concluir a decisao.
-              </p>
-            </div>
-            <div className="relative w-full md:w-[280px]">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <CardContent className="space-y-4 p-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar por pedido, solicitante ou departamento..."
+                placeholder="Buscar por solicitante, justificativa..."
                 className="pl-9"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setPage(1)
+                }}
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {loading ? (
             <div className="flex min-h-[240px] items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Solicitante</TableHead>
-                  <TableHead>Itens</TableHead>
-                  <TableHead>Valor estimado</TableHead>
-                  <TableHead>Criado em</TableHead>
-                  <TableHead className="text-right">Acoes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRequests.length === 0 ? (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10">
-                      <div className="flex flex-col items-center gap-3 text-center text-muted-foreground">
-                        <CheckCircle2 className="h-10 w-10 text-emerald-500/40" />
-                        <div>
-                          <p className="font-medium text-foreground">Nenhuma aprovacao pendente</p>
-                          <p className="text-sm">
-                            Quando novas solicitacoes chegarem ao seu escopo, elas aparecerao aqui.
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
+                    <TableHead>Pedido / Solicitante</TableHead>
+                    <TableHead>Departamento</TableHead>
+                    <TableHead>Itens solicitados</TableHead>
+                    <TableHead>Estimativa</TableHead>
+                    <TableHead>Data de abertura</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ) : (
-                  filteredRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="align-top">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground">Pedido #{request.code}</span>
-                            <Badge variant="outline">Pendente</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{request.justification}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="space-y-1 text-sm">
-                          <p className="font-medium text-foreground">{request.requester.user.name}</p>
-                          <p className="text-muted-foreground">{request.department?.name || 'Departamento nao informado'}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          {request.items.slice(0, 2).map((item) => (
-                            <p key={item.id ?? `${request.id}-${item.description}`}>
-                              {item.quantity}x {item.product?.name || item.description || 'Item sem descricao'}
-                            </p>
-                          ))}
-                          {request.items.length > 2 ? (
-                            <p>+ {request.items.length - 2} item(ns)</p>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {request.estimatedTotal
-                          ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                            })}`
-                          : 'Nao informado'}
-                      </TableCell>
-                      <TableCell>{format(new Date(request.createdAt), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/dashboard/compras/pedidos/${request.id}`}>Detalhes</Link>
-                          </Button>
-                          <Button size="sm" className="gap-2" onClick={() => handleApprove(request.id)}>
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Aprovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                            onClick={() => setRejectId(request.id)}
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Reprovar
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        Nenhum pedido pendente de aprovação.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    paginatedRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="align-top">
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">Pedido #{request.code}</p>
+                            <p className="text-sm text-muted-foreground">{request.justification}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Por: {request.requester.user.name}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{request.department?.name || 'Não informado'}</TableCell>
+                        <TableCell className="align-top">
+                          <div className="space-y-1 text-sm text-foreground">
+                            {request.items.slice(0, 2).map((item, index) => (
+                              <p key={item.id ?? index} className="text-xs text-muted-foreground">
+                                • {Number(item.quantity)}x{' '}
+                                {item.product?.name || item.description || 'Item sem descrição'}
+                              </p>
+                            ))}
+                            {request.items.length > 2 ? (
+                              <p className="text-xs font-medium text-muted-foreground">
+                                +{request.items.length - 2} outro(s) item(ns)
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {request.estimatedTotal
+                            ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                              })}`
+                            : 'Não informado'}
+                        </TableCell>
+                        <TableCell>{format(new Date(request.createdAt), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/dashboard/compras/pedidos/${request.id}`}>Detalhes</Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="gap-2"
+                              onClick={() =>
+                                setApproveConfirm({
+                                  open: true,
+                                  requestId: request.id,
+                                  requestNumber: request.code,
+                                })
+                              }
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                              onClick={() => setRejectId(request.id)}
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Reprovar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                totalItems={filteredRequests.length}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize)
+                  setPage(1)
+                }}
+              />
+            </>
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={approveConfirm.open}
+        onOpenChange={(open) =>
+          setApproveConfirm((prev) => ({ ...prev, open }))
+        }
+        title="Aprovar Pedido de Compra"
+        description={`Deseja aprovar a solicitação #${approveConfirm.requestNumber}? Ela seguirá para a etapa de cotações com fornecedores.`}
+        confirmText="Confirmar Aprovação"
+        onConfirm={executeApprove}
+      />
 
       <Dialog open={Boolean(rejectId)} onOpenChange={(open) => !open && setRejectId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reprovar pedido</DialogTitle>
             <DialogDescription>
-              O motivo informado sera registrado na trilha do pedido e compartilhado com o solicitante.
+              O motivo informado será registrado na trilha do pedido e compartilhado com o solicitante.
             </DialogDescription>
           </DialogHeader>
 
@@ -296,7 +340,7 @@ export default function ApprovalsPage() {
             <Textarea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Explique por que este pedido nao pode seguir neste momento..."
+              placeholder="Explique por que este pedido não pode seguir neste momento..."
               className="min-h-[120px]"
             />
           </div>
@@ -307,7 +351,7 @@ export default function ApprovalsPage() {
             </Button>
             <Button variant="destructive" onClick={handleReject} disabled={actionLoading || !reason.trim()}>
               {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Confirmar reprovacao
+              Confirmar reprovação
             </Button>
           </DialogFooter>
         </DialogContent>

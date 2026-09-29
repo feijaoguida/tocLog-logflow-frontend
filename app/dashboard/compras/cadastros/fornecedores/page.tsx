@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import { Plus, Pencil, Trash2, Loader2, Search, Truck, Phone, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
@@ -32,6 +34,15 @@ export default function SuppliersPage() {
     const [cnpj, setCnpj] = useState("")
     const [email, setEmail] = useState("")
     const [phone, setPhone] = useState("")
+
+    // Delete dialog
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [deleteLoading, setDeleteLoading] = useState(false)
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1)
+    const pageSize = 9
 
     const fetchSuppliers = async () => {
         try {
@@ -64,13 +75,17 @@ export default function SuppliersPage() {
         finally { setFormLoading(false) }
     }
 
-    const handleDelete = async (id: string) => {
-        if(!confirm("Excluir fornecedor?")) return
+    const handleDelete = async () => {
+        if(!deleteId) return
+        setDeleteLoading(true)
         try {
-            await api.delete(`/suppliers/${id}`)
+            await api.delete(`/suppliers/${deleteId}`)
             toast.success("Fornecedor excluído.")
+            setIsDeleteDialogOpen(false)
+            setDeleteId(null)
             fetchSuppliers()
-        } catch { toast.error("Erro ao excluir.") }
+        } catch { toast.error("Erro ao excluir fornecedor.") }
+        finally { setDeleteLoading(false) }
     }
 
     const resetForm = () => {
@@ -87,6 +102,8 @@ export default function SuppliersPage() {
     }
 
     const filtered = suppliers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    const totalPages = Math.ceil(filtered.length / pageSize) || 1
+    const paginatedSuppliers = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
     return (
      <div className="flex flex-1 flex-col gap-4 p-4">
@@ -100,15 +117,20 @@ export default function SuppliersPage() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-2">
              <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar fornecedor..." className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <Input
+                    placeholder="Buscar fornecedor..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                />
             </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(s => (
+            {paginatedSuppliers.map(s => (
                 <Card key={s.id} className="group relative hover:border-primary/50 transition-all">
                     <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="font-medium text-base truncate pr-8">{s.name}</CardTitle>
@@ -122,12 +144,31 @@ export default function SuppliersPage() {
                         </div>
                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(s)}><Pencil className="h-3.5 w-3.5"/></Button>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDelete(s.id)}><Trash2 className="h-3.5 w-3.5"/></Button>
+                             <Button
+                                 variant="ghost"
+                                 size="icon"
+                                 className="h-8 w-8 text-red-500 hover:text-red-600"
+                                 onClick={() => { setDeleteId(s.id); setIsDeleteDialogOpen(true); }}
+                             >
+                                 <Trash2 className="h-3.5 w-3.5"/>
+                             </Button>
                         </div>
                     </CardContent>
                 </Card>
             ))}
+            {!loading && filtered.length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-10">
+                    Nenhum fornecedor encontrado.
+                </div>
+            )}
         </div>
+
+        <TablePagination
+            page={currentPage}
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+        />
 
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogContent>
@@ -158,6 +199,17 @@ export default function SuppliersPage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+            title="Excluir Fornecedor"
+            description="Tem certeza que deseja excluir este fornecedor? Esta ação não pode ser desfeita."
+            confirmText="Excluir"
+            variant="destructive"
+            loading={deleteLoading}
+            onConfirm={handleDelete}
+        />
      </div>
     )
 }

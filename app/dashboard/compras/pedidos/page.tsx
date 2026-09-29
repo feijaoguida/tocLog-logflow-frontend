@@ -2,16 +2,32 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Edit, Eye, Loader2, Plus, Search, Send } from 'lucide-react'
+import { Edit, Eye, FilePlus2, Loader2, Search, Send } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+
+type PurchaseRequestItem = {
+  id: string
+  quantity: number | string
+  product?: { name?: string | null } | null
+  description?: string | null
+}
 
 type PurchaseRequest = {
   id: string
@@ -21,25 +37,35 @@ type PurchaseRequest = {
   observation?: string | null
   createdAt: string
   estimatedTotal?: number | string | null
-  items: Array<{ id: string }>
+  items: PurchaseRequestItem[]
 }
 
-const STATUS_META: Record<
-  string,
-  { label: string; variant?: 'default' | 'secondary' | 'destructive' | 'outline' }
-> = {
+const STATUS_MAP: Record<string, { label: string; variant: 'secondary' | 'outline' | 'default' | 'destructive' }> = {
   DRAFT: { label: 'Rascunho', variant: 'secondary' },
-  PENDING: { label: 'Aguardando aprovacao', variant: 'outline' },
+  PENDING: { label: 'Aguardando aprovação', variant: 'outline' },
   APPROVED: { label: 'Aprovado', variant: 'default' },
   REJECTED: { label: 'Reprovado', variant: 'destructive' },
-  IN_QUOTATION: { label: 'Em cotacao', variant: 'outline' },
-  ORDERED: { label: 'Ordenado', variant: 'outline' },
+  IN_QUOTATION: { label: 'Em cotação', variant: 'secondary' },
+  ORDERED: { label: 'Ordem gerada', variant: 'default' },
 }
 
-export default function MyRequestsPage() {
+export default function PurchaseRequestsPage() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmText?: string
+    action?: () => Promise<void>
+  }>({
+    open: false,
+    title: '',
+  })
 
   const fetchRequests = async () => {
     try {
@@ -47,7 +73,7 @@ export default function MyRequestsPage() {
       const { data } = await api.get<PurchaseRequest[]>('/purchase-requests/my')
       setRequests(data)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel carregar os pedidos.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível carregar os pedidos.'))
     } finally {
       setLoading(false)
     }
@@ -57,18 +83,22 @@ export default function MyRequestsPage() {
     fetchRequests()
   }, [])
 
-  const handleSubmitRequest = async (id: string) => {
-    if (!confirm('Enviar este pedido para aprovacao?')) {
-      return
-    }
-
-    try {
-      await api.patch(`/purchase-requests/${id}/submit`)
-      toast.success('Pedido enviado para aprovacao.')
-      await fetchRequests()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel enviar o pedido.'))
-    }
+  const handleSubmitRequest = (id: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Enviar Pedido para Aprovação',
+      description: 'Deseja submeter esta requisição para aprovação departamental? Uma vez enviada, a edição ficará restrita.',
+      confirmText: 'Enviar para Aprovação',
+      action: async () => {
+        try {
+          await api.patch(`/purchase-requests/${id}/submit`)
+          toast.success('Pedido enviado para aprovação com sucesso.')
+          await fetchRequests()
+        } catch (error) {
+          toast.error(getApiErrorMessage(error, 'Não foi possível enviar o pedido.'))
+        }
+      },
+    })
   }
 
   const filteredRequests = useMemo(() => {
@@ -79,6 +109,11 @@ export default function MyRequestsPage() {
       return haystack.includes(searchTerm.toLowerCase())
     })
   }, [requests, searchTerm])
+
+  const paginatedRequests = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredRequests.slice(start, start + pageSize)
+  }, [filteredRequests, page, pageSize])
 
   const stats = useMemo(() => {
     return {
@@ -91,157 +126,187 @@ export default function MyRequestsPage() {
   return (
     <div className="app-page">
       <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Compras</p>
-          <h1 className="app-title">Meus Pedidos de Compra</h1>
-          <p className="app-subtitle">
-            Organize os rascunhos, acompanhe solicitacoes enviadas e entre nos detalhes
-            para seguir o andamento do fluxo.
-          </p>
+        <div className="space-y-3">
+          <div className="app-badge-row">
+            <span className="app-badge">Módulo de Compras</span>
+            <span className="app-badge app-badge-info">Solicitações</span>
+          </div>
+          <div className="space-y-1">
+            <h1 className="page-title">Meus pedidos de compra</h1>
+            <p className="page-description">
+              Crie novas solicitações, envie para aprovação e acompanhe o status dos seus pedidos.
+            </p>
+          </div>
         </div>
+
         <Button asChild className="gap-2">
-          <Link href="/dashboard/compras/pedidos/new">
-            <Plus className="h-4 w-4" />
+          <Link href="/dashboard/compras/pedidos/novo">
+            <FilePlus2 className="h-4 w-4" />
             Novo pedido
           </Link>
         </Button>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Pedidos cadastrados</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.total}</p>
+      <section className="app-kpi-grid">
+        <Card className="app-kpi-card">
+          <CardContent className="space-y-2 p-0">
+            <p className="kpi-label">Total de solicitações</p>
+            <p className="kpi-value">{stats.total}</p>
+            <p className="text-xs text-muted-foreground">histórico próprio</p>
           </CardContent>
         </Card>
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Rascunhos prontos para revisar</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.drafts}</p>
+        <Card className="app-kpi-card">
+          <CardContent className="space-y-2 p-0">
+            <p className="kpi-label">Rascunhos</p>
+            <p className="kpi-value">{stats.drafts}</p>
+            <p className="text-xs text-muted-foreground">ainda não enviados</p>
           </CardContent>
         </Card>
-        <Card className="app-section-card">
-          <CardContent className="p-0">
-            <p className="text-sm text-muted-foreground">Aguardando aprovacao</p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{stats.pending}</p>
+        <Card className="app-kpi-card">
+          <CardContent className="space-y-2 p-0">
+            <p className="kpi-label">Em aprovação</p>
+            <p className="kpi-value">{stats.pending}</p>
+            <p className="text-xs text-muted-foreground">aguardando liderança</p>
           </CardContent>
         </Card>
       </section>
 
       <Card className="app-section-card">
-        <CardHeader className="pb-3">
-          <div className="app-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Lista de pedidos</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Use os rascunhos para revisar itens antes do envio e acompanhe os status nas
-                etapas seguintes do processo.
-              </p>
-            </div>
-            <div className="relative w-full md:w-[280px]">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <CardContent className="space-y-4 p-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar por codigo ou justificativa..."
+                placeholder="Buscar por número, justificativa..."
                 className="pl-9"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setPage(1)
+                }}
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {loading ? (
             <div className="flex min-h-[240px] items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Itens</TableHead>
-                  <TableHead>Valor estimado</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Criado em</TableHead>
-                  <TableHead className="text-right">Acoes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRequests.length === 0 ? (
+            <>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                      Nenhum pedido encontrado para o filtro informado.
-                    </TableCell>
+                    <TableHead>Identificação / Justificativa</TableHead>
+                    <TableHead>Itens</TableHead>
+                    <TableHead>Valor estimado</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ) : (
-                  filteredRequests.map((request) => {
-                    const statusMeta = STATUS_META[request.status] ?? {
-                      label: request.status,
-                      variant: 'outline' as const,
-                    }
+                </TableHeader>
+                <TableBody>
+                  {paginatedRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        Nenhum pedido encontrado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedRequests.map((request) => {
+                      const statusMeta = STATUS_MAP[request.status] ?? {
+                        label: request.status,
+                        variant: 'outline' as const,
+                      }
 
-                    return (
-                      <TableRow key={request.id}>
-                        <TableCell className="align-top">
-                          <div className="space-y-1">
-                            <p className="font-medium text-foreground">Pedido #{request.code}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {request.justification}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{request.items.length}</TableCell>
-                        <TableCell>
-                          {request.estimatedTotal
-                            ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                              })}`
-                            : 'Nao informado'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button asChild variant="outline" size="sm" className="gap-2">
-                              <Link href={`/dashboard/compras/pedidos/${request.id}`}>
-                                <Eye className="h-3.5 w-3.5" />
-                                Detalhes
-                              </Link>
-                            </Button>
-                            {request.status === 'DRAFT' ? (
-                              <>
-                                <Button asChild variant="outline" size="sm" className="gap-2">
-                                  <Link href={`/dashboard/compras/pedidos/${request.id}/edit`}>
-                                    <Edit className="h-3.5 w-3.5" />
-                                    Editar
-                                  </Link>
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="gap-2"
-                                  onClick={() => handleSubmitRequest(request.id)}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                  Enviar
-                                </Button>
-                              </>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
+                      return (
+                        <TableRow key={request.id}>
+                          <TableCell className="align-top">
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">Pedido #{request.code}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {request.justification}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{request.items.length}</TableCell>
+                          <TableCell>
+                            {request.estimatedTotal
+                              ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 2,
+                                })}`
+                              : 'Não informado'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button asChild variant="outline" size="sm" className="gap-2">
+                                <Link href={`/dashboard/compras/pedidos/${request.id}`}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Detalhes
+                                </Link>
+                              </Button>
+                              {request.status === 'DRAFT' ? (
+                                <>
+                                  <Button asChild variant="outline" size="sm" className="gap-2">
+                                    <Link href={`/dashboard/compras/pedidos/${request.id}/edit`}>
+                                      <Edit className="h-3.5 w-3.5" />
+                                      Editar
+                                    </Link>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="gap-2"
+                                    onClick={() => handleSubmitRequest(request.id)}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                    Enviar
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                totalItems={filteredRequests.length}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize)
+                  setPage(1)
+                }}
+              />
+            </>
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((s) => ({ ...s, open }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        onConfirm={async () => {
+          if (confirmDialog.action) {
+            await confirmDialog.action()
+          }
+          setConfirmDialog((s) => ({ ...s, open: false }))
+        }}
+      />
     </div>
   )
 }

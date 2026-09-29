@@ -7,11 +7,13 @@ import { ArrowLeft, Loader2, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { PurchaseRequestTimeline } from '@/components/dashboard/widgets/PurchaseRequestTimeline'
+import { EventTimeline } from '@/components/dashboard/widgets/EventTimeline'
 import { QuotationsList } from '@/components/dashboard/widgets/QuotationsList'
 import { QuotationForm } from '@/components/dashboard/widgets/QuotationForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -56,10 +58,10 @@ type Quotation = {
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Rascunho',
-  PENDING: 'Aguardando aprovacao',
+  PENDING: 'Aguardando aprovação',
   APPROVED: 'Aprovado',
   REJECTED: 'Reprovado',
-  IN_QUOTATION: 'Em cotacao',
+  IN_QUOTATION: 'Em cotação',
   ORDERED: 'Ordem gerada',
 }
 
@@ -81,12 +83,24 @@ export default function RequestDetailsPage() {
   const [isQuoteFormOpen, setIsQuoteFormOpen] = useState(false)
   const [editingQuote, setEditingQuote] = useState<any>(null)
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmText?: string
+    variant?: 'default' | 'destructive'
+    action?: () => Promise<void>
+  }>({
+    open: false,
+    title: '',
+  })
+
   const fetchDetails = async () => {
     try {
       const { data } = await api.get<PurchaseRequestDetail>(`/purchase-requests/${requestId}`)
       setRequest(data)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel carregar o pedido.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível carregar o pedido.'))
       router.push('/dashboard/compras/pedidos')
     } finally {
       setLoading(false)
@@ -98,7 +112,7 @@ export default function RequestDetailsPage() {
       const { data } = await api.get(`/quotations/request/${requestId}`)
       setQuotations(data)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel carregar as cotacoes.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível carregar as cotações.'))
     }
   }
 
@@ -108,33 +122,41 @@ export default function RequestDetailsPage() {
     void fetchQuotations()
   }, [requestId])
 
-  const handleSetWinner = async (quoteId: string) => {
-    if (!confirm('Confirmar esta cotacao como vencedora?')) {
-      return
-    }
-
-    try {
-      await api.patch(`/quotations/${quoteId}/win`)
-      toast.success('Cotacao aprovada com sucesso.')
-      await fetchQuotations()
-      await fetchDetails()
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel definir a cotacao vencedora.'))
-    }
+  const handleSetWinner = (quoteId: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Confirmar Cotação Vencedora',
+      description: 'Deseja definir esta cotação como vencedora? Isso encerrará o processo de cotação para as demais propostas.',
+      confirmText: 'Definir Vencedor',
+      action: async () => {
+        try {
+          await api.patch(`/quotations/${quoteId}/win`)
+          toast.success('Cotação aprovada com sucesso.')
+          await fetchQuotations()
+          await fetchDetails()
+        } catch (error) {
+          toast.error(getApiErrorMessage(error, 'Não foi possível definir a cotação vencedora.'))
+        }
+      },
+    })
   }
 
-  const handleGenerateOrder = async (quoteId: string) => {
-    if (!confirm('Gerar ordem de compra para esta cotacao?')) {
-      return
-    }
-
-    try {
-      await api.post(`/purchase-orders/generate/${quoteId}`)
-      toast.success('Ordem de compra gerada com sucesso.')
-      router.push('/dashboard/compras/ordens')
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel gerar a ordem de compra.'))
-    }
+  const handleGenerateOrder = (quoteId: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Gerar Ordem de Compra',
+      description: 'Deseja emitir a Ordem de Compra oficial com base nesta cotação vencedora?',
+      confirmText: 'Gerar Ordem',
+      action: async () => {
+        try {
+          await api.post(`/purchase-orders/generate/${quoteId}`)
+          toast.success('Ordem de compra gerada com sucesso.')
+          router.push('/dashboard/compras/ordens')
+        } catch (error) {
+          toast.error(getApiErrorMessage(error, 'Não foi possível gerar a ordem de compra.'))
+        }
+      },
+    })
   }
 
   const isQuotationEnabled = useMemo(() => {
@@ -158,24 +180,29 @@ export default function RequestDetailsPage() {
     <div className="app-page">
       <section className="app-page-header">
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/dashboard/compras/pedidos" className="transition hover:text-foreground">
-              Compras
-            </Link>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span className="text-primary">Pedido #{request.code}</span>
+          <div className="app-badge-row">
+            <span className="app-badge">Modulo de Compras</span>
+            <span className="app-badge app-badge-info">Auditoria Integrada</span>
           </div>
-          <div className="space-y-2">
-            <p className="app-kicker">Compras</p>
-            <h1 className="app-title">Pedido #{request.code}</h1>
-            <p className="app-subtitle">
-              Criado em {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')} por{' '}
-              {request.requester?.user?.name || 'Solicitante nao identificado'}.
+          <div className="space-y-1">
+            <h1 className="page-title">Requisicao #{request.code}</h1>
+            <p className="page-description">
+              Solicitacao aberta em {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')} por{' '}
+              {request.requester?.user?.name || 'Solicitante'}.
             </p>
           </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant={request.status === 'REJECTED' ? 'destructive' : 'outline'}>
+          <Badge
+            variant={
+              request.status === 'APPROVED' || request.status === 'ORDERED'
+                ? 'default'
+                : request.status === 'REJECTED'
+                  ? 'destructive'
+                  : 'secondary'
+            }
+          >
             {STATUS_LABELS[request.status] || request.status}
           </Badge>
           <Button asChild variant="outline" className="gap-2">
@@ -198,7 +225,7 @@ export default function RequestDetailsPage() {
           <div className="space-y-1">
             <h2 className="section-title">Andamento do pedido</h2>
             <p className="text-sm text-muted-foreground">
-              Acompanhe a etapa atual e os registros auditáveis já gravados para esta solicitação.
+              Acompanhe a etapa atual e a jornada passo a passo do fluxo desde a submissão.
             </p>
           </div>
           <PurchaseRequestTimeline
@@ -336,29 +363,10 @@ export default function RequestDetailsPage() {
 
           <Card className="app-section-card">
             <CardHeader className="px-0 pt-0">
-              <CardTitle>Trilha de eventos</CardTitle>
+              <CardTitle>Trilha de eventos e auditoria</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-0 pb-0">
-              {(request.events || []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum evento auditável registrado até o momento.
-                </p>
-              ) : (
-                request.events?.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-[18px] border border-border/60 bg-muted/20 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">{event.description || event.action}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(event.createdAt), 'dd/MM HH:mm')}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{event.action}</p>
-                  </div>
-                ))
-              )}
+            <CardContent className="px-0 pb-0">
+              <EventTimeline events={request.events} />
             </CardContent>
           </Card>
         </div>
@@ -373,6 +381,21 @@ export default function RequestDetailsPage() {
         onSuccess={() => {
           void fetchQuotations()
           void fetchDetails()
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((s) => ({ ...s, open }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        onConfirm={async () => {
+          if (confirmDialog.action) {
+            await confirmDialog.action()
+          }
+          setConfirmDialog((s) => ({ ...s, open: false }))
         }}
       />
     </div>

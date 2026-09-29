@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -41,6 +43,15 @@ export default function ProductsPage() {
   const [description, setDescription] = useState("")
   const [categoryId, setCategoryId] = useState("")
   const [unitId, setUnitId] = useState("")
+
+  // Delete dialog
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 12
 
   // Fetch Data
   const fetchData = async () => {
@@ -89,13 +100,17 @@ export default function ProductsPage() {
       }
   }
 
-  const handleDeleteProduct = async (id: string) => {
-      if(!confirm("Deseja excluir este produto?")) return
+  const handleDeleteProduct = async () => {
+      if(!deleteProductId) return
+      setDeleteLoading(true)
       try {
-          await api.delete(`/products/${id}`)
+          await api.delete(`/products/${deleteProductId}`)
           toast.success("Produto excluído")
+          setIsDeleteDialogOpen(false)
+          setDeleteProductId(null)
           fetchData()
-      } catch { toast.error("Erro ao excluir") }
+      } catch { toast.error("Erro ao excluir produto") }
+      finally { setDeleteLoading(false) }
   }
 
   const resetForm = () => {
@@ -113,6 +128,7 @@ export default function ProductsPage() {
   }
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
@@ -137,12 +153,17 @@ export default function ProductsPage() {
                  <div className="flex items-center gap-2">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Buscar produtos..." className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        <Input
+                            placeholder="Buscar produtos..."
+                            className="pl-8"
+                            value={searchTerm}
+                            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {filteredProducts.map(p => (
+                    {paginatedProducts.map(p => (
                         <Card key={p.id} className="group relative hover:border-primary/50 transition-all">
                             <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start">
@@ -160,13 +181,27 @@ export default function ProductsPage() {
                                 </div>
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(p)}>Editar</Button>
-                                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="h-4 w-4"/></Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        onClick={() => { setDeleteProductId(p.id); setIsDeleteDialogOpen(true); }}
+                                    >
+                                        <Trash2 className="h-4 w-4"/>
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
                     {!loading && filteredProducts.length === 0 && <div className="col-span-full text-center text-muted-foreground py-10">Nenhum produto encontrado.</div>}
                 </div>
+
+                <TablePagination
+                    page={currentPage}
+                    totalItems={filteredProducts.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                />
             </TabsContent>
 
             <TabsContent value="categories">
@@ -238,6 +273,17 @@ export default function ProductsPage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+            title="Excluir Produto"
+            description="Tem certeza que deseja excluir este produto do catálogo? Esta ação não pode ser desfeita."
+            confirmText="Excluir"
+            variant="destructive"
+            loading={deleteLoading}
+            onConfirm={handleDeleteProduct}
+        />
     </div>
   )
 }

@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Plus, DollarSign, Trophy, FileCheck, ShoppingCart } from "lucide-react"
+import { Loader2, Plus, DollarSign, Trophy, ShoppingCart, Ban } from "lucide-react"
 import { toast } from "sonner"
 import { useParams, useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api"
+import { getApiErrorMessage } from "@/lib/api-error"
 
 interface RequestItem {
     id: string
@@ -53,73 +54,102 @@ export default function QuotationDetailPage() {
 
     const [request, setRequest] = useState<PurchaseRequest | null>(null)
     const [quotations, setQuotations] = useState<Quotation[]>([])
-    const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([])
-    
-    // UI States
+    const [suppliers, setSuppliers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+
+    // Modals
     const [isAddOpen, setIsAddOpen] = useState(false)
+    const [isEditOpen, setIsEditOpen] = useState(false)
     const [selectedSupplierId, setSelectedSupplierId] = useState("")
     const [createLoading, setCreateLoading] = useState(false)
 
-    // Edit State
-    const [isEditOpen, setIsEditOpen] = useState(false)
+    // Edit Values State
     const [editingQuote, setEditingQuote] = useState<Quotation | null>(null)
-    const [editItems, setEditItems] = useState<{id: string, price: number, deliveryTime: string, paymentConditions: string}[]>([])
+    const [editItems, setEditItems] = useState<{ id: string, price: number, deliveryTime: string, paymentConditions: string }[]>([])
     const [savingQuote, setSavingQuote] = useState(false)
+
+    // Confirm dialog
+    const [confirmDialog, setConfirmDialog] = useState<{
+        open: boolean
+        title: string
+        description?: string
+        confirmText?: string
+        variant?: 'default' | 'destructive'
+        action?: () => Promise<void>
+    }>({ open: false, title: '' })
 
     const fetchData = async () => {
         try {
             setLoading(true)
-            
-            const [reqRes, quoteRes, supRes] = await Promise.all([
+            const [reqRes, quotesRes, supRes] = await Promise.all([
                 api.get(`/purchase-requests/${requestId}`),
                 api.get(`/quotations/request/${requestId}`),
                 api.get('/suppliers')
             ])
-
             setRequest(reqRes.data)
-            setQuotations(quoteRes.data)
+            setQuotations(quotesRes.data)
             setSuppliers(supRes.data)
-
-        } catch { toast.error("Erro ao carregar dados") }
-        finally { setLoading(false) }
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Erro ao carregar dados da cotação"))
+        } finally {
+            setLoading(false)
+        }
     }
 
-    useEffect(() => { fetchData() }, [requestId])
+    useEffect(() => {
+        if(requestId) fetchData()
+    }, [requestId])
 
     const handleCreateQuotation = async () => {
-        if(!selectedSupplierId) return
+        if(!selectedSupplierId) return toast.error("Selecione um fornecedor")
         setCreateLoading(true)
         try {
-            await api.post('/quotations', { requestId, supplierId: selectedSupplierId })
-            toast.success("Cotação iniciada")
+            await api.post('/quotations', {
+                requestId,
+                supplierId: selectedSupplierId
+            })
+            toast.success("Cotação iniciada!")
             setIsAddOpen(false)
+            setSelectedSupplierId("")
             fetchData()
-        } catch { toast.error("Erro ao criar cotação") }
-        finally { setCreateLoading(false) }
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Erro ao criar cotação"))
+        } finally {
+            setCreateLoading(false)
+        }
     }
 
-    const openEdit = (quote: Quotation) => {
+    const openEditModal = (quote: Quotation) => {
         setEditingQuote(quote)
         setEditItems(quote.items.map(i => ({
             id: i.id,
-            price: Number(i.price),
-            deliveryTime: i.deliveryTime || "",
-            paymentConditions: i.paymentConditions || ""
+            price: i.price,
+            deliveryTime: i.deliveryTime || '',
+            paymentConditions: i.paymentConditions || ''
         })))
         setIsEditOpen(true)
     }
 
     const handleSaveValues = async () => {
-        if (!editingQuote) return
+        if(!editingQuote) return
         setSavingQuote(true)
         try {
-            await api.patch(`/quotations/${editingQuote.id}`, { items: editItems })
-            toast.success("Valores atualizados")
+            await api.patch(`/quotations/${editingQuote.id}`, {
+                items: editItems.map(i => ({
+                    id: i.id,
+                    price: Number(i.price),
+                    deliveryTime: i.deliveryTime,
+                    paymentConditions: i.paymentConditions
+                }))
+            })
+            toast.success("Valores salvos!")
             setIsEditOpen(false)
             fetchData()
-        } catch { toast.error("Erro ao atualizar valores") }
-        finally { setSavingQuote(false) }
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, "Erro ao salvar valores"))
+        } finally {
+            setSavingQuote(false)
+        }
     }
 
     const updateEditItem = (index: number, field: string, value: any) => {
@@ -128,22 +158,59 @@ export default function QuotationDetailPage() {
         setEditItems(newItems)
     }
 
-    const handleWin = async (id: string) => {
-        if(!confirm("Definir esta cotação como VENCEDORA? Isso encerrará as outras.")) return
-        try {
-            await api.patch(`/quotations/${id}/win`)
-            toast.success("Vencedor definido!")
-            fetchData()
-        } catch { toast.error("Erro ao definir vencedor") }
+    const handleWin = (id: string) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Definir Cotação Vencedora',
+            description: 'Deseja definir esta cotação como VENCEDORA? Isso encerrará as outras cotações abertas.',
+            confirmText: 'Definir Vencedora',
+            action: async () => {
+                try {
+                    await api.patch(`/quotations/${id}/win`)
+                    toast.success("Vencedor definido!")
+                    fetchData()
+                } catch (error) {
+                    toast.error(getApiErrorMessage(error, "Erro ao definir vencedor"))
+                }
+            }
+        })
     }
 
-    const handleGenerateOrder = async (quoteId: string) => {
-        if(!confirm("Gerar Ordem de Compra agora?")) return
-        try {
-            await api.post(`/purchase-orders/generate/${quoteId}`)
-            toast.success("Ordem de Compra Gerada!")
-            router.push('/dashboard/compras/ordens')
-        } catch { toast.error("Erro ao gerar ordem") }
+    const handleGenerateOrder = (quoteId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Gerar Ordem de Compra',
+            description: 'Deseja emitir a Ordem de Compra para esta cotação agora?',
+            confirmText: 'Gerar Ordem',
+            action: async () => {
+                try {
+                    await api.post(`/purchase-orders/generate/${quoteId}`)
+                    toast.success("Ordem de Compra Gerada!")
+                    router.push('/dashboard/compras/ordens')
+                } catch (error) {
+                    toast.error(getApiErrorMessage(error, "Erro ao gerar ordem"))
+                }
+            }
+        })
+    }
+
+    const handleCancelQuotation = (quoteId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: 'Cancelar Cotação',
+            description: 'Deseja realmente cancelar esta cotação? Ela não poderá mais ser homologada.',
+            confirmText: 'Cancelar Cotação',
+            variant: 'destructive',
+            action: async () => {
+                try {
+                    await api.delete(`/quotations/${quoteId}`)
+                    toast.success("Cotação cancelada com sucesso.")
+                    fetchData()
+                } catch (error) {
+                    toast.error(getApiErrorMessage(error, "Não foi possível cancelar a cotação."))
+                }
+            }
+        })
     }
 
     if(loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin"/></div>
@@ -160,45 +227,66 @@ export default function QuotationDetailPage() {
                     <p className="text-muted-foreground">{request.justification}</p>
                 </div>
                 {request.status !== 'ORDERED' && (
-                    <Button onClick={() => setIsAddOpen(true)} className="gap-2"><Plus className="h-4 w-4"/> Adicionar Fornecedor</Button>
+                    <Button onClick={() => setIsAddOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Nova Cotação (Fornecedor)
+                    </Button>
                 )}
             </div>
 
-            {/* Request Items Summary */}
-            <Card>
-                <CardHeader className="pb-3"><CardTitle className="text-base">Itens da Requisição</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="flex gap-4 flex-wrap">
-                        {request.items.map(i => (
-                            <Badge key={i.id} variant="secondary" className="px-3 py-1">
-                                {i.quantity}{i.unit.symbol} - {i.product?.name || i.description}
-                            </Badge>
-                        ))}
+            {winner && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 p-4 rounded-lg flex items-center justify-between">
+                    <div>
+                        <h3 className="font-semibold text-lg flex items-center gap-2"><Trophy className="h-5 w-5"/> Cotação Vencedora: {winner.supplier.name}</h3>
+                        <p className="text-sm opacity-90">Valor Total: R$ {Number(winner.totalValue).toFixed(2)}</p>
                     </div>
-                </CardContent>
-            </Card>
+                    {request.status !== 'ORDERED' && (
+                        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleGenerateOrder(winner.id)}>
+                            <ShoppingCart className="mr-2 h-4 w-4"/> Gerar Ordem de Compra
+                        </Button>
+                    )}
+                </div>
+            )}
 
-            {/* Quotations List */}
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {quotations.map(quote => (
-                    <Card key={quote.id} className={`border-l-4 ${quote.status === 'WON' ? 'border-l-green-500 bg-green-50/50' : quote.status === 'LOST' ? 'border-l-red-200 opacity-75' : 'border-l-blue-500'}`}>
+                    <Card key={quote.id} className={quote.status === 'WON' ? 'border-emerald-500' : quote.status === 'CANCELLED' ? 'opacity-60 border-dashed' : ''}>
                         <CardHeader className="pb-2">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <CardTitle className="flex items-center gap-2">
-                                        {quote.supplier.name}
-                                        {quote.status === 'WON' && <Badge className="bg-green-500"><Trophy className="h-3 w-3 mr-1"/> Vencedora</Badge>}
-                                    </CardTitle>
-                                    <div className="text-sm text-muted-foreground mt-1">
-                                        Total: <span className="font-bold text-foreground">R$ {Number(quote.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                    </div>
+                                    <CardTitle>{quote.supplier.name}</CardTitle>
+                                    <CardDescription>
+                                        Status: 
+                                        <Badge
+                                          variant={
+                                            quote.status === 'WON' ? 'default' :
+                                            quote.status === 'CANCELLED' ? 'destructive' :
+                                            quote.status === 'LOST' ? 'secondary' : 'outline'
+                                          }
+                                          className="ml-2"
+                                        >
+                                            {quote.status === 'PENDING' ? 'Em Preenchimento' :
+                                             quote.status === 'WON' ? 'Vencedora' :
+                                             quote.status === 'LOST' ? 'Perdida' :
+                                             quote.status === 'CANCELLED' ? 'Cancelada' : quote.status}
+                                        </Badge>
+                                    </CardDescription>
                                 </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold">R$ {Number(quote.totalValue || 0).toFixed(2)}</div>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-2">
                                 <div className="flex gap-2">
                                     {quote.status === 'PENDING' && (
                                         <>
-                                            <Button size="sm" variant="outline" onClick={() => openEdit(quote)}><DollarSign className="h-4 w-4 mr-2"/> Preços</Button>
+                                            <Button size="sm" variant="outline" onClick={() => openEditModal(quote)}>
+                                                <DollarSign className="h-4 w-4 mr-2" /> Inserir Preços
+                                            </Button>
                                             <Button size="sm" variant="default" onClick={() => handleWin(quote.id)} disabled={Number(quote.totalValue) === 0}>
                                                 <Trophy className="h-4 w-4 mr-2" /> Vencedor
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="text-rose-600 hover:bg-rose-50" onClick={() => handleCancelQuotation(quote.id)}>
+                                                <Ban className="h-4 w-4 mr-1" /> Cancelar
                                             </Button>
                                         </>
                                     )}
@@ -283,6 +371,21 @@ export default function QuotationDetailPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={confirmDialog.open}
+                onOpenChange={(open) => setConfirmDialog(s => ({ ...s, open }))}
+                title={confirmDialog.title}
+                description={confirmDialog.description}
+                confirmText={confirmDialog.confirmText}
+                variant={confirmDialog.variant}
+                onConfirm={async () => {
+                    if (confirmDialog.action) {
+                        await confirmDialog.action()
+                    }
+                    setConfirmDialog(s => ({ ...s, open: false }))
+                }}
+            />
         </div>
     )
 }

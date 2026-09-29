@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api"
 import { toast } from "sonner"
 import { ThemePaletteCard } from "@/components/theme/theme-palette-card"
+import { EmailSettingsPanel } from "@/components/email/email-settings-panel"
 import {
     THEME_PALETTES,
     getThemePalette,
@@ -150,10 +151,11 @@ export default function SettingsPage() {
             </section>
 
             <Tabs defaultValue="theme" className="w-full space-y-6">
-                <TabsList className="grid w-full max-w-[520px] grid-cols-3">
+                <TabsList className="grid w-full max-w-[680px] grid-cols-4">
                     <TabsTrigger value="theme">Tema</TabsTrigger>
                     <TabsTrigger value="interface">Interface</TabsTrigger>
                     <TabsTrigger value="company">Empresa</TabsTrigger>
+                    <TabsTrigger value="email">E-mail e Alertas</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="theme" className="space-y-6">
@@ -329,6 +331,10 @@ export default function SettingsPage() {
                             </form>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                <TabsContent value="email" className="space-y-6">
+                    <EmailSettingsPanel />
                 </TabsContent>
             </Tabs>
         </div>
