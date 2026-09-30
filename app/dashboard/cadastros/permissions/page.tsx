@@ -166,6 +166,12 @@ export default function ProfilesPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button asChild variant="outline" size="sm" className="gap-2">
+                            <Link href={`/dashboard/cadastros/permissions/${role.id}/members`}>
+                              <Users className="h-3.5 w-3.5" />
+                              Membros
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="sm" className="gap-2">
                             <Link href={`/dashboard/cadastros/permissions/${role.id}/edit`}>
                               <Edit className="h-3.5 w-3.5" />
                               Editar

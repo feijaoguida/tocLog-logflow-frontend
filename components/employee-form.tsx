@@ -287,6 +287,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
   const [managerSearch, setManagerSearch] = useState("")
   const [isSearchingManager, setIsSearchingManager] = useState(false)
   const [selectedManagerObj, setSelectedManagerObj] = useState<ManagerItem | null>(null)
+  const [secondaryRoleIds, setSecondaryRoleIds] = useState<string[]>([])
   const [formData, setFormData] = useState<EmployeeData>(buildInitialData(initialData))
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({})
   const [skillQuery, setSkillQuery] = useState("")
@@ -318,6 +319,17 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
           if (managerRes.data) {
             setSelectedManagerObj(managerRes.data)
             setManagers([managerRes.data])
+          }
+        }
+
+        if (initialData?.id) {
+          try {
+            const secRes = await api.get(`/employees/${initialData.id}/roles`)
+            if (secRes.data?.secondaryRoles && Array.isArray(secRes.data.secondaryRoles)) {
+              setSecondaryRoleIds(secRes.data.secondaryRoles.map((s: any) => s.roleId))
+            }
+          } catch (e) {
+            console.error("Secondary roles fetch error", e)
           }
         }
       } catch (error) {
@@ -384,6 +396,9 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
   }
 
   const handleChange = (field: keyof EmployeeData, value: unknown) => {
+    if (field === "roleId" && typeof value === "string") {
+      setSecondaryRoleIds((prev) => prev.filter((id) => id !== value))
+    }
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -575,10 +590,18 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
 
       if (isEditMode && formData.id) {
         await api.patch(`/employees/${formData.id}`, payload)
+        await api.put(`/employees/${formData.id}/secondary-roles`, {
+          roleIds: secondaryRoleIds,
+        })
         toast.success("Funcionário atualizado com sucesso.")
         router.push(`/dashboard/rh/employees/${formData.id}`)
       } else {
-        await api.post("/employees", payload)
+        const { data: created } = await api.post("/employees", payload)
+        if (created?.id && secondaryRoleIds.length > 0) {
+          await api.put(`/employees/${created.id}/secondary-roles`, {
+            roleIds: secondaryRoleIds,
+          })
+        }
         toast.success("Funcionário criado com sucesso.")
         router.push("/dashboard/rh/employees")
       }
@@ -668,7 +691,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
           </div>
 
           <div className="field-stack">
-            <Label>Perfil do Sistema</Label>
+            <Label>Perfil do Sistema (Principal)</Label>
             <Select
               value={formData.roleId || "none"}
               onValueChange={(value) => handleChange("roleId", value === "none" ? "" : value)}
@@ -685,6 +708,86 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="field-stack md:col-span-2 border-t border-border/50 pt-3">
+            <div className="flex items-center justify-between">
+              <Label>Perfis Secundários (Complementares)</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Acumulativos sobre o perfil principal
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Perfis secundários adicionam permissões ao funcionário sem alterar o perfil principal.
+            </p>
+
+            {/* Badges of current active roles */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {formData.roleId && (
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-50/50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                  <span className="material-symbols-outlined text-[14px] text-amber-600">crown</span>
+                  <span>Principal: {roles.find((r) => r.id === formData.roleId)?.name || 'Perfil'}</span>
+                  <span className="text-[10px] text-muted-foreground ml-0.5">(Definido acima)</span>
+                </div>
+              )}
+
+              {secondaryRoleIds.map((secId) => {
+                const roleObj = roles.find((r) => r.id === secId)
+                if (!roleObj) return null
+                return (
+                  <div
+                    key={secId}
+                    className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-900 dark:bg-blue-950/40 dark:text-blue-200"
+                  >
+                    <span>{roleObj.name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSecondaryRoleIds((prev) => prev.filter((id) => id !== secId))
+                      }
+                      className="ml-1 rounded hover:bg-blue-200/50 p-0.5 text-blue-700 dark:hover:bg-blue-900 dark:text-blue-300"
+                      title={`Remover perfil ${roleObj.name}`}
+                    >
+                      <span className="material-symbols-outlined text-[13px] leading-none">close</span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Add secondary role dropdown */}
+            <div className="pt-1">
+              <Select
+                value="placeholder"
+                onValueChange={(value) => {
+                  if (value && value !== "placeholder") {
+                    if (!secondaryRoleIds.includes(value)) {
+                      setSecondaryRoleIds((prev) => [...prev, value])
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[320px]">
+                  <SelectValue placeholder="+ Adicionar perfil secundário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="placeholder" disabled>
+                    + Selecione um perfil para adicionar
+                  </SelectItem>
+                  {roles
+                    .filter(
+                      (role) =>
+                        role.id !== formData.roleId &&
+                        !secondaryRoleIds.includes(role.id),
+                    )
+                    .map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         </Section>

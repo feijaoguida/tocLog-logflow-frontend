@@ -1,20 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import _ from 'lodash'
-import { ArrowLeft, Loader2, Save, ShieldCheck } from 'lucide-react'
+import {
+  ArrowLeft,
+  Ban,
+  Check,
+  Loader2,
+  Save,
+  ShieldAlert,
+  ShieldCheck,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { cn } from '@/lib/utils'
 
 type PermissionCatalogItem = {
   id: string
@@ -26,7 +41,7 @@ type PermissionCatalogItem = {
 type RoleFormValue = {
   name: string
   description: string
-  permissionSlugs: string[]
+  permissionEntries: Record<string, 'GRANT' | 'DENY'>
 }
 
 type RoleFormProps = {
@@ -34,7 +49,7 @@ type RoleFormProps = {
   roleId?: string
 }
 
-type FieldErrors = Partial<Record<'name' | 'permissionSlugs', string>>
+type FieldErrors = Partial<Record<'name' | 'permissionEntries', string>>
 
 export function RoleForm({ mode, roleId }: RoleFormProps) {
   const router = useRouter()
@@ -42,7 +57,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
   const [formData, setFormData] = useState<RoleFormValue>({
     name: '',
     description: '',
-    permissionSlugs: [],
+    permissionEntries: {},
   })
   const [loading, setLoading] = useState(true)
   const [submitLoading, setSubmitLoading] = useState(false)
@@ -61,17 +76,37 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
         setPermissions(permissionsResponse.data)
 
         if (roleResponse?.data) {
+          const entries: Record<string, 'GRANT' | 'DENY'> = {}
+
+          if (
+            roleResponse.data.permissionEntries &&
+            Array.isArray(roleResponse.data.permissionEntries)
+          ) {
+            for (const item of roleResponse.data.permissionEntries) {
+              if (item.permission?.slug) {
+                entries[item.permission.slug] = item.type
+              }
+            }
+          } else if (
+            roleResponse.data.permissions &&
+            Array.isArray(roleResponse.data.permissions)
+          ) {
+            for (const item of roleResponse.data.permissions) {
+              if (item.slug) {
+                entries[item.slug] = 'GRANT'
+              }
+            }
+          }
+
           setFormData({
             name: roleResponse.data.name ?? '',
             description: roleResponse.data.description ?? '',
-            permissionSlugs: Array.isArray(roleResponse.data.permissions)
-              ? roleResponse.data.permissions.map((permission: { slug: string }) => permission.slug)
-              : [],
+            permissionEntries: entries,
           })
         }
       } catch (error) {
         toast.error(
-          getApiErrorMessage(error, 'Nao foi possivel carregar os dados do perfil.'),
+          getApiErrorMessage(error, 'Não foi possível carregar os dados do perfil.'),
         )
         router.push('/dashboard/cadastros/permissions')
       } finally {
@@ -87,6 +122,18 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
     left.localeCompare(right),
   )
 
+  const grantCount = useMemo(
+    () => Object.values(formData.permissionEntries).filter((t) => t === 'GRANT').length,
+    [formData.permissionEntries],
+  )
+
+  const denyCount = useMemo(
+    () => Object.values(formData.permissionEntries).filter((t) => t === 'DENY').length,
+    [formData.permissionEntries],
+  )
+
+  const totalEntriesCount = grantCount + denyCount
+
   const validateForm = () => {
     const nextErrors: FieldErrors = {}
 
@@ -94,52 +141,55 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
       nextErrors.name = 'Informe o nome do perfil.'
     }
 
-    if (formData.permissionSlugs.length === 0) {
-      nextErrors.permissionSlugs = 'Selecione ao menos uma permissao.'
+    if (totalEntriesCount === 0) {
+      nextErrors.permissionEntries = 'Selecione ao menos uma permissão (Conceder ou Negar).'
     }
 
     setFieldErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
 
-  const togglePermission = (slug: string) => {
+  const setPermissionState = (slug: string, type: 'GRANT' | 'DENY' | null) => {
     setFormData((current) => {
-      const nextPermissionSlugs = current.permissionSlugs.includes(slug)
-        ? current.permissionSlugs.filter((permissionSlug) => permissionSlug !== slug)
-        : [...current.permissionSlugs, slug]
-
+      const nextEntries = { ...current.permissionEntries }
+      if (type === null) {
+        delete nextEntries[slug]
+      } else {
+        nextEntries[slug] = type
+      }
       return {
         ...current,
-        permissionSlugs: nextPermissionSlugs,
+        permissionEntries: nextEntries,
       }
     })
 
     setFieldErrors((current) => ({
       ...current,
-      permissionSlugs: undefined,
+      permissionEntries: undefined,
     }))
   }
 
-  const togglePermissionGroup = (group: string) => {
-    const groupSlugs = groupedPermissions[group].map((permission) => permission.slug)
-    const isEveryPermissionSelected = groupSlugs.every((slug) =>
-      formData.permissionSlugs.includes(slug),
-    )
+  const setGroupState = (group: string, type: 'GRANT' | 'DENY' | null) => {
+    const groupSlugs = groupedPermissions[group].map((p) => p.slug)
 
     setFormData((current) => {
-      const nextPermissionSlugs = isEveryPermissionSelected
-        ? current.permissionSlugs.filter((slug) => !groupSlugs.includes(slug))
-        : Array.from(new Set([...current.permissionSlugs, ...groupSlugs]))
-
+      const nextEntries = { ...current.permissionEntries }
+      for (const slug of groupSlugs) {
+        if (type === null) {
+          delete nextEntries[slug]
+        } else {
+          nextEntries[slug] = type
+        }
+      }
       return {
         ...current,
-        permissionSlugs: nextPermissionSlugs,
+        permissionEntries: nextEntries,
       }
     })
 
     setFieldErrors((current) => ({
       ...current,
-      permissionSlugs: undefined,
+      permissionEntries: undefined,
     }))
   }
 
@@ -153,10 +203,18 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
     setSubmitLoading(true)
 
     try {
+      const permissionEntries = Object.entries(formData.permissionEntries).map(
+        ([slug, type]) => ({ slug, type }),
+      )
+      const permissionSlugs = permissionEntries
+        .filter((e) => e.type === 'GRANT')
+        .map((e) => e.slug)
+
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim(),
-        permissionSlugs: formData.permissionSlugs,
+        permissionEntries,
+        permissionSlugs,
       }
 
       if (mode === 'edit' && roleId) {
@@ -170,7 +228,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
       router.push('/dashboard/cadastros/permissions')
       router.refresh()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel salvar o perfil.'))
+      toast.error(getApiErrorMessage(error, 'Não foi possível salvar o perfil.'))
     } finally {
       setSubmitLoading(false)
     }
@@ -185,12 +243,15 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
   }
 
   return (
-    <div className="app-page">
+    <div className="app-page space-y-6">
       <section className="app-page-header">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/dashboard/cadastros/permissions" className="transition hover:text-foreground">
-              Gestao de Permissoes
+            <Link
+              href="/dashboard/cadastros/permissions"
+              className="transition hover:text-foreground"
+            >
+              Gestão de Permissões
             </Link>
             <span className="material-symbols-outlined text-[14px]">chevron_right</span>
             <span className="text-primary">
@@ -203,8 +264,8 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
               {mode === 'edit' ? 'Editar Perfil de Acesso' : 'Criar Perfil de Acesso'}
             </h1>
             <p className="app-subtitle">
-              Defina o nome do perfil, descreva o contexto de uso e selecione as permissoes
-              que esse perfil podera conceder.
+              Configure as permissões deste perfil. Você pode conceder (GRANT) ou negar
+              explicitamente (DENY). Lembre-se: qualquer negação sobrepõe aprovações.
             </p>
           </div>
         </div>
@@ -222,7 +283,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
             <div className="space-y-1">
               <h2 className="section-title">Dados do perfil</h2>
               <p className="text-sm text-muted-foreground">
-                Perfis organizam o acesso padrao por funcao e podem ser vinculados aos
+                Perfis organizam o acesso padrão por função e podem ser vinculados aos
                 colaboradores nas telas administrativas.
               </p>
             </div>
@@ -231,7 +292,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
               <div className="field-stack">
                 <Label htmlFor="role-name">Nome do perfil *</Label>
                 <p className="text-sm text-muted-foreground">
-                  Exibido na gestao de usuarios e em referencias internas de acesso.
+                  Exibido na gestão de usuários e em referências internas de acesso.
                 </p>
                 <Input
                   id="role-name"
@@ -249,7 +310,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
               </div>
 
               <div className="field-stack md:col-span-2">
-                <Label htmlFor="role-description">Descricao</Label>
+                <Label htmlFor="role-description">Descrição</Label>
                 <p className="text-sm text-muted-foreground">
                   Contexto opcional para diferenciar esse perfil de outros perfis similares.
                 </p>
@@ -263,7 +324,7 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
                     }))
                   }
                   placeholder="Explique o uso principal e as responsabilidades cobertas."
-                  className="min-h-28"
+                  className="min-h-24"
                 />
               </div>
             </div>
@@ -274,73 +335,200 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
           <CardContent className="space-y-6 p-0">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
-                <h2 className="section-title">Permissoes do sistema</h2>
+                <h2 className="section-title">Permissões do perfil</h2>
                 <p className="text-sm text-muted-foreground">
-                  O perfil precisa ter ao menos uma permissao para ser salvo.
+                  Defina o comportamento para cada permissão. Permissões não configuradas
+                  permanecem neutras (sem associação).
                 </p>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                <span>{formData.permissionSlugs.length} permissao(oes) selecionada(s)</span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{grantCount} Concedidas (GRANT)</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">
+                  <ShieldAlert className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>{denyCount} Negadas (DENY)</span>
+                </div>
               </div>
             </div>
 
-            {fieldErrors.permissionSlugs ? (
-              <p className="text-sm text-destructive">{fieldErrors.permissionSlugs}</p>
+            {fieldErrors.permissionEntries ? (
+              <p className="text-sm text-destructive">{fieldErrors.permissionEntries}</p>
             ) : null}
 
             <div className="rounded-2xl border border-border bg-background/80 p-2">
               <Accordion type="multiple" defaultValue={sortedGroups} className="w-full">
                 {sortedGroups.map((group) => {
                   const groupPermissions = groupedPermissions[group]
-                  const groupSlugs = groupPermissions.map((permission) => permission.slug)
-                  const selectedCount = groupedPermissions[group].filter((permission) =>
-                    formData.permissionSlugs.includes(permission.slug),
+                  const groupGrants = groupPermissions.filter(
+                    (p) => formData.permissionEntries[p.slug] === 'GRANT',
                   ).length
-                  const isEveryPermissionSelected =
-                    groupSlugs.length > 0 && selectedCount === groupSlugs.length
+                  const groupDenies = groupPermissions.filter(
+                    (p) => formData.permissionEntries[p.slug] === 'DENY',
+                  ).length
 
                   return (
-                    <AccordionItem key={group} value={group} className="border-b border-border last:border-b-0">
+                    <AccordionItem
+                      key={group}
+                      value={group}
+                      className="border-b border-border last:border-b-0"
+                    >
                       <AccordionTrigger className="rounded-xl px-3 text-left hover:no-underline">
                         <div className="flex flex-1 items-center justify-between gap-3">
                           <span className="text-sm font-semibold text-foreground">{group}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {selectedCount} / {groupedPermissions[group].length}
-                          </span>
+                          <div className="flex items-center gap-2 pr-2 text-xs">
+                            {groupGrants > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 py-0"
+                              >
+                                +{groupGrants}
+                              </Badge>
+                            )}
+                            {groupDenies > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="border-rose-500/30 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 py-0"
+                              >
+                                -{groupDenies}
+                              </Badge>
+                            )}
+                            <span className="text-muted-foreground">
+                              {groupGrants + groupDenies} / {groupPermissions.length}
+                            </span>
+                          </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-3 pb-4">
-                        <div className="mb-3 flex justify-end">
+                        {/* Quick action buttons for the group */}
+                        <div className="mb-3 flex flex-wrap items-center justify-end gap-2 border-b border-border/50 pb-2">
+                          <span className="text-xs text-muted-foreground mr-1">Ações em lote:</span>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => togglePermissionGroup(group)}
+                            className="h-7 text-xs gap-1 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                            onClick={() => setGroupState(group, 'GRANT')}
                           >
-                            {isEveryPermissionSelected ? 'Desmarcar todos' : 'Marcar todos'}
+                            <Check className="h-3 w-3" />
+                            Conceder todos
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                            onClick={() => setGroupState(group, 'DENY')}
+                          >
+                            <Ban className="h-3 w-3" />
+                            Negar todos
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => setGroupState(group, null)}
+                          >
+                            <X className="h-3 w-3" />
+                            Limpar grupo
                           </Button>
                         </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {groupPermissions.map((permission) => (
-                            <label
-                              key={permission.id}
-                              htmlFor={permission.id}
-                              className="flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card px-4 py-3 transition hover:border-primary/40 hover:bg-muted/40"
-                            >
-                              <Checkbox
-                                id={permission.id}
-                                checked={formData.permissionSlugs.includes(permission.slug)}
-                                onCheckedChange={() => togglePermission(permission.slug)}
-                              />
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium leading-none text-foreground">
-                                  {permission.description || permission.slug}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{permission.slug}</p>
+
+                        {/* List of permissions in group */}
+                        <div className="grid gap-2.5">
+                          {groupPermissions.map((permission) => {
+                            const currentType = formData.permissionEntries[permission.slug]
+
+                            return (
+                              <div
+                                key={permission.id}
+                                className={cn(
+                                  'flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-3 transition',
+                                  currentType === 'GRANT'
+                                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                                    : currentType === 'DENY'
+                                    ? 'border-rose-500/40 bg-rose-500/5'
+                                    : 'border-border bg-card/60 hover:bg-muted/20',
+                                )}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium leading-none text-foreground">
+                                      {permission.description || permission.slug}
+                                    </p>
+                                    {currentType === 'GRANT' && (
+                                      <Badge
+                                        variant="outline"
+                                        className="h-4 border-emerald-500/30 bg-emerald-50 px-1.5 py-0 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                      >
+                                        GRANT
+                                      </Badge>
+                                    )}
+                                    {currentType === 'DENY' && (
+                                      <Badge
+                                        variant="outline"
+                                        className="h-4 border-rose-500/30 bg-rose-50 px-1.5 py-0 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                                      >
+                                        DENY
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {permission.slug}
+                                  </p>
+                                </div>
+
+                                {/* 3-state segmented toggle */}
+                                <div className="flex items-center gap-1 self-end sm:self-auto rounded-lg border border-border bg-muted/40 p-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPermissionState(permission.slug, null)}
+                                    className={cn(
+                                      'rounded-md px-2.5 py-1 text-xs font-medium transition',
+                                      !currentType
+                                        ? 'bg-background text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    Nenhum
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setPermissionState(permission.slug, 'GRANT')
+                                    }
+                                    className={cn(
+                                      'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition',
+                                      currentType === 'GRANT'
+                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                        : 'text-muted-foreground hover:text-emerald-600',
+                                    )}
+                                  >
+                                    <Check className="h-3 w-3" />
+                                    Conceder
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setPermissionState(permission.slug, 'DENY')
+                                    }
+                                    className={cn(
+                                      'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition',
+                                      currentType === 'DENY'
+                                        ? 'bg-rose-600 text-white shadow-sm'
+                                        : 'text-muted-foreground hover:text-rose-600',
+                                    )}
+                                  >
+                                    <Ban className="h-3 w-3" />
+                                    Negar
+                                  </button>
+                                </div>
                               </div>
-                            </label>
-                          ))}
+                            )
+                          })}
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -356,8 +544,12 @@ export function RoleForm({ mode, roleId }: RoleFormProps) {
             <Link href="/dashboard/cadastros/permissions">Cancelar</Link>
           </Button>
           <Button type="submit" className="gap-2" disabled={submitLoading}>
-            {submitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {mode === 'edit' ? 'Salvar alteracoes' : 'Criar perfil'}
+            {submitLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {mode === 'edit' ? 'Salvar alterações' : 'Criar perfil'}
           </Button>
         </div>
       </form>
