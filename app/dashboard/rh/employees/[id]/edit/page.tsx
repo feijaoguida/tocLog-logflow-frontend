@@ -6,6 +6,8 @@ import { api } from "@/lib/api"
 import { EmployeeForm, EmployeeData, formatCPF } from "@/components/employee-form"
 import { toast } from "sonner"
 
+import { ChevronRight, Loader2 } from "lucide-react"
+
 export default function EditEmployeePage() {
   const params = useParams()
   const router = useRouter()
@@ -76,36 +78,36 @@ export default function EditEmployeePage() {
   if (loading) {
     return (
         <div className="flex-1 w-full flex items-center justify-center p-12">
-           <span className="material-symbols-outlined animate-spin text-4xl text-slate-300">sync</span>
+           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
     )
   }
 
   return (
-    <div className="app-page">
-      <section className="app-page-header theme-surface">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="cursor-pointer transition hover:text-foreground" onClick={() => router.push('/dashboard/rh/employees')}>
-              Colaboradores
-            </span>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span
-              className="max-w-[220px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap transition hover:text-foreground"
-              onClick={() => router.push(`/dashboard/rh/employees/${id}`)}
-            >
-              {initialData?.name}
-            </span>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span className="text-primary">Editar</span>
-          </div>
-          <div className="space-y-2">
-            <p className="app-kicker">Recursos Humanos</p>
-            <h1 className="app-title">Editar Colaborador</h1>
-            <p className="app-subtitle">Atualize dados, vínculos e qualificações com validação visual antes do salvamento.</p>
-          </div>
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="cursor-pointer transition hover:text-foreground" onClick={() => router.push('/dashboard/rh/employees')}>
+            Colaboradores
+          </span>
+          <ChevronRight className="size-3 text-muted-foreground/60" />
+          <span
+            className="max-w-[220px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap transition hover:text-foreground"
+            onClick={() => router.push(`/dashboard/rh/employees/${id}`)}
+          >
+            {initialData?.name}
+          </span>
+          <ChevronRight className="size-3 text-muted-foreground/60" />
+          <span className="font-medium text-primary">Editar</span>
         </div>
-      </section>
+        <div className="space-y-1">
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Recursos Humanos</span>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Editar Colaborador</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Atualize dados, vínculos e qualificações com validação visual antes do salvamento.
+          </p>
+        </div>
+      </div>
 
       {initialData && <EmployeeForm initialData={initialData} isEditMode={true} />}
     </div>

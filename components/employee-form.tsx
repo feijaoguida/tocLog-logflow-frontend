@@ -262,17 +262,17 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="app-section-card overflow-visible">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-xs overflow-visible">
       <div className="flex items-start gap-3 border-b border-border/70 pb-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <span className="material-symbols-outlined text-[20px]">{icon}</span>
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <span className="material-symbols-outlined text-[18px]">{icon}</span>
         </div>
-        <div className="space-y-1">
-          <h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{title}</h3>
-          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+        <div className="space-y-0.5">
+          <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+          {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
         </div>
       </div>
-      <CardContent className="px-0 pt-6 pb-0">{children}</CardContent>
+      <div className="pt-5">{children}</div>
     </section>
   )
 }
@@ -600,7 +600,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
               Alguns campos impeditivos ainda precisam de ajuste para concluir o cadastro do colaborador.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-2xl border border-warning/20 bg-warning/5 p-4">
+          <div className="rounded-lg border border-warning/20 bg-warning/5 p-4">
             <ul className="space-y-2 text-sm text-foreground">
               {validationMessages.map((message) => (
                 <li key={message} className="flex items-start gap-2">
@@ -624,7 +624,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
           title="Foto do Colaborador"
           description="Atualize a foto com um recorte limpo e uma prévia maior para revisão antes do salvamento."
         >
-          <div className="rounded-3xl border border-dashed border-border bg-linear-to-br from-muted/60 via-card to-muted/30 p-6 shadow-sm sm:p-8">
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-5 sm:p-6 shadow-xs">
             <ImageUpload
               value={formData.avatarUrl || ""}
               onChange={(value) => handleChange("avatarUrl", value)}
@@ -1078,20 +1078,20 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                 <h4 className="text-sm font-semibold text-foreground">Filhos</h4>
                 <p className="text-xs text-muted-foreground">Cada card usa a mesma grade e altura dos demais controles.</p>
               </div>
-              <Button type="button" variant="outlinePrimary" size="sm" onClick={handleAddChild}>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddChild} className="gap-1.5 shadow-xs">
                 <span className="material-symbols-outlined text-[16px]">add</span>
                 Adicionar Filho
               </Button>
             </div>
 
             {(formData.children ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
                 Nenhum filho registrado.
               </div>
             ) : (
               <div className="space-y-4">
                 {(formData.children ?? []).map((child, index) => (
-                  <div key={`child-${index}`} className="grid gap-4 rounded-2xl border border-border/70 bg-muted/20 p-4 md:grid-cols-[1.6fr_120px_1fr_auto] md:items-end">
+                  <div key={`child-${index}`} className="grid gap-4 rounded-lg border border-border/70 bg-muted/20 p-4 md:grid-cols-[1.6fr_120px_1fr_auto] md:items-end">
                     <div className="field-stack">
                       <Label>Nome</Label>
                       <Input
@@ -1172,7 +1172,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
               />
 
               {showSkillSuggestions && (skillQuery.trim().length >= 3 || isSearchingSkills) ? (
-                <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-popover p-2 shadow-lg">
+                <div className="absolute z-20 mt-2 w-full rounded-lg border border-border bg-popover p-2 shadow-lg">
                   {isSearchingSkills ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">Buscando skills...</div>
                   ) : (
@@ -1181,7 +1181,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                         <button
                           key={skill.id}
                           type="button"
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-accent"
+                          className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => resolveSkill(skill.name)}
                         >
@@ -1191,7 +1191,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                       ))}
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-accent"
+                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => resolveSkill(skillQuery)}
                       >
@@ -1205,7 +1205,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
             </div>
 
             {(formData.skills ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
                 Nenhuma skill associada ainda.
               </div>
             ) : (
@@ -1235,7 +1235,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                 <h4 className="text-sm font-semibold text-foreground">Experiências Profissionais</h4>
                 <p className="text-xs text-muted-foreground">Histórico resumido de cargos e empresas anteriores.</p>
               </div>
-              <Button type="button" variant="outlinePrimary" size="sm" onClick={() => handleAddArrayItem("experiences", { ...DEFAULT_EXPERIENCE })}>
+              <Button type="button" variant="outline" size="sm" onClick={() => handleAddArrayItem("experiences", { ...DEFAULT_EXPERIENCE })} className="gap-1.5 shadow-xs">
                 <span className="material-symbols-outlined text-[16px]">add</span>
                 Adicionar Experiência
               </Button>
@@ -1243,7 +1243,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
 
             <div className="space-y-4">
               {(formData.experiences ?? []).map((experience, index) => (
-                <div key={`experience-${index}`} className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                <div key={`experience-${index}`} className="rounded-lg border border-border/70 bg-muted/20 p-4">
                   <div className="mb-4 flex justify-end">
                     <Button
                       type="button"
@@ -1305,7 +1305,7 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
               ))}
 
               {(formData.experiences ?? []).length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
                   Nenhuma experiência registrada.
                 </div>
               ) : null}
@@ -1319,19 +1319,19 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                   <h4 className="text-sm font-semibold text-foreground">Certificações</h4>
                   <p className="text-xs text-muted-foreground">Nome, instituição, datas e andamento.</p>
                 </div>
-                <Button type="button" variant="outlinePrimary" size="sm" onClick={() => handleAddArrayItem("certifications", { ...DEFAULT_CERTIFICATION })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => handleAddArrayItem("certifications", { ...DEFAULT_CERTIFICATION })} className="gap-1.5 shadow-xs">
                   <span className="material-symbols-outlined text-[16px]">add</span>
                   Adicionar
                 </Button>
               </div>
 
               {(formData.certifications ?? []).length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
                   Nenhuma certificação registrada.
                 </div>
               ) : (
                 (formData.certifications ?? []).map((certification, index) => (
-                  <div key={`certification-${index}`} className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div key={`certification-${index}`} className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-4">
                     <div className="flex justify-end">
                       <Button
                         type="button"
@@ -1404,19 +1404,19 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
                   <h4 className="text-sm font-semibold text-foreground">Cursos / Treinamentos</h4>
                   <p className="text-xs text-muted-foreground">Mesmo padrão visual e de dados das certificações.</p>
                 </div>
-                <Button type="button" variant="outlinePrimary" size="sm" onClick={() => handleAddArrayItem("courses", { ...DEFAULT_COURSE })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => handleAddArrayItem("courses", { ...DEFAULT_COURSE })} className="gap-1.5 shadow-xs">
                   <span className="material-symbols-outlined text-[16px]">add</span>
                   Adicionar
                 </Button>
               </div>
 
               {(formData.courses ?? []).length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
                   Nenhum curso ou treinamento registrado.
                 </div>
               ) : (
                 (formData.courses ?? []).map((course, index) => (
-                  <div key={`course-${index}`} className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div key={`course-${index}`} className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-4">
                     <div className="flex justify-end">
                       <Button
                         type="button"

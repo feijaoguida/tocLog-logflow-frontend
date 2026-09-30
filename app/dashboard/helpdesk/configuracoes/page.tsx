@@ -21,6 +21,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { AlertCircle, Plus, Search, Trash2 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -154,6 +163,14 @@ export default function HelpdeskSettingsPage() {
   const [queueForm, setQueueForm] = useState<QueueFormState>(EMPTY_QUEUE_FORM)
   const [catalogForm, setCatalogForm] = useState<CatalogFormState>(EMPTY_CATALOG_FORM)
 
+  // Estados de modais e filtros
+  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false)
+  const [queueSearch, setQueueSearch] = useState('')
+  const [queueStatusFilter, setQueueStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false)
+  const [catalogSearch, setCatalogSearch] = useState('')
+
   useEffect(() => {
     void loadOverview()
   }, [])
@@ -195,18 +212,18 @@ export default function HelpdeskSettingsPage() {
         ...EMPTY_QUEUE_FORM,
         departmentId: overview?.departments[0]?.id || '',
       })
-      return
+    } else {
+      setQueueForm({
+        id: queue.id,
+        name: queue.name,
+        description: queue.description || '',
+        departmentId: queue.departmentId,
+        active: queue.active,
+        autoAssignEnabled: queue.autoAssignEnabled,
+        allowAgentPickup: queue.allowAgentPickup,
+      })
     }
-
-    setQueueForm({
-      id: queue.id,
-      name: queue.name,
-      description: queue.description || '',
-      departmentId: queue.departmentId,
-      active: queue.active,
-      autoAssignEnabled: queue.autoAssignEnabled,
-      allowAgentPickup: queue.allowAgentPickup,
-    })
+    setIsQueueModalOpen(true)
   }
 
   function startCatalogEdit(item?: HelpdeskOverview['catalogItems'][number]) {
@@ -219,29 +236,55 @@ export default function HelpdeskSettingsPage() {
         departmentId: defaultDepartmentId,
         queueId: defaultQueueId,
       })
-      return
+    } else {
+      setCatalogForm({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        description: item.description || '',
+        departmentId: item.departmentId,
+        queueId: item.queueId,
+        ticketCategoryId: item.ticketCategoryId || 'none',
+        slaResponseHours: item.slaResponseHours == null ? '' : String(item.slaResponseHours),
+        slaResolveHours: item.slaResolveHours == null ? '' : String(item.slaResolveHours),
+        defaultPriority: item.defaultPriority,
+        approvalMode: item.approvalMode,
+        active: item.active,
+        allowMultipleOpenTickets: item.allowMultipleOpenTickets,
+        maxOpenTicketsPerUser: item.maxOpenTicketsPerUser ? String(item.maxOpenTicketsPerUser) : '',
+        requesterCanClose: item.requesterCanClose,
+        duplicateWindowHours: String(item.duplicateWindowHours),
+        reopenWithinDays: String(item.reopenWithinDays),
+      })
     }
-
-    setCatalogForm({
-      id: item.id,
-      name: item.name,
-      slug: item.slug,
-      description: item.description || '',
-      departmentId: item.departmentId,
-      queueId: item.queueId,
-      ticketCategoryId: item.ticketCategoryId || 'none',
-      slaResponseHours: item.slaResponseHours == null ? '' : String(item.slaResponseHours),
-      slaResolveHours: item.slaResolveHours == null ? '' : String(item.slaResolveHours),
-      defaultPriority: item.defaultPriority,
-      approvalMode: item.approvalMode,
-      active: item.active,
-      allowMultipleOpenTickets: item.allowMultipleOpenTickets,
-      maxOpenTicketsPerUser: item.maxOpenTicketsPerUser ? String(item.maxOpenTicketsPerUser) : '',
-      requesterCanClose: item.requesterCanClose,
-      duplicateWindowHours: String(item.duplicateWindowHours),
-      reopenWithinDays: String(item.reopenWithinDays),
-    })
+    setIsCatalogModalOpen(true)
   }
+
+  const filteredQueues = useMemo(() => {
+    return (overview?.queues || []).filter((queue) => {
+      const matchesSearch =
+        queue.name.toLowerCase().includes(queueSearch.toLowerCase()) ||
+        (queue.description || '').toLowerCase().includes(queueSearch.toLowerCase())
+      const matchesStatus =
+        queueStatusFilter === 'all'
+          ? true
+          : queueStatusFilter === 'active'
+          ? queue.active
+          : !queue.active
+      return matchesSearch && matchesStatus
+    })
+  }, [overview?.queues, queueSearch, queueStatusFilter])
+
+  const filteredCatalogItems = useMemo(() => {
+    return (overview?.catalogItems || []).filter((item) => {
+      return (
+        item.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        (item.description || '').toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        (item.department?.name || '').toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        (item.queue?.name || '').toLowerCase().includes(catalogSearch.toLowerCase())
+      )
+    })
+  }, [overview?.catalogItems, catalogSearch])
 
   const filteredQueuesForCatalog = useMemo(() => {
     return overview?.queues.filter((queue) => queue.departmentId === catalogForm.departmentId) || []
@@ -298,7 +341,8 @@ export default function HelpdeskSettingsPage() {
         toast.success('Fila criada com sucesso.')
       }
 
-      startQueueEdit()
+      setIsQueueModalOpen(false)
+      setQueueForm(EMPTY_QUEUE_FORM)
       await loadOverview()
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Não foi possível salvar a fila.'))
@@ -366,7 +410,8 @@ export default function HelpdeskSettingsPage() {
         toast.success('Serviço criado com sucesso.')
       }
 
-      startCatalogEdit()
+      setIsCatalogModalOpen(false)
+      setCatalogForm(EMPTY_CATALOG_FORM)
       await loadOverview()
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Não foi possível salvar o serviço.'))
@@ -522,235 +567,126 @@ export default function HelpdeskSettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="queues" className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          {context?.capabilities.manageQueues && <div className="xl:col-span-2"><QueueGovernance context={context} /></div>}
+        <TabsContent value="queues" className="space-y-6">
+          {context?.capabilities.manageQueues && (
+            <QueueGovernance context={context} />
+          )}
+
           <Card className="app-section-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-xl">Filas configuradas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading ? (
-                <Skeleton className="h-80 rounded-2xl" />
-              ) : overview?.queues.length ? (
-                overview.queues.map((queue) => (
-                  <div
-                    key={queue.id}
-                    className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted/20 p-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{queue.name}</p>
-                        <Badge variant={queue.active ? 'success' : 'outline'}>
-                          {queue.active ? 'Ativa' : 'Inativa'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {queue.department?.name || 'Sem departamento'} · {queue.members?.length || 0} membro(s)
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {queue.description || 'Sem descrição operacional registrada.'}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => startQueueEdit(queue)}>
-                      Editar
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma fila cadastrada para esta empresa ainda.
-                </p>
+              {context?.capabilities.manageQueues && (
+                <Button size="sm" onClick={() => startQueueEdit()} className="gap-1.5">
+                  <Plus className="size-4" />
+                  Nova fila
+                </Button>
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">
-                {queueForm.id ? 'Editar fila' : 'Nova fila'}
-              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="field-stack">
-                <Label htmlFor="queue-name">Nome</Label>
-                <Input
-                  id="queue-name"
-                  value={queueForm.name}
-                  onChange={(event) =>
-                    setQueueForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="field-stack">
-                <Label htmlFor="queue-department">Departamento</Label>
-                <Select
-                  value={queueForm.departmentId || 'none'}
-                  onValueChange={(value) =>
-                    setQueueForm((current) => ({ ...current, departmentId: value }))
-                  }
-                >
-                  <SelectTrigger id="queue-department">
-                    <SelectValue placeholder="Selecione o departamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(overview?.departments || []).map((department) => (
-                      <SelectItem key={department.id} value={department.id}>
-                        {department.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="field-stack">
-                <Label htmlFor="queue-description">Descrição</Label>
-                <Textarea
-                  id="queue-description"
-                  value={queueForm.description}
-                  onChange={(event) =>
-                    setQueueForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="grid gap-3">
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Fila ativa</span>
-                  <Switch
-                    checked={queueForm.active}
-                    onCheckedChange={(value) =>
-                      setQueueForm((current) => ({ ...current, active: value }))
-                    }
+              {/* Barra de busca e filtros de status */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Input
+                    placeholder="Buscar fila pelo nome..."
+                    value={queueSearch}
+                    onChange={(e) => setQueueSearch(e.target.value)}
+                    className="pl-9 h-10"
                   />
-                </label>
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Permitir pickup do agente</span>
-                  <Switch
-                    checked={queueForm.allowAgentPickup}
-                    onCheckedChange={(value) =>
-                      setQueueForm((current) => ({ ...current, allowAgentPickup: value }))
-                    }
-                  />
-                </label>
-                <p className="text-sm text-muted-foreground">A distribuição de chamados é manual.</p>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => startQueueEdit()}>
-                  Limpar
-                </Button>
-                <Button onClick={() => void handleSaveQueue()} disabled={savingQueue || !context?.capabilities.manageQueues}>
-                  {savingQueue ? 'Salvando...' : queueForm.id ? 'Salvar fila' : 'Criar fila'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="catalog" className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          {context?.capabilities.catalog && <div className="xl:col-span-2"><CategoryEditor categories={overview?.categories ?? []} companyId={context.companyId} refresh={loadOverview} /></div>}
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">Catálogo de serviços</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading ? (
-                <Skeleton className="h-80 rounded-2xl" />
-              ) : overview?.catalogItems.length ? (
-                overview.catalogItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted/20 p-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{item.name}</p>
-                        <Badge variant={item.active ? 'success' : 'outline'}>
-                          {item.active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {item.department?.name || 'Sem departamento'} · {item.queue?.name || 'Sem fila'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {item.ticketCategory?.name || 'Sem categoria vinculada'}{item.regularizationRequired ? ' · Regularização necessária' : ''} · prioridade{' '}
-                        {item.defaultPriority}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => startCatalogEdit(item)}>
-                      Editar
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum serviço cadastrado para esta empresa ainda.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">
-                {catalogForm.id ? 'Editar serviço' : 'Novo serviço'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Metas em horas corridas. Deixe vazio para herdar da categoria; alterações afetam apenas novos chamados.</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="field-stack"><Label htmlFor="service-response">Primeira resposta — vazio para herdar</Label><Input id="service-response" type="number" min={1} step={1} placeholder="Herdar categoria" value={catalogForm.slaResponseHours} onChange={e => setCatalogForm(current => ({ ...current, slaResponseHours: e.target.value }))} /></div>
-                <div className="field-stack"><Label htmlFor="service-resolve">Resolução — vazio para herdar</Label><Input id="service-resolve" type="number" min={1} step={1} placeholder="Herdar categoria" value={catalogForm.slaResolveHours} onChange={e => setCatalogForm(current => ({ ...current, slaResolveHours: e.target.value }))} /></div>
-              </div>
-              <div className="field-stack">
-                <Label htmlFor="catalog-name">Nome</Label>
-                <Input
-                  id="catalog-name"
-                  value={catalogForm.name}
-                  onChange={(event) =>
-                    setCatalogForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="field-stack">
-                <Label htmlFor="catalog-slug">Slug</Label>
-                <Input
-                  id="catalog-slug"
-                  placeholder="Opcional: gerado automaticamente se vazio"
-                  value={catalogForm.slug}
-                  onChange={(event) =>
-                    setCatalogForm((current) => ({ ...current, slug: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="field-stack">
-                <Label htmlFor="catalog-description">Descrição</Label>
-                <Textarea
-                  id="catalog-description"
-                  value={catalogForm.description}
-                  onChange={(event) =>
-                    setCatalogForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="field-stack">
-                  <Label htmlFor="catalog-department">Departamento</Label>
+                </div>
+                <div className="w-full sm:w-[200px]">
                   <Select
-                    value={catalogForm.departmentId || 'none'}
+                    value={queueStatusFilter}
+                    onValueChange={(val: 'all' | 'active' | 'inactive') => setQueueStatusFilter(val)}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="active">Ativas</SelectItem>
+                      <SelectItem value="inactive">Inativas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Grid de 2 colunas para os cards de filas */}
+              {loading ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-28 rounded-lg" />
+                  ))}
+                </div>
+              ) : filteredQueues.length ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filteredQueues.map((queue) => (
+                    <div
+                      key={queue.id}
+                      className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-4 transition-all hover:shadow-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-foreground">{queue.name}</p>
+                          <Badge variant={queue.active ? 'success' : 'outline'}>
+                            {queue.active ? 'Ativa' : 'Inativa'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {queue.department?.name || 'Sem departamento'} · {queue.members?.length || 0} membro(s)
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {queue.description || 'Sem descrição operacional registrada.'}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => startQueueEdit(queue)}>
+                        Editar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Nenhuma fila cadastrada ou encontrada para os filtros atuais.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Modal: Editar fila / Nova fila */}
+          <Dialog open={isQueueModalOpen} onOpenChange={setIsQueueModalOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{queueForm.id ? 'Editar fila' : 'Nova fila'}</DialogTitle>
+                <DialogDescription>
+                  {queueForm.id
+                    ? 'Atualize as configurações e escopo desta fila de atendimento.'
+                    : 'Preencha os dados abaixo para cadastrar uma nova fila de atendimento.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="field-stack">
+                  <Label htmlFor="queue-name">Nome</Label>
+                  <Input
+                    id="queue-name"
+                    placeholder="Ex: Fila de Compras"
+                    value={queueForm.name}
+                    onChange={(event) =>
+                      setQueueForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="field-stack">
+                  <Label htmlFor="queue-department">Departamento</Label>
+                  <Select
+                    value={queueForm.departmentId || 'none'}
                     onValueChange={(value) =>
-                      setCatalogForm((current) => ({
-                        ...current,
-                        departmentId: value,
-                        queueId:
-                          overview?.queues.find((queue) => queue.departmentId === value)?.id || '',
-                      }))
+                      setQueueForm((current) => ({ ...current, departmentId: value }))
                     }
                   >
-                    <SelectTrigger id="catalog-department">
+                    <SelectTrigger id="queue-department" className="h-10">
                       <SelectValue placeholder="Selecione o departamento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -762,203 +698,535 @@ export default function HelpdeskSettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="field-stack">
-                  <Label htmlFor="catalog-queue">Fila</Label>
-                  <Select
-                    value={catalogForm.queueId || 'none'}
-                    onValueChange={(value) =>
-                      setCatalogForm((current) => ({ ...current, queueId: value }))
-                    }
-                  >
-                    <SelectTrigger id="catalog-queue">
-                      <SelectValue placeholder="Selecione a fila" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredQueuesForCatalog.map((queue) => (
-                        <SelectItem key={queue.id} value={queue.id}>
-                          {queue.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-category">Categoria</Label>
-                  <Select
-                    value={catalogForm.ticketCategoryId}
-                    onValueChange={(value) =>
-                      setCatalogForm((current) => ({ ...current, ticketCategoryId: value }))
-                    }
-                  >
-                    <SelectTrigger id="catalog-category">
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sem categoria específica</SelectItem>
-                      {(overview?.categories || []).map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-priority">Prioridade padrão</Label>
-                  <Select
-                    value={catalogForm.defaultPriority}
-                    onValueChange={(value) =>
-                      setCatalogForm((current) => ({ ...current, defaultPriority: value }))
-                    }
-                  >
-                    <SelectTrigger id="catalog-priority">
-                      <SelectValue placeholder="Selecione a prioridade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Baixa</SelectItem>
-                      <SelectItem value="MEDIUM">Média</SelectItem>
-                      <SelectItem value="HIGH">Alta</SelectItem>
-                      <SelectItem value="CRITICAL">Crítica</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-approval">Aprovação</Label>
-                  <Select
-                    value={catalogForm.approvalMode}
-                    onValueChange={(value) =>
-                      setCatalogForm((current) => ({ ...current, approvalMode: value }))
-                    }
-                  >
-                    <SelectTrigger id="catalog-approval">
-                      <SelectValue placeholder="Selecione o modo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">Sem aprovação</SelectItem>
-                      <SelectItem value="REQUIRED">Exige aprovação</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-limit">Limite aberto por usuário</Label>
-                  <Input
-                    id="catalog-limit"
-                    type="number"
-                    min={1}
-                    value={catalogForm.maxOpenTicketsPerUser}
+                  <Label htmlFor="queue-description">Descrição</Label>
+                  <Textarea
+                    id="queue-description"
+                    placeholder="Finalidade e escopo desta fila..."
+                    rows={3}
+                    value={queueForm.description}
                     onChange={(event) =>
-                      setCatalogForm((current) => ({
+                      setQueueForm((current) => ({
                         ...current,
-                        maxOpenTicketsPerUser: event.target.value,
+                        description: event.target.value,
                       }))
                     }
                   />
                 </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-duplicate">Janela de duplicidade (horas)</Label>
-                  <Input
-                    id="catalog-duplicate"
-                    type="number"
-                    min={1}
-                    value={catalogForm.duplicateWindowHours}
-                    onChange={(event) =>
-                      setCatalogForm((current) => ({
-                        ...current,
-                        duplicateWindowHours: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="field-stack">
-                  <Label htmlFor="catalog-reopen">Janela de reabertura (dias)</Label>
-                  <Input
-                    id="catalog-reopen"
-                    type="number"
-                    min={1}
-                    value={catalogForm.reopenWithinDays}
-                    onChange={(event) =>
-                      setCatalogForm((current) => ({
-                        ...current,
-                        reopenWithinDays: event.target.value,
-                      }))
-                    }
-                  />
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-foreground">Fila ativa</span>
+                      <p className="text-xs text-muted-foreground">Chamados só chegam a filas ativas</p>
+                    </div>
+                    <Switch
+                      checked={queueForm.active}
+                      onCheckedChange={(value) =>
+                        setQueueForm((current) => ({ ...current, active: value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-foreground">Permitir pickup do agente</span>
+                      <p className="text-xs text-muted-foreground">A distribuição de chamados é manual</p>
+                    </div>
+                    <Switch
+                      checked={queueForm.allowAgentPickup}
+                      onCheckedChange={(value) =>
+                        setQueueForm((current) => ({ ...current, allowAgentPickup: value }))
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="grid gap-3">
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Serviço ativo</span>
-                  <Switch
-                    checked={catalogForm.active}
-                    onCheckedChange={(value) =>
-                      setCatalogForm((current) => ({ ...current, active: value }))
-                    }
-                  />
-                </label>
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Permitir múltiplos chamados abertos</span>
-                  <Switch
-                    checked={catalogForm.allowMultipleOpenTickets}
-                    onCheckedChange={(value) =>
-                      setCatalogForm((current) => ({
-                        ...current,
-                        allowMultipleOpenTickets: value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
-                  <span className="text-sm">Solicitante pode fechar</span>
-                  <Switch
-                    checked={catalogForm.requesterCanClose}
-                    onCheckedChange={(value) =>
-                      setCatalogForm((current) => ({
-                        ...current,
-                        requesterCanClose: value,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => startCatalogEdit()}>
-                  Limpar
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsQueueModalOpen(false)}>
+                  Cancelar
                 </Button>
-                <Button onClick={() => void handleSaveCatalog()} disabled={savingCatalog || !validCatalog || !context?.capabilities.catalog}>
-                  {savingCatalog ? 'Salvando...' : catalogForm.id ? 'Salvar serviço' : 'Criar serviço'}
+                <Button
+                  onClick={() => void handleSaveQueue()}
+                  disabled={savingQueue || !queueForm.name.trim() || !context?.capabilities.manageQueues}
+                >
+                  {savingQueue ? 'Salvando...' : queueForm.id ? 'Salvar alterações' : 'Criar fila'}
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="catalog" className="space-y-6">
+          {context?.capabilities.catalog && (
+            <CategoryEditor
+              categories={overview?.categories ?? []}
+              companyId={context.companyId}
+              refresh={loadOverview}
+            />
+          )}
+
+          {/* Catálogo de serviços em Grid de Cards */}
+          <Card className="app-section-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xl">Catálogo de serviços</CardTitle>
+              {context?.capabilities.catalog && (
+                <Button size="sm" onClick={() => startCatalogEdit()} className="gap-1.5">
+                  <Plus className="size-4" />
+                  Novo serviço
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Barra de busca de serviços */}
+              <div className="relative">
+                <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  placeholder="Buscar serviço..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  className="pl-9 h-10"
+                />
               </div>
+
+              {/* Grid de 3 colunas de serviços */}
+              {loading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-36 rounded-lg" />
+                  ))}
+                </div>
+              ) : filteredCatalogItems.length ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredCatalogItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col justify-between rounded-lg border border-border bg-card p-4 transition-all hover:shadow-xs"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold text-foreground text-sm line-clamp-1">{item.name}</p>
+                          <Badge variant={item.active ? 'success' : 'outline'} className="shrink-0 text-xs">
+                            {item.active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <p>
+                            {item.department?.name || 'Sem departamento'} · {item.queue?.name || 'Sem fila'}
+                          </p>
+                          <p>
+                            {item.ticketCategory?.name || 'Sem categoria vinculada'}
+                            {item.regularizationRequired ? ' · Regularização necessária' : ''} · prioridade{' '}
+                            {item.defaultPriority}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs font-medium"
+                          onClick={() => startCatalogEdit(item)}
+                        >
+                          Editar serviço
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Nenhum serviço cadastrado ou encontrado com a busca.
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="app-section-card xl:col-span-2">
+          {/* Modal: Editar serviço / Novo serviço */}
+          <Dialog open={isCatalogModalOpen} onOpenChange={setIsCatalogModalOpen}>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{catalogForm.id ? 'Editar serviço' : 'Novo serviço'}</DialogTitle>
+                <DialogDescription>
+                  Configure as metas de SLA, regras operacionais e vinculações deste item no catálogo.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                  <AlertCircle className="size-4 shrink-0 text-destructive mt-0.5" />
+                  <span>
+                    Metas em horas corridas. Deixe vazio para herdar da categoria: alterações afetam apenas novos chamados.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="field-stack">
+                    <Label htmlFor="service-response">1ª resposta — vazio p/ herdar</Label>
+                    <Input
+                      id="service-response"
+                      type="number"
+                      min={1}
+                      step={1}
+                      placeholder="Herdar da categoria"
+                      value={catalogForm.slaResponseHours}
+                      onChange={(e) =>
+                        setCatalogForm((current) => ({ ...current, slaResponseHours: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="field-stack">
+                    <Label htmlFor="service-resolve">Resolução — vazio p/ herdar</Label>
+                    <Input
+                      id="service-resolve"
+                      type="number"
+                      min={1}
+                      step={1}
+                      placeholder="Herdar da categoria"
+                      value={catalogForm.slaResolveHours}
+                      onChange={(e) =>
+                        setCatalogForm((current) => ({ ...current, slaResolveHours: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="field-stack">
+                  <Label htmlFor="catalog-name">Nome</Label>
+                  <Input
+                    id="catalog-name"
+                    placeholder="Nome do serviço"
+                    value={catalogForm.name}
+                    onChange={(event) =>
+                      setCatalogForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="field-stack">
+                  <Label htmlFor="catalog-slug">Slug</Label>
+                  <Input
+                    id="catalog-slug"
+                    placeholder="Opcional: gerado automaticamente se vazio"
+                    value={catalogForm.slug}
+                    onChange={(event) =>
+                      setCatalogForm((current) => ({ ...current, slug: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="field-stack">
+                  <Label htmlFor="catalog-description">Descrição</Label>
+                  <Textarea
+                    id="catalog-description"
+                    rows={3}
+                    placeholder="Descrição detalhada do serviço..."
+                    value={catalogForm.description}
+                    onChange={(event) =>
+                      setCatalogForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-department">Departamento</Label>
+                    <Select
+                      value={catalogForm.departmentId || 'none'}
+                      onValueChange={(value) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          departmentId: value,
+                          queueId:
+                            overview?.queues.find((queue) => queue.departmentId === value)?.id || '',
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="catalog-department" className="h-10">
+                        <SelectValue placeholder="Selecione o departamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(overview?.departments || []).map((department) => (
+                          <SelectItem key={department.id} value={department.id}>
+                            {department.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-queue">Fila</Label>
+                    <Select
+                      value={catalogForm.queueId || 'none'}
+                      onValueChange={(value) =>
+                        setCatalogForm((current) => ({ ...current, queueId: value }))
+                      }
+                    >
+                      <SelectTrigger id="catalog-queue" className="h-10">
+                        <SelectValue placeholder="Selecione a fila" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredQueuesForCatalog.map((queue) => (
+                          <SelectItem key={queue.id} value={queue.id}>
+                            {queue.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-category">Categoria</Label>
+                    <Select
+                      value={catalogForm.ticketCategoryId}
+                      onValueChange={(value) =>
+                        setCatalogForm((current) => ({ ...current, ticketCategoryId: value }))
+                      }
+                    >
+                      <SelectTrigger id="catalog-category" className="h-10">
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem categoria específica</SelectItem>
+                        {(overview?.categories || []).map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-priority">Prioridade padrão</Label>
+                    <Select
+                      value={catalogForm.defaultPriority}
+                      onValueChange={(value) =>
+                        setCatalogForm((current) => ({ ...current, defaultPriority: value }))
+                      }
+                    >
+                      <SelectTrigger id="catalog-priority" className="h-10">
+                        <SelectValue placeholder="Selecione a prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOW">Baixa</SelectItem>
+                        <SelectItem value="MEDIUM">Média</SelectItem>
+                        <SelectItem value="HIGH">Alta</SelectItem>
+                        <SelectItem value="CRITICAL">Crítica</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-approval">Modo de aprovação</Label>
+                    <Select
+                      value={catalogForm.approvalMode}
+                      onValueChange={(value) =>
+                        setCatalogForm((current) => ({ ...current, approvalMode: value }))
+                      }
+                    >
+                      <SelectTrigger id="catalog-approval" className="h-10">
+                        <SelectValue placeholder="Selecione o modo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Sem aprovação</SelectItem>
+                        <SelectItem value="REQUIRED">Exige aprovação</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-limit">Limite aberto por usuário</Label>
+                    <Input
+                      id="catalog-limit"
+                      type="number"
+                      min={1}
+                      value={catalogForm.maxOpenTicketsPerUser}
+                      onChange={(event) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          maxOpenTicketsPerUser: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-duplicate">Janela de duplicidade (h)</Label>
+                    <Input
+                      id="catalog-duplicate"
+                      type="number"
+                      min={1}
+                      value={catalogForm.duplicateWindowHours}
+                      onChange={(event) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          duplicateWindowHours: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="field-stack">
+                    <Label htmlFor="catalog-reopen">Janela de reabertura (dias)</Label>
+                    <Input
+                      id="catalog-reopen"
+                      type="number"
+                      min={1}
+                      value={catalogForm.reopenWithinDays}
+                      onChange={(event) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          reopenWithinDays: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-foreground">Serviço ativo</span>
+                      <p className="text-xs text-muted-foreground">Disponível no catálogo de abertura</p>
+                    </div>
+                    <Switch
+                      checked={catalogForm.active}
+                      onCheckedChange={(value) =>
+                        setCatalogForm((current) => ({ ...current, active: value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-foreground">Permitir múltiplos chamados abertos</span>
+                      <p className="text-xs text-muted-foreground">Colaborador pode ter múltiplos chamados ativos deste item</p>
+                    </div>
+                    <Switch
+                      checked={catalogForm.allowMultipleOpenTickets}
+                      onCheckedChange={(value) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          allowMultipleOpenTickets: value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-foreground">Solicitante pode fechar</span>
+                      <p className="text-xs text-muted-foreground">Autoriza o fechamento pelo próprio solicitante</p>
+                    </div>
+                    <Switch
+                      checked={catalogForm.requesterCanClose}
+                      onCheckedChange={(value) =>
+                        setCatalogForm((current) => ({
+                          ...current,
+                          requesterCanClose: value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsCatalogModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => void handleSaveCatalog()}
+                  disabled={savingCatalog || !validCatalog || !context?.capabilities.catalog}
+                >
+                  {savingCatalog ? 'Salvando...' : catalogForm.id ? 'Salvar alterações' : 'Criar serviço'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Motivos já semeados */}
+          <Card className="app-section-card">
             <CardHeader>
               <CardTitle className="text-xl">Motivos já semeados</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-2">
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Fechamento
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Fechamento
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs font-medium text-primary hover:bg-transparent hover:underline"
+                    onClick={() => toast.info('Os motivos de fechamento são fixados pela governança de conformidade.')}
+                  >
+                    + Adicionar
+                  </Button>
+                </div>
                 {(overview?.closeReasons || []).map((reason) => (
                   <div
                     key={reason.id}
-                    className="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm"
+                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3.5 text-sm transition-colors hover:bg-muted/30"
                   >
-                    {reason.name}
+                    <span className="text-foreground">{reason.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground/60 hover:text-destructive"
+                      title="Motivo do sistema"
+                      onClick={() => toast.info('Este motivo é protegido pelo sistema.')}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
+
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Transferência
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Transferência
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs font-medium text-primary hover:bg-transparent hover:underline"
+                    onClick={() => toast.info('Os motivos de transferência são fixados pela governança de conformidade.')}
+                  >
+                    + Adicionar
+                  </Button>
+                </div>
                 {(overview?.transferReasons || []).map((reason) => (
                   <div
                     key={reason.id}
-                    className="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm"
+                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3.5 text-sm transition-colors hover:bg-muted/30"
                   >
-                    {reason.name}
+                    <span className="text-foreground">{reason.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground/60 hover:text-destructive"
+                      title="Motivo do sistema"
+                      onClick={() => toast.info('Este motivo é protegido pelo sistema.')}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>

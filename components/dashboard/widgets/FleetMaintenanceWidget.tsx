@@ -40,7 +40,7 @@ export function FleetMaintenanceWidget() {
   }
 
   if (loading) {
-    return <Skeleton className="h-full w-full rounded-3xl" />
+    return <Skeleton className="h-full w-full rounded-lg" />
   }
 
   const count = vehicles.length

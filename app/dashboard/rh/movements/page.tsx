@@ -258,11 +258,11 @@ export default function EmployeeMovementsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
-            <div className="rounded-3xl border border-dashed border-border/80 px-6 py-12 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border/80 px-6 py-12 text-center text-sm text-muted-foreground">
               Carregando movimentacoes...
             </div>
           ) : filteredMovements.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border/80 px-6 py-12 text-center">
+            <div className="rounded-lg border border-dashed border-border/80 px-6 py-12 text-center">
               <p className="text-sm font-medium text-foreground">Nenhuma movimentacao encontrada.</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Ajuste os filtros ou execute uma alteracao na ficha do colaborador para iniciar o ledger.
@@ -279,13 +279,13 @@ export default function EmployeeMovementsPage() {
                 return (
                   <article
                     key={movement.id}
-                    className="rounded-3xl border border-border/80 bg-card/90 p-5 shadow-sm"
+                    className="rounded-lg border border-border bg-card p-5 shadow-xs"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                            <span className="material-symbols-outlined text-[20px]">{meta.icon}</span>
+                          <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
                           </span>
                           <div className="space-y-1">
                             <div className="flex flex-wrap items-center gap-2">

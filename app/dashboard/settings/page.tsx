@@ -12,16 +12,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/layout/page-header"
 import { api } from "@/lib/api"
 import { toast } from "sonner"
 import { ThemePaletteCard } from "@/components/theme/theme-palette-card"
+import { ThemeSelectionShellPreview } from "@/components/theme/theme-selection-shell-preview"
 import { EmailSettingsPanel } from "@/components/email/email-settings-panel"
 import {
     THEME_PALETTES,
     getThemePalette,
     resolvePreviewMode,
     type ThemeMode,
-    type ThemePaletteId,
+    type ThemeColor,
 } from "@/lib/theme-system"
 
 const MODE_OPTIONS: Array<{
@@ -31,21 +33,21 @@ const MODE_OPTIONS: Array<{
     icon: React.ComponentType<{ className?: string }>
 }> = [
     {
-        id: 'light',
-        title: 'Modo Claro',
-        description: 'Superficies claras com contraste alto e leitura institucional.',
-        icon: SunMedium,
-    },
-    {
         id: 'dark',
         title: 'Modo Escuro',
-        description: 'Base escura com contraste reforcado para jornadas longas.',
+        description: 'Superfícies escuras com contraste alto e leitura confortável.',
         icon: MoonStar,
+    },
+    {
+        id: 'light',
+        title: 'Modo Claro',
+        description: 'Superfícies claras com contraste reforçado para jornadas longas.',
+        icon: SunMedium,
     },
     {
         id: 'system',
         title: 'Seguir Sistema',
-        description: 'Acompanha automaticamente a preferencia do dispositivo.',
+        description: 'Acompanha automaticamente a preferência do seu dispositivo.',
         icon: MonitorCog,
     },
 ]
@@ -66,7 +68,7 @@ export default function SettingsPage() {
     } = useSettings()
 
     const [draftThemeMode, setDraftThemeMode] = useState<ThemeMode>(themeMode)
-    const [draftThemePalette, setDraftThemePalette] = useState<ThemePaletteId>(themePalette)
+    const [draftThemePalette, setDraftThemePalette] = useState<ThemeColor>(themePalette)
 
     const [companyLoading, setCompanyLoading] = useState(false)
     const [companyId, setCompanyId] = useState<string | null>(null)
@@ -99,26 +101,23 @@ export default function SettingsPage() {
                 setCompanyDoc(compRes.data.document || "")
                 setCompanyDesc(compRes.data.description || "")
             }
-        } catch (error) {
-            console.error(error)
+        } catch {
+            // profile/company can fail gracefully if user has no company
         }
     }
 
-    const handleSaveCompany = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleSaveCompany = async () => {
         if (!companyId) return
-
         setCompanyLoading(true)
         try {
             await api.patch(`/companies/${companyId}`, {
                 name: companyName,
                 document: companyDoc,
-                description: companyDesc
+                description: companyDesc,
             })
-            toast.success("Perfil da empresa atualizado!")
-        } catch (error) {
-            console.error(error)
-            toast.error("Erro ao atualizar empresa.")
+            toast.success("Dados da empresa atualizados com sucesso!")
+        } catch {
+            toast.error("Erro ao salvar dados da empresa.")
         } finally {
             setCompanyLoading(false)
         }
@@ -127,28 +126,23 @@ export default function SettingsPage() {
     const handleApplyTheme = () => {
         setThemeMode(draftThemeMode)
         setThemePalette(draftThemePalette)
-        toast.success(`Tema ${selectedPalette.name} aplicado em ${previewMode === 'dark' ? 'modo escuro' : 'modo claro'}.`)
+        toast.success("Tema e paleta aplicados com sucesso!", {
+            description: `${selectedPalette.name} · ${draftThemeMode === 'system' ? 'Seguir sistema' : draftThemeMode === 'dark' ? 'Modo escuro' : 'Modo claro'}`,
+        })
     }
 
     return (
-        <div className="app-page">
-            <section className="app-page-header theme-surface">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="space-y-3">
-                        <p className="app-kicker">Configuracao</p>
-                        <div className="space-y-2">
-                            <h1 className="app-title">Tema</h1>
-                            <p className="app-subtitle">
-                                Escolha a paleta visual e o modo de exibicao para personalizar a experiencia do LogFlow2.
-                                As novas telas devem seguir esta mesma fundacao de layout, tipografia e componentes.
-                            </p>
-                        </div>
-                    </div>
-                    <Badge variant="outline" className="rounded-full px-4 py-2 text-sm">
+        <div className="flex flex-col gap-6">
+            <PageHeader
+                eyebrow="Configurações"
+                title="Tema"
+                description="Escolha a paleta visual e o modo de exibição para personalizar a experiência do LogFlow2."
+                actions={
+                    <Badge variant="outline" className="px-3 py-1 text-xs">
                         {selectedPalette.name} · {previewMode === 'dark' ? 'Escuro' : 'Claro'}
                     </Badge>
-                </div>
-            </section>
+                }
+            />
 
             <Tabs defaultValue="theme" className="w-full space-y-6">
                 <TabsList className="grid w-full max-w-[680px] grid-cols-4">
@@ -159,176 +153,213 @@ export default function SettingsPage() {
                 </TabsList>
 
                 <TabsContent value="theme" className="space-y-6">
-                    <section className="app-section-card space-y-6">
-                        <div className="rounded-[24px] border border-border/60 bg-primary/6 p-5">
-                            <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2">
-                                    <Palette className="size-5 text-primary" />
-                                    <h2 className="text-2xl font-semibold tracking-tight">Visual por usuario</h2>
-                                </div>
-                                <p className="text-sm leading-6 text-muted-foreground">
-                                    A preferencia fica salva neste navegador e orienta o shell, cards, formularios e futuras telas.
-                                </p>
+                    {/* Bloco 1: Visual por usuário */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <Palette className="size-4 text-primary" />
+                                <CardTitle>Visual por usuário</CardTitle>
                             </div>
-                        </div>
+                            <CardDescription>
+                                A preferência fica salva neste navegador e orienta o sistema, formulários e futuras telas.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                {MODE_OPTIONS.map((option) => {
+                                    const Icon = option.icon
+                                    const selected = draftThemeMode === option.id
 
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            {MODE_OPTIONS.map((option) => {
-                                const Icon = option.icon
-                                const selected = draftThemeMode === option.id
-
-                                return (
-                                    <button
-                                        key={option.id}
-                                        type="button"
-                                        onClick={() => setDraftThemeMode(option.id)}
-                                        className={`rounded-[24px] border p-5 text-left transition ${selected ? 'border-primary bg-primary/7 shadow-sm' : 'border-border/70 hover:border-primary/40 hover:bg-muted/40'}`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className={`flex size-11 items-center justify-center rounded-2xl ${selected ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground'}`}>
-                                                <Icon className="size-5" />
-                                            </span>
-                                            <div>
-                                                <h3 className="text-lg font-semibold tracking-tight">{option.title}</h3>
-                                                <p className="mt-1 text-sm leading-6 text-muted-foreground">{option.description}</p>
+                                    return (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            onClick={() => setDraftThemeMode(option.id)}
+                                            className={`flex flex-col gap-3 rounded-lg border p-4 text-left shadow-xs transition-all outline-none ${
+                                                selected
+                                                    ? 'border-primary bg-primary/4 ring-1 ring-primary'
+                                                    : 'border-border bg-card hover:border-border-strong hover:bg-surface-subtle'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className={`flex size-9 items-center justify-center rounded-md ${
+                                                    selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+                                                }`}>
+                                                    <Icon className="size-4.5" />
+                                                </div>
+                                                <span className={`size-3 rounded-full border ${
+                                                    selected ? 'border-primary bg-primary' : 'border-border'
+                                                }`} />
                                             </div>
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </section>
+                                            <div>
+                                                <h3 className="text-sm font-semibold tracking-tight text-foreground">{option.title}</h3>
+                                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{option.description}</p>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                    <section className="app-section-card space-y-6">
-                        <div className="space-y-2">
-                            <p className="app-kicker">Color Palette</p>
-                            <h2 className="text-3xl font-semibold tracking-tight">Escolha sua assinatura visual</h2>
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                Cada paleta ajusta cor principal, sidebar, foco e acentos semanticos mantendo o mesmo sistema de layout e componentes.
-                            </p>
-                        </div>
+                    {/* Bloco 2: Assinatura visual */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Escolha sua assinatura visual</CardTitle>
+                            <CardDescription>
+                                Cada paleta ajusta cor principal, sidebar, ícones e componentes do sistema.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                {THEME_PALETTES.map((palette) => (
+                                    <ThemePaletteCard
+                                        key={palette.id}
+                                        palette={palette}
+                                        mode={previewMode}
+                                        selected={draftThemePalette === palette.id}
+                                        onSelect={setDraftThemePalette}
+                                    />
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                        <div className="grid gap-5 xl:grid-cols-2">
-                            {THEME_PALETTES.map((palette) => (
-                                <ThemePaletteCard
-                                    key={palette.id}
-                                    palette={palette}
-                                    mode={previewMode}
-                                    selected={draftThemePalette === palette.id}
-                                    onSelect={setDraftThemePalette}
-                                />
-                            ))}
-                        </div>
-                    </section>
-
-                    <section className="app-section-card space-y-5">
-                        <div className="space-y-2">
-                            <p className="app-kicker">Preview da selecao</p>
-                            <h2 className="text-2xl font-semibold tracking-tight">{selectedPalette.name} em {previewMode === 'dark' ? 'modo escuro' : 'modo claro'}</h2>
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                Esta combinacao passa a orientar cabecalhos, botoes primarios, feedback visual e o menu lateral.
-                            </p>
-                        </div>
-
-                        <div className="rounded-[28px] border border-border/60 bg-background/60 p-4">
-                            <ThemePaletteCard
+                    {/* Bloco 3: Preview da seleção */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Preview da seleção</CardTitle>
+                            <CardDescription>
+                                Veja como a paleta fica aplicada em componentes reais do sistema.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <ThemeSelectionShellPreview
                                 palette={selectedPalette}
                                 mode={previewMode}
-                                selected
-                                className="pointer-events-none"
                             />
-                        </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-sm text-muted-foreground">
-                                Padrao atual salvo: {getThemePalette(themePalette).name} · {themeMode === 'system' ? 'Seguir sistema' : themeMode === 'dark' ? 'Escuro' : 'Claro'}
-                            </p>
-                            <Button onClick={handleApplyTheme} disabled={!hasPendingThemeChange}>
-                                Aplicar tema
-                            </Button>
-                        </div>
-                    </section>
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                <p className="text-xs text-muted-foreground">
+                                    Padrão atual salvo: <span className="font-semibold text-foreground">{getThemePalette(themePalette).name}</span> · {themeMode === 'system' ? 'Seguir sistema' : themeMode === 'dark' ? 'Modo Escuro' : 'Modo Claro'}
+                                </p>
+                                <Button onClick={handleApplyTheme} disabled={!hasPendingThemeChange}>
+                                    Salvar alterações
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="interface" className="space-y-6">
-                    <section className="app-section-card">
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-semibold tracking-tight">Preferencias de interface</h2>
-                            <p className="text-sm leading-6 text-muted-foreground">
-                                Controles operacionais que afetam navegacao e densidade das telas.
-                            </p>
-                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Preferências de interface</CardTitle>
+                            <CardDescription>
+                                Controles operacionais que afetam navegação e densidade das telas.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="accordion-mode" className="text-sm font-medium">Menu estilo Acordeão</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Fecha automaticamente o menu anterior ao abrir outro no painel lateral.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="accordion-mode"
+                                    checked={accordionMode}
+                                    onCheckedChange={setAccordionMode}
+                                />
+                            </div>
 
-                        <div className="mt-6 space-y-5">
-                            <PreferenceRow
-                                title="Menu em acordeao"
-                                description="Apenas um grupo de menu aberto por vez."
-                                control={
-                                    <Switch id="accordion" checked={accordionMode} onCheckedChange={setAccordionMode} />
-                                }
-                            />
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="collapse-mode" className="text-sm font-medium">Recolher Menu ao Clicar</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Fecha a barra lateral ao selecionar um item para priorizar a área útil da tela.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="collapse-mode"
+                                    checked={collapseOnClick}
+                                    onCheckedChange={setCollapseOnClick}
+                                />
+                            </div>
 
-                            <PreferenceRow
-                                title="Recolher ao clicar"
-                                description="Fecha o menu lateral automaticamente ao clicar em um item no mobile."
-                                control={
-                                    <Switch id="collapse" checked={collapseOnClick} onCheckedChange={setCollapseOnClick} />
-                                }
-                            />
-
-                            <PreferenceRow
-                                title="Itens por pagina"
-                                description="Padrao para tabelas e listagens. As novas telas devem respeitar este valor."
-                                control={
-                                    <div className="w-full max-w-[220px]">
-                                        <Select value={String(itemsPerPage)} onValueChange={(value) => setItemsPerPage(Number(value))}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecione" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="5">5 itens</SelectItem>
-                                                <SelectItem value="10">10 itens</SelectItem>
-                                                <SelectItem value="20">20 itens</SelectItem>
-                                                <SelectItem value="50">50 itens</SelectItem>
-                                                <SelectItem value="100">100 itens</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                }
-                            />
-                        </div>
-                    </section>
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="items-per-page" className="text-sm font-medium">Itens por Página Padrão</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Quantidade padrão de linhas exibidas em tabelas e listagens.
+                                    </p>
+                                </div>
+                                <div className="w-[180px]">
+                                    <Select
+                                        value={String(itemsPerPage)}
+                                        onValueChange={(val) => setItemsPerPage(Number(val))}
+                                    >
+                                        <SelectTrigger id="items-per-page">
+                                            <SelectValue placeholder="Selecione" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="10">10 itens</SelectItem>
+                                            <SelectItem value="25">25 itens</SelectItem>
+                                            <SelectItem value="50">50 itens</SelectItem>
+                                            <SelectItem value="100">100 itens</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="company" className="space-y-6">
-                    <Card className="rounded-[28px] border-border/60 shadow-sm">
+                    <Card>
                         <CardHeader>
-                            <CardTitle>Perfil da empresa</CardTitle>
-                            <CardDescription>Informacoes principais da organizacao.</CardDescription>
+                            <CardTitle>Dados da Empresa</CardTitle>
+                            <CardDescription>
+                                Informações institucionais da empresa ou filial ativa.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSaveCompany} className="space-y-6">
-                                <div className="app-form-grid">
-                                    <div className="field-stack md:col-span-2">
-                                        <Label htmlFor="compName">Razao Social / Nome</Label>
-                                        <Input id="compName" value={companyName} onChange={e => setCompanyName(e.target.value)} required />
-                                    </div>
-                                    <div className="field-stack">
-                                        <Label htmlFor="compDoc">CNPJ / Documento</Label>
-                                        <Input id="compDoc" value={companyDoc} onChange={e => setCompanyDoc(e.target.value)} />
-                                    </div>
-                                    <div className="field-stack">
-                                        <Label htmlFor="compDesc">Descricao / Ramo de Atividade</Label>
-                                        <Input id="compDesc" value={companyDesc} onChange={e => setCompanyDesc(e.target.value)} />
-                                    </div>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="company-name">Nome da Empresa</Label>
+                                    <Input
+                                        id="company-name"
+                                        value={companyName}
+                                        onChange={(e) => setCompanyName(e.target.value)}
+                                        placeholder="Razão Social ou Nome Fantasia"
+                                    />
                                 </div>
-                                <div className="flex justify-end">
-                                    <Button type="submit" disabled={companyLoading}>
-                                        {companyLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Salvar alteracoes
-                                    </Button>
+                                <div className="space-y-2">
+                                    <Label htmlFor="company-doc">CNPJ / Documento</Label>
+                                    <Input
+                                        id="company-doc"
+                                        value={companyDoc}
+                                        onChange={(e) => setCompanyDoc(e.target.value)}
+                                        placeholder="00.000.000/0000-00"
+                                    />
                                 </div>
-                            </form>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="company-desc">Descrição / Atividade</Label>
+                                <Input
+                                    id="company-desc"
+                                    value={companyDesc}
+                                    onChange={(e) => setCompanyDesc(e.target.value)}
+                                    placeholder="Descrição breve da empresa"
+                                />
+                            </div>
+                            <div className="flex justify-end pt-2">
+                                <Button onClick={handleSaveCompany} disabled={companyLoading}>
+                                    {companyLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                    Salvar Dados
+                                </Button>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -337,28 +368,6 @@ export default function SettingsPage() {
                     <EmailSettingsPanel />
                 </TabsContent>
             </Tabs>
-        </div>
-    )
-}
-
-function PreferenceRow({
-    title,
-    description,
-    control,
-}: {
-    title: string
-    description: string
-    control: React.ReactNode
-}) {
-    return (
-        <div className="flex flex-col gap-3 rounded-[24px] border border-border/60 p-5 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl space-y-1">
-                <h3 className="text-base font-semibold">{title}</h3>
-                <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-            </div>
-            <div className="w-full md:flex md:w-auto md:justify-end">
-                {control}
-            </div>
         </div>
     )
 }

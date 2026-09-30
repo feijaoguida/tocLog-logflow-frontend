@@ -183,9 +183,7 @@ export default function EmployeesPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                     <Badge variant={emp.status === 'ACTIVE' ? 'default' : emp.status === 'AWAY' || emp.status === 'SUSPENDED' ? 'secondary' : 'destructive'} 
-                                             className={emp.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 
-                                                        emp.status === 'AWAY' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : ''}>
+                                     <Badge variant={emp.status === 'ACTIVE' ? 'success' : emp.status === 'VACATION' || emp.status === 'AWAY' || emp.status === 'SUSPENDED' ? 'warning' : 'neutral'} className="rounded-full px-2.5 py-0.5 text-xs font-medium">
                                           {emp.status === 'ACTIVE' ? 'Ativo' : 
                                            emp.status === 'INACTIVE' ? 'Inativo' : 
                                            emp.status === 'VACATION' ? 'Férias' : 
@@ -194,16 +192,16 @@ export default function EmployeesPage() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-green-600 hover:bg-green-50" onClick={() => handleViewClick(emp)}>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleViewClick(emp)}>
                                                   <span className="material-symbols-outlined text-[18px]">visibility</span>
                                               </Button>
                                               {canEdit && (
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleEditClick(emp)}>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={() => handleEditClick(emp)}>
                                                   <span className="material-symbols-outlined text-[18px]">edit</span>
                                               </Button>
                                               )}
                                               {canDelete && (
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(emp.id)}>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(emp.id)}>
                                                   <span className="material-symbols-outlined text-[18px]">delete</span>
                                               </Button>
                                               )}
@@ -254,13 +252,13 @@ export default function EmployeesPage() {
                             </div>
 
                             <div className="flex gap-2 pt-4 border-t border-slate-200">
-                                   <Button variant="outline" size="sm" className="flex-1 bg-white hover:text-green-700 hover:bg-green-50" onClick={() => handleViewClick(emp)}>
+                                   <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewClick(emp)}>
                                       <span className="material-symbols-outlined text-[16px] mr-2">visibility</span> Ver
                                   </Button>
-                                  {canEdit && <Button variant="outline" size="sm" className="flex-1 bg-white hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEditClick(emp)}>
+                                  {canEdit && <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditClick(emp)}>
                                       <span className="material-symbols-outlined text-[16px] mr-2">edit</span> Editar
                                   </Button>}
-                                  {canDelete && <Button variant="outline" size="sm" className="bg-white text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(emp.id)}>
+                                  {canDelete && <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => handleDelete(emp.id)}>
                                       <span className="material-symbols-outlined text-[16px]">delete</span>
                                   </Button>}
                               </div>

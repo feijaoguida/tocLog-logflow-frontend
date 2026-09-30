@@ -144,10 +144,10 @@ export default function VehicleDetailsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-24 w-full rounded-3xl" />
+        <Skeleton className="h-24 w-full rounded-lg" />
         <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
-          <Skeleton className="h-[420px] rounded-3xl" />
-          <Skeleton className="h-[420px] rounded-3xl" />
+          <Skeleton className="h-[420px] rounded-lg" />
+          <Skeleton className="h-[420px] rounded-lg" />
         </div>
       </div>
     )

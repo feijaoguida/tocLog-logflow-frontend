@@ -175,7 +175,7 @@ export default function ProfilesPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            className="size-8 text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => handleDelete(role)}
                             disabled={role.isSystem}
                             title={
@@ -184,7 +184,7 @@ export default function ProfilesPage() {
                                 : 'Excluir perfil'
                             }
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </div>
                       </TableCell>

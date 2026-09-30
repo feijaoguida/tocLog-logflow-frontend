@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes'
 import {
     DEFAULT_THEME_PALETTE,
     type ThemeMode,
+    type ThemeColor,
     type ThemePaletteId,
 } from '@/lib/theme-system'
 
@@ -19,6 +20,8 @@ interface SettingsContextType {
     setThemeMode: (theme: ThemeMode) => void
     themePalette: ThemePaletteId
     setThemePalette: (palette: ThemePaletteId) => void
+    themeColor: ThemeColor
+    setThemeColor: (color: ThemeColor) => void
     resolvedTheme: string | undefined
 }
 
@@ -32,7 +35,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [collapseOnClick, setCollapseOnClickState] = useState(false)
     const [itemsPerPage, setItemsPerPageState] = useState(10)
     const [themeMode, setThemeModeState] = useState<ThemeMode>('system')
-    const [themePalette, setThemePaletteState] = useState<ThemePaletteId>(DEFAULT_THEME_PALETTE)
+    const [themePalette, setThemePaletteState] = useState<ThemeColor>(DEFAULT_THEME_PALETTE)
     const [mounted, setMounted] = useState(false)
 
     // Load from LocalStorage on mount to preserve per-browser preferences.
@@ -55,11 +58,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             setThemeModeState(theme)
         }
 
-        const storedThemePalette = localStorage.getItem('settings_theme_palette') as ThemePaletteId | null
-        if (storedThemePalette) {
-            setThemePaletteState(storedThemePalette)
-            document.documentElement.dataset.palette = storedThemePalette
+        const storedThemeColor = (localStorage.getItem('settings_theme_color') || localStorage.getItem('settings_theme_palette')) as ThemeColor | null
+        if (storedThemeColor && (storedThemeColor === 'ruby' || storedThemeColor === 'royal' || storedThemeColor === 'forest' || storedThemeColor === 'ember')) {
+            setThemePaletteState(storedThemeColor)
+            document.documentElement.dataset.themeColor = storedThemeColor
+            document.documentElement.dataset.palette = storedThemeColor
         } else {
+            document.documentElement.dataset.themeColor = DEFAULT_THEME_PALETTE
             document.documentElement.dataset.palette = DEFAULT_THEME_PALETTE
         }
         
@@ -69,6 +74,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!mounted) return
+        document.documentElement.dataset.themeColor = themePalette
         document.documentElement.dataset.palette = themePalette
     }, [mounted, themePalette])
 
@@ -94,14 +100,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setTheme(value)
     }
 
-    const handleThemePalette = (value: ThemePaletteId) => {
+    const handleThemeColor = (value: ThemeColor) => {
         setThemePaletteState(value)
+        localStorage.setItem('settings_theme_color', value)
         localStorage.setItem('settings_theme_palette', value)
+        document.documentElement.dataset.themeColor = value
         document.documentElement.dataset.palette = value
     }
 
     if (!mounted) {
-        return null // or a loader
+        return null
     }
 
     return (
@@ -112,7 +120,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             themeMode,
             setThemeMode: handleThemeMode,
             themePalette,
-            setThemePalette: handleThemePalette,
+            setThemePalette: handleThemeColor,
+            themeColor: themePalette,
+            setThemeColor: handleThemeColor,
             resolvedTheme,
         }}>
             {children}

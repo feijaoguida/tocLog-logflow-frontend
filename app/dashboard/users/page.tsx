@@ -219,18 +219,18 @@ export default function UsersPage() {
               <TabsTrigger value="effective">Resultado efetivo ({effectiveSlugs.size})</TabsTrigger>
             </TabsList>
             <TabsContent value="direct" className="space-y-4 pt-4">
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
                 A concessão adiciona capacidade ao perfil; ela não libera dados de outra empresa ou grupo.
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {Object.keys(groupedPermissions).sort().map((group) => (
-                  <Card key={group} className="shadow-none">
-                    <CardHeader className="border-b py-3"><CardTitle className="text-sm">{group}</CardTitle></CardHeader>
-                    <CardContent className="divide-y p-0">
+                  <Card key={group} className="shadow-xs border-border">
+                    <CardHeader className="border-b border-border/70 py-3"><CardTitle className="text-sm font-semibold">{group}</CardTitle></CardHeader>
+                    <CardContent className="divide-y divide-border/60 p-0">
                       {groupedPermissions[group].map((item) => {
                         const inherited = inheritedSlugs.has(item.slug)
                         return (
-                          <label key={item.id} className="flex cursor-pointer items-start gap-3 p-3">
+                          <label key={item.id} className="flex cursor-pointer items-start gap-3 p-3 hover:bg-muted/30 transition-colors">
                             <Checkbox
                               checked={inherited || directSlugs.includes(item.slug)}
                               disabled={!canManage || inherited}
@@ -251,9 +251,9 @@ export default function UsersPage() {
             <TabsContent value="effective" className="pt-4">
               <div className="grid gap-2 md:grid-cols-2">
                 {[...effectiveSlugs].sort().map((slug) => (
-                  <div key={slug} className="flex items-center gap-2 rounded-md border p-3 text-sm">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                    <span>{slug}</span>
+                  <div key={slug} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-3 text-sm">
+                    <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-mono">{slug}</span>
                   </div>
                 ))}
               </div>

@@ -155,37 +155,51 @@ export default function BranchesPage() {
     const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
     return (
-        <div className="flex flex-1 flex-col gap-4 p-4">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold tracking-tight">Filiais</h1>
+        <div className="space-y-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="space-y-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">Cadastros</span>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Filiais</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Gerencie as unidades operacionais da empresa e mantenha o registro ativo para os demais módulos.
+                    </p>
+                </div>
                 <Dialog open={isOpen} onOpenChange={handleOpenChange}>
                     <DialogTrigger asChild>
-                        <Button className="gap-2"><Plus className="h-4 w-4" /> Nova Filial</Button>
+                        <Button className="gap-2 shadow-xs shrink-0"><Plus className="size-4" /> Nova Filial</Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle>{editingId ? "Editar Filial" : "Criar Filial"}</DialogTitle>
-                            <DialogDescription>Gerencie as unidades da empresa.</DialogDescription>
+                            <DialogDescription>Gerencie as unidades operacionais da empresa.</DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nome *</Label>
-                                <Input id="name" value={name} onChange={e => setName(e.target.value)} className="col-span-3" required />
+                        <form onSubmit={handleSubmit} className="space-y-4 py-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="name">Nome da Filial *</Label>
+                                <Input id="name" placeholder="Ex: Matriz - São Paulo" value={name} onChange={e => setName(e.target.value)} required />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="code" className="text-right">Código</Label>
-                                <Input id="code" value={code} onChange={e => setCode(e.target.value)} className="col-span-3" placeholder="Ex: 001" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="code">Código de Identificação</Label>
+                                <Input id="code" value={code} onChange={e => setCode(e.target.value)} placeholder="Ex: FIL-01" />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="active" className="text-right">Ativo</Label>
-                                <div className="col-span-3 flex items-center space-x-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="active">Status</Label>
+                                <div className="flex min-h-10 items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                                    <div className="space-y-0.5">
+                                        <p className="text-sm font-medium">{active ? "Ativo" : "Inativo"}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {active ? "Disponível para novos lançamentos." : "Mantida para histórico."}
+                                        </p>
+                                    </div>
                                     <Switch id="active" checked={active} onCheckedChange={setActive} />
-                                    <Label htmlFor="active">{active ? "Sim" : "Não"}</Label>
                                 </div>
                             </div>
-                            <DialogFooter>
+                            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+                                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                                    Cancelar
+                                </Button>
                                 <Button type="submit" disabled={submitLoading}>
-                                    {submitLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar"}
+                                    {submitLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : editingId ? "Salvar alterações" : "Criar filial"}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -193,61 +207,91 @@ export default function BranchesPage() {
                 </Dialog>
             </div>
 
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Listagem</CardTitle>
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Buscar..." className="pl-8 w-[200px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Card className="shadow-xs">
+                <CardHeader className="pb-3 border-b border-border/70">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-0.5">
+                            <CardTitle className="text-sm font-semibold">Listagem de Filiais</CardTitle>
+                            <p className="text-xs text-muted-foreground">Consulte filiais cadastradas e seus respectivos status.</p>
+                        </div>
+                        <div className="relative w-full sm:w-[240px]">
+                            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                            <Input placeholder="Buscar filial..." className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    {loading ? <Loader2 className="mx-auto h-8 w-8 animate-spin" /> : (
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex items-center justify-center p-12">
+                            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <>
                         <Table>
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Nome</TableHead>
-                                    <TableHead>Código</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Ações</TableHead>
+                                <TableRow className="border-b border-border/80 hover:bg-transparent">
+                                    <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider pl-6">Nome</TableHead>
+                                    <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">Código</TableHead>
+                                    <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">Status</TableHead>
+                                    <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider text-right pr-6">Ações</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {paginated.map(branch => (
-                                    <TableRow key={branch.id}>
-                                        <TableCell className="font-medium">{branch.name}</TableCell>
-                                        <TableCell>
-                                            {branch.code ? <Badge variant="outline">{branch.code}</Badge> : '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {branch.active ? 
-                                                <Badge className="bg-green-500 hover:bg-green-600">Ativo</Badge> : 
-                                                <Badge variant="destructive">Inativo</Badge>
-                                            }
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(branch)}><Pencil className="h-4 w-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDelete(branch.id)}><Trash2 className="h-4 w-4" /></Button>
+                                {paginated.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                                            Nenhuma filial encontrada.
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                ) : (
+                                    paginated.map(branch => (
+                                        <TableRow key={branch.id} className="border-b border-border/60 hover:bg-muted/40 transition-colors">
+                                            <TableCell className="font-medium pl-6 text-foreground">{branch.name}</TableCell>
+                                            <TableCell>
+                                                {branch.code ? <Badge variant="outline">{branch.code}</Badge> : '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={branch.active ? "success" : "neutral"} className="rounded-full px-2.5 py-0.5 text-xs font-medium">
+                                                    {branch.active ? "Ativo" : "Inativo"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right pr-6">
+                                                <div className="inline-flex items-center gap-1">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={() => handleEdit(branch)}>
+                                                        <Pencil className="size-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="size-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(branch.id)}>
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
-                    )}
-                     {/* Pagination Controls */}
-                    <div className="flex items-center justify-end space-x-2 py-4">
-                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                            Anterior
-                        </Button>
-                        <div className="text-sm text-muted-foreground">
-                            Página {currentPage} de {Math.ceil(filtered.length / itemsPerPage)}
+
+                        {/* Pagination Controls */}
+                        <div className="flex flex-col gap-4 border-t border-border/70 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-xs text-muted-foreground">
+                                Mostrando <span className="font-semibold text-foreground">{filtered.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> a{" "}
+                                <span className="font-semibold text-foreground">{Math.min(currentPage * itemsPerPage, filtered.length)}</span> de{" "}
+                                <span className="font-semibold text-foreground">{filtered.length}</span> resultados
+                            </div>
+                            <div className="flex items-center justify-end space-x-2">
+                                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                                    Anterior
+                                </Button>
+                                <div className="text-xs text-muted-foreground px-2">
+                                    Página {currentPage} de {Math.max(1, Math.ceil(filtered.length / itemsPerPage))}
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(filtered.length / itemsPerPage), p + 1))} disabled={currentPage >= Math.ceil(filtered.length / itemsPerPage)}>
+                                    Próxima
+                                </Button>
+                            </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(filtered.length / itemsPerPage), p + 1))} disabled={currentPage === Math.ceil(filtered.length / itemsPerPage)}>
-                            Próxima
-                        </Button>
-                    </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>

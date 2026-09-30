@@ -93,7 +93,7 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
         <div className={`flex flex-col gap-4 ${className}`}>
              <div className="flex flex-col gap-5 md:flex-row md:items-center">
                 {previewUrl || value ? (
-                    <div className="relative h-32 w-32 overflow-hidden rounded-3xl border border-border bg-card shadow-sm group">
+                    <div className="relative size-28 overflow-hidden rounded-full border-2 border-border bg-card shadow-xs group shrink-0">
                         <Image
                             src={previewUrl || value || ""}
                             alt="Preview"
@@ -110,23 +110,23 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
                                 setPreviewUrl(null)
                                 onChange("")
                             }}
-                            className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+                            className="absolute inset-0 flex items-center justify-center bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                            <X className="h-4 w-4" />
+                            <X className="size-5" />
                         </button>
                     </div>
                 ) : (
-                    <div className="flex h-32 w-32 items-center justify-center rounded-3xl border-2 border-dashed border-border bg-muted/50 text-muted-foreground">
-                        <ImageIcon className="h-10 w-10 opacity-60" />
+                    <div className="flex size-28 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border bg-muted/40 text-muted-foreground">
+                        <ImageIcon className="size-8 opacity-60" />
                     </div>
                 )}
                 
-                <div className="flex max-w-md flex-1 flex-col gap-3">
+                <div className="flex max-w-md flex-1 flex-col gap-2.5">
                     <div className="space-y-1">
                         <p className="text-sm font-semibold text-foreground">
                             {value ? "Imagem pronta para revisão" : "Envie uma foto nítida do colaborador"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                             Use preferencialmente uma imagem centralizada, com rosto visível e fundo limpo para manter o padrão visual.
                         </p>
                     </div>
@@ -139,22 +139,22 @@ export function ImageUpload({ value, onChange, folder, className, placeholder = 
                     />
                     <Button 
                         type="button" 
-                        variant="outlinePrimary" 
+                        variant="outline" 
                         disabled={uploading}
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-fit"
+                        className="w-fit gap-2 shadow-xs"
                     >
                         {uploading ? (
                             <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...
+                                <Loader2 className="size-4 animate-spin" /> Carregando...
                             </>
                         ) : (
                             <>
-                                <Upload className="mr-2 h-4 w-4" /> {value ? "Trocar Imagem" : placeholder}
+                                <Upload className="size-4" /> {value ? "Trocar Imagem" : placeholder}
                             </>
                         )}
                     </Button>
-                    <div className="rounded-2xl border border-border/70 bg-card/80 px-3 py-2 text-xs text-muted-foreground">
+                    <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
                         JPG, PNG ou GIF. Máx 5MB. O recorte continua disponível antes do upload.
                     </div>
                 </div>

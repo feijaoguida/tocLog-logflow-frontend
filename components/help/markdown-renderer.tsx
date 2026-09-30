@@ -313,7 +313,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
             <div
               key={index}
               className={cn(
-                'rounded-3xl border px-4 py-4 text-sm',
+                'rounded-lg border px-4 py-4 text-sm shadow-xs',
                 calloutToneClasses[block.tone],
               )}
             >
@@ -335,7 +335,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
           return (
             <figure
               key={index}
-              className="overflow-hidden rounded-3xl border border-border/70 bg-muted/20"
+              className="overflow-hidden rounded-lg border border-border/70 bg-muted/20 shadow-xs"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={block.src} alt={block.alt} className="w-full object-cover" />

@@ -426,8 +426,8 @@ function NewChecklistPageContent() {
 function ChecklistLoadingState() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-24 w-full rounded-3xl" />
-      <Skeleton className="h-[420px] w-full rounded-3xl" />
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-[420px] w-full rounded-lg" />
     </div>
   )
 }

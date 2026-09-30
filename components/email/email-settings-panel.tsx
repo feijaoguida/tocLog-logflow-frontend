@@ -346,10 +346,10 @@ export function EmailSettingsPanel() {
         {/* ABA: EVENTOS E ALERTAS SEGMENTADOS POR MÓDULO                             */}
         {/* ========================================================================= */}
         <TabsContent value="events" className="space-y-6">
-          <div className="rounded-2xl border border-border/70 bg-card p-5">
+          <div className="rounded-lg border border-border bg-card p-5 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold tracking-tight">Eventos e Alertas Segmentados por Módulo</h3>
+                <h3 className="text-lg font-semibold tracking-tight text-foreground">Eventos e Alertas Segmentados por Módulo</h3>
                 <p className="text-sm text-muted-foreground">
                   Selecione o módulo para personalizar o gatilho dos e-mails, quem deve ser notificado e cópias adicionais.
                 </p>
@@ -376,10 +376,10 @@ export function EmailSettingsPanel() {
                     key={mod.id}
                     type="button"
                     onClick={() => setSelectedModule(mod.id)}
-                    className={`flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition ${
+                    className={`flex flex-col items-start gap-1.5 rounded-md border p-3 text-left transition shadow-xs ${
                       isSelected
-                        ? 'border-primary bg-primary/10 shadow-sm'
-                        : 'border-border/60 hover:border-primary/40 hover:bg-muted/40'
+                        ? 'border-primary bg-primary/10 shadow-xs'
+                        : 'border-border/70 hover:border-primary/40 hover:bg-muted/40'
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
@@ -396,11 +396,11 @@ export function EmailSettingsPanel() {
           </div>
 
           {/* CABEÇALHO DO MÓDULO SELECIONADO */}
-          <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex items-center justify-between border-b border-border/70 pb-3">
             <div className="flex items-center gap-2">
               {React.createElement(currentModuleDef.icon, { className: 'size-5 text-primary' })}
               <div>
-                <h4 className="text-base font-semibold tracking-tight">{currentModuleDef.title}</h4>
+                <h4 className="text-base font-semibold tracking-tight text-foreground">{currentModuleDef.title}</h4>
                 <p className="text-xs text-muted-foreground">{currentModuleDef.description}</p>
               </div>
             </div>
@@ -417,7 +417,7 @@ export function EmailSettingsPanel() {
               </Card>
             ) : (
               filteredEvents.map((item) => (
-                <Card key={item.event} className="transition border-border/70 hover:border-primary/40">
+                <Card key={item.event} className="transition border-border shadow-xs hover:border-primary/40">
                   <CardHeader className="pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="space-y-1">
@@ -455,7 +455,7 @@ export function EmailSettingsPanel() {
                           return (
                             <div
                               key={role.id}
-                              className={`flex items-center space-x-2 rounded-xl border p-2.5 transition ${
+                              className={`flex items-center space-x-2 rounded-md border p-2.5 transition ${
                                 isChecked
                                   ? 'border-primary/40 bg-primary/5 text-foreground'
                                   : 'border-border/60 bg-muted/20 text-muted-foreground'

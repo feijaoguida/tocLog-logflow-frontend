@@ -72,7 +72,7 @@ function HelpSidebar({
   const sections = useMemo(() => filterSections(menu.sections, query), [menu.sections, query])
 
   return (
-    <div className="flex h-full flex-col rounded-[28px] border border-border/70 bg-card/90 shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-border bg-card shadow-xs">
       <div className="border-b border-border/70 p-4">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -105,7 +105,7 @@ function HelpSidebar({
                       key={item.slug}
                       href={href}
                       className={cn(
-                        'block rounded-2xl border px-3 py-3 transition',
+                        'block rounded-md border px-3 py-2.5 transition text-xs',
                         isActive
                           ? 'border-primary/40 bg-primary/10 text-foreground shadow-sm'
                           : 'border-transparent bg-muted/20 text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground',

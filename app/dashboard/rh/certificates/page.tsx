@@ -23,12 +23,14 @@ interface MedicalCertificate {
     hr?: { user: { name: string } } | null; createdAt: string
 }
 
-const STATUS_BADGES: Record<string, { label: string; className: string }> = {
-    SUBMITTED: { label: 'Enviado', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    MANAGER_APPROVED: { label: 'Aprovado (Gestor)', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-    HR_APPROVED: { label: 'Aprovado (RH)', className: 'bg-green-100 text-green-800 border-green-200' },
-    MANAGER_REJECTED: { label: 'Reprovado (Gestor)', className: 'bg-red-100 text-red-800 border-red-200' },
-    HR_REJECTED: { label: 'Reprovado (RH)', className: 'bg-red-100 text-red-800 border-red-200' },
+type CertificateStatus = 'SUBMITTED' | 'MANAGER_APPROVED' | 'HR_APPROVED' | 'MANAGER_REJECTED' | 'HR_REJECTED'
+
+const STATUS_BADGE_CONFIG: Record<string, { label: string; variant: 'warning' | 'info' | 'success' | 'destructive' }> = {
+    SUBMITTED: { label: 'Enviado', variant: 'warning' },
+    MANAGER_APPROVED: { label: 'Aprovado (Gestor)', variant: 'info' },
+    HR_APPROVED: { label: 'Aprovado (RH)', variant: 'success' },
+    MANAGER_REJECTED: { label: 'Reprovado (Gestor)', variant: 'destructive' },
+    HR_REJECTED: { label: 'Reprovado (RH)', variant: 'destructive' },
 }
 
 export default function CertificatesPage() {
@@ -54,8 +56,8 @@ export default function CertificatesPage() {
 
     const formatDate = (d: string) => new Date(d).toLocaleDateString('pt-BR')
     const getStatusBadge = (status: string) => {
-        const info = STATUS_BADGES[status] || { label: status, className: '' }
-        return <Badge variant="outline" className={info.className}>{info.label}</Badge>
+        const config = STATUS_BADGE_CONFIG[status] || { label: status, variant: 'warning' as const }
+        return <Badge variant={config.variant} className="rounded-full px-2.5 py-0.5 text-xs font-medium">{config.label}</Badge>
     }
 
     useEffect(() => { fetchInitialData() }, [])
@@ -149,18 +151,18 @@ export default function CertificatesPage() {
                         <TableCell>{formatDate(c.startDate)} - {formatDate(c.endDate)}</TableCell>
                         <TableCell className="max-w-[200px] truncate">
                             {c.description}
-                            {c.rejectionReason && <p className="text-xs text-red-600 mt-1">Motivo: {c.rejectionReason}</p>}
+                            {c.rejectionReason && <p className="text-xs text-destructive mt-1 font-medium">Motivo: {c.rejectionReason}</p>}
                         </TableCell>
                         <TableCell>
                             <div className="flex gap-1">{c.fileUrls.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline"><FileText className="h-4 w-4" /></a>
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline"><FileText className="size-4" /></a>
                             ))}{c.fileUrls.length === 0 && <span className="text-muted-foreground text-xs">—</span>}</div>
                         </TableCell>
                         <TableCell>{getStatusBadge(c.status)}</TableCell>
                         {showActions && <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                                {approveStatus && <Button size="sm" variant="outline" className="text-green-600 hover:bg-green-50 border-green-200" onClick={() => handleApprove(c.id, approveStatus)}><Check className="h-4 w-4 mr-1" /> Aprovar</Button>}
-                                {rejectStatusVal && <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50 border-red-200" onClick={() => { setRejectId(c.id); setRejectStatus(rejectStatusVal) }}><X className="h-4 w-4 mr-1" /> Reprovar</Button>}
+                                {approveStatus && <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400" onClick={() => handleApprove(c.id, approveStatus)}><Check className="size-3.5 mr-1" /> Aprovar</Button>}
+                                {rejectStatusVal && <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setRejectId(c.id); setRejectStatus(rejectStatusVal) }}><X className="size-3.5 mr-1" /> Reprovar</Button>}
                             </div>
                         </TableCell>}
                     </TableRow>

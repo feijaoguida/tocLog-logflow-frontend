@@ -186,7 +186,7 @@ export default function PurchaseRequestPrintPage() {
       </section>
 
       <div className="mx-auto w-full max-w-5xl space-y-6 print:max-w-none print:space-y-4">
-        <section className="rounded-[28px] border border-border/70 bg-card px-6 py-6 print:rounded-none print:border-0 print:px-0 print:py-0">
+        <section className="rounded-lg border border-border/70 bg-card px-6 py-6 shadow-xs print:rounded-none print:border-0 print:px-0 print:py-0">
           <div className="flex flex-wrap items-start justify-between gap-6 border-b border-border/70 pb-6">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">

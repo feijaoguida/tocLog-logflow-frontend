@@ -184,10 +184,10 @@ export default function ProductsPage() {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        className="size-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
                                         onClick={() => { setDeleteProductId(p.id); setIsDeleteDialogOpen(true); }}
                                     >
-                                        <Trash2 className="h-4 w-4"/>
+                                        <Trash2 className="size-4"/>
                                     </Button>
                                 </div>
                             </CardContent>

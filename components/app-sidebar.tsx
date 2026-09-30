@@ -1,6 +1,7 @@
 'use client'
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 import {
   Sidebar,
@@ -45,6 +46,7 @@ type MenuGroup = {
 }
 
 export function AppSidebar() {
+  const pathname = usePathname()
   const { user, hasPermission, logout, isLoading } = useAuth()
   const { setOpen, isMobile, setOpenMobile } = useSidebar()
   const { accordionMode, collapseOnClick } = useSettings()
@@ -118,10 +120,11 @@ export function AppSidebar() {
       const hasNestedItems = Boolean(sub.items?.length)
 
       if (!hasNestedItems) {
+        const isActive = pathname === sub.url || (sub.url !== '#' && pathname?.startsWith(sub.url + '/'))
         return (
           <SidebarMenuSubItem key={`${depth}-${sub.title}`}>
-            <SidebarMenuSubButton asChild onClick={handleItemClick}>
-              <Link href={sub.url}>
+            <SidebarMenuSubButton asChild isActive={isActive} onClick={handleItemClick}>
+              <Link href={sub.url} className={isActive ? "text-primary font-medium" : ""}>
                 <span>{sub.title}</span>
               </Link>
             </SidebarMenuSubButton>
@@ -360,11 +363,11 @@ export function AppSidebar() {
                       const hasSubItems = item.items && item.items.length > 0;
                       
                       if (!hasSubItems) {
-                          // Simple Link
+                          const isActive = pathname === item.url || (item.url !== '#' && pathname?.startsWith(item.url + '/'))
                           return (
                             <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton asChild tooltip={item.title} onClick={handleItemClick}>
-                                    <Link href={item.url}>
+                                <SidebarMenuButton asChild tooltip={item.title} isActive={isActive} onClick={handleItemClick}>
+                                    <Link href={item.url} className={isActive ? "text-primary font-medium" : ""}>
                                     <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
                                     <span>{item.title}</span>
                                     </Link>
@@ -409,8 +412,8 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Configurações">
-                    <Link href="/dashboard/settings">
+                <SidebarMenuButton asChild tooltip="Configurações" isActive={pathname?.startsWith('/dashboard/settings')}>
+                    <Link href="/dashboard/settings" className={pathname?.startsWith('/dashboard/settings') ? "text-primary font-medium" : ""}>
                         <span className="material-symbols-outlined text-[20px]">settings</span>
                         <span>Configurações</span>
                     </Link>
