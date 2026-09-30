@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { RotateCw, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -71,34 +70,35 @@ export default function ProcurementSettingsPage() {
   const [departmentMinimumQuotationCount, setDepartmentMinimumQuotationCount] = useState('1')
   const [departmentAllowUrgentQuotationWaiver, setDepartmentAllowUrgentQuotationWaiver] = useState(true)
 
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        const [{ data: settings }, { data: approverOptions }, { data: departments }] = await Promise.all([
-          api.get<ProcurementSettingsRecord>('/procurement-settings'),
-          api.get<ApproverOption[]>('/procurement-settings/approvers'),
-          api.get<DepartmentSettingsRecord[]>('/procurement-settings/departments'),
-        ])
+  async function loadSettings() {
+    try {
+      setLoading(true)
+      const [{ data: settings }, { data: approverOptions }, { data: departments }] = await Promise.all([
+        api.get<ProcurementSettingsRecord>('/procurement-settings'),
+        api.get<ApproverOption[]>('/procurement-settings/approvers'),
+        api.get<DepartmentSettingsRecord[]>('/procurement-settings/departments'),
+      ])
 
-        setApprovalMode(settings.approvalMode)
-        setDelegatedApproverId(settings.delegatedApproverId ?? 'none')
-        setHierarchyThreshold(String(settings.hierarchyThreshold))
-        setMinimumQuotationCount(String(settings.minimumQuotationCount))
-        setAllowUrgentQuotationWaiver(settings.allowUrgentQuotationWaiver)
-        setApprovers(approverOptions)
-        setDepartmentSettings(departments)
-        if (departments.length > 0) {
-          setSelectedDepartmentId(departments[0].departmentId)
-        }
-      } catch (error) {
-        toast.error(
-          getApiErrorMessage(error, 'Nao foi possivel carregar as configuracoes de compras.'),
-        )
-      } finally {
-        setLoading(false)
+      setApprovalMode(settings.approvalMode)
+      setDelegatedApproverId(settings.delegatedApproverId ?? 'none')
+      setHierarchyThreshold(String(settings.hierarchyThreshold))
+      setMinimumQuotationCount(String(settings.minimumQuotationCount))
+      setAllowUrgentQuotationWaiver(settings.allowUrgentQuotationWaiver)
+      setApprovers(approverOptions)
+      setDepartmentSettings(departments)
+      if (departments.length > 0) {
+        setSelectedDepartmentId(departments[0].departmentId)
       }
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, 'Não foi possível carregar as configurações de compras.'),
+      )
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     void loadSettings()
   }, [])
 
@@ -139,10 +139,10 @@ export default function ProcurementSettingsPage() {
         minimumQuotationCount: Number(minimumQuotationCount || 1),
         allowUrgentQuotationWaiver,
       })
-      toast.success('Configuracoes de compras atualizadas com sucesso.')
+      toast.success('Configurações de compras atualizadas com sucesso.')
     } catch (error) {
       toast.error(
-        getApiErrorMessage(error, 'Nao foi possivel salvar as configuracoes de compras.'),
+        getApiErrorMessage(error, 'Não foi possível salvar as configurações de compras.'),
       )
     } finally {
       setSaving(false)
@@ -175,12 +175,12 @@ export default function ProcurementSettingsPage() {
         '/procurement-settings/departments',
       )
       setDepartmentSettings(data)
-      toast.success('Configuracoes do departamento atualizadas com sucesso.')
+      toast.success('Configurações do departamento atualizadas com sucesso.')
     } catch (error) {
       toast.error(
         getApiErrorMessage(
           error,
-          'Nao foi possivel salvar as configuracoes do departamento.',
+          'Não foi possível salvar as configurações do departamento.',
         ),
       )
     } finally {
@@ -192,34 +192,68 @@ export default function ProcurementSettingsPage() {
     departmentSettings.find((department) => department.departmentId === selectedDepartmentId) ?? null
 
   return (
-    <div className="app-page">
-      <MenuFunctionHeader
-        title="Compras > Configuracoes"
-        description="Area de governanca do fluxo procure-to-pay. As decisoes desta tela ficam persistidas por empresa e orientam a aprovacao e os parametros operacionais do modulo."
-        actions={
-          <Badge variant="outline" className="rounded-full px-4 py-2">
-            Governanca por empresa
-          </Badge>
-        }
-      />
+    <div className="app-page space-y-6">
+      {/* 1. Cabeçalho Padronizado */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Configurações de Compras
+            </h1>
+            <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <ShieldCheck className="size-3 mr-1" />
+              Governança Corporativa
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Defina as regras de aprovação, alçadas financeiras, requisitos de cotação e exceções departamentais.
+          </p>
+        </div>
 
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void loadSettings()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </div>
+      </section>
+
+      {/* 2. Abas de Configuração */}
       <Tabs defaultValue="approval" className="space-y-6">
-        <TabsList className="grid w-full max-w-[720px] grid-cols-3">
-          <TabsTrigger value="approval">Aprovacao</TabsTrigger>
-          <TabsTrigger value="quotations">Cotacoes</TabsTrigger>
-          <TabsTrigger value="departments">Departamentos</TabsTrigger>
+        <TabsList className="bg-muted/60 p-1">
+          <TabsTrigger value="approval" className="text-xs font-medium">
+            Roteamento de Aprovação
+          </TabsTrigger>
+          <TabsTrigger value="quotations" className="text-xs font-medium">
+            Política de Cotações
+          </TabsTrigger>
+          <TabsTrigger value="departments" className="text-xs font-medium">
+            Regras Departamentais
+          </TabsTrigger>
         </TabsList>
 
+        {/* Aba 1: Aprovação */}
         <TabsContent value="approval" className="space-y-6">
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">Roteamento de aprovacao da requisicao</CardTitle>
+          <Card className="app-section-card p-6">
+            <CardHeader className="p-0 mb-6">
+              <CardTitle className="text-lg">Roteamento padrão de requisições</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Define para quem a solicitação de compra é direcionada assim que o solicitante envia o pedido.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="field-stack">
-                <Label htmlFor="approval-mode">Modo base</Label>
+            <CardContent className="p-0 space-y-5">
+              <div className="field-stack max-w-lg">
+                <Label htmlFor="approval-mode" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Modo de aprovação
+                </Label>
                 {loading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-9 w-full rounded-md" />
                 ) : (
                   <Select
                     value={approvalMode}
@@ -227,31 +261,33 @@ export default function ProcurementSettingsPage() {
                       setApprovalMode(value as ProcurementSettingsRecord['approvalMode'])
                     }
                   >
-                    <SelectTrigger id="approval-mode">
-                      <SelectValue placeholder="Selecione o modo de aprovacao" />
+                    <SelectTrigger id="approval-mode" className="h-9 text-sm">
+                      <SelectValue placeholder="Selecione o modo de aprovação" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="department-manager">Gestor do departamento</SelectItem>
-                      <SelectItem value="delegated-approver">Aprovador delegado</SelectItem>
+                      <SelectItem value="department-manager">Gestor direto do departamento</SelectItem>
+                      <SelectItem value="delegated-approver">Aprovador delegado fixo</SelectItem>
                       <SelectItem value="manager-with-hierarchy">
-                        Gestor com escalonamento hierarquico
+                        Gestor com escalonamento hierárquico
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 )}
-                <p className="text-sm leading-6 text-muted-foreground">
-                  O fluxo atual do backend já passa a respeitar esta escolha no envio da requisição.
+                <p className="text-xs text-muted-foreground">
+                  O fluxo operacional do backend valida automaticamente este direcionamento no envio de cada pedido.
                 </p>
               </div>
 
-              {approvalMode === 'delegated-approver' ? (
-                <div className="field-stack">
-                  <Label htmlFor="delegated-approver">Aprovador delegado</Label>
+              {approvalMode === 'delegated-approver' && (
+                <div className="field-stack max-w-lg">
+                  <Label htmlFor="delegated-approver" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Aprovador delegado
+                  </Label>
                   {loading ? (
-                    <Skeleton className="h-10 w-full rounded-xl" />
+                    <Skeleton className="h-9 w-full rounded-md" />
                   ) : (
                     <Select value={delegatedApproverId} onValueChange={setDelegatedApproverId}>
-                      <SelectTrigger id="delegated-approver">
+                      <SelectTrigger id="delegated-approver" className="h-9 text-sm">
                         <SelectValue placeholder="Selecione um aprovador" />
                       </SelectTrigger>
                       <SelectContent>
@@ -265,17 +301,18 @@ export default function ProcurementSettingsPage() {
                       </SelectContent>
                     </Select>
                   )}
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Use este modo quando a empresa quiser centralizar a aprovacao inicial em um comprador
-                    ou responsavel fixo.
+                  <p className="text-xs text-muted-foreground">
+                    Centraliza a decisão de compras em um único colaborador responsável pela triagem de pedidos.
                   </p>
                 </div>
-              ) : null}
+              )}
 
               <div className="field-stack max-w-sm">
-                <Label htmlFor="hierarchy-threshold">Escalonar acima de</Label>
+                <Label htmlFor="hierarchy-threshold" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Escalonar alçada acima de (R$)
+                </Label>
                 {loading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-9 w-full rounded-md" />
                 ) : (
                   <Input
                     id="hierarchy-threshold"
@@ -284,36 +321,39 @@ export default function ProcurementSettingsPage() {
                     step="0.01"
                     value={hierarchyThreshold}
                     onChange={(event) => setHierarchyThreshold(event.target.value)}
+                    className="h-9 text-sm"
                   />
                 )}
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Este valor define quando a regra de hierarquia sobe para o gestor acima, caso o modo
-                  configurado use escalonamento.
+                <p className="text-xs text-muted-foreground">
+                  Quando o pedido exceder este limite, a aprovação é escalonada na hierarquia gerencial.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={handleSave} disabled={loading || saving}>
-                  {saving ? 'Salvando...' : 'Salvar configuracoes'}
+              <div className="flex items-center gap-3 pt-3 border-t">
+                <Button size="sm" onClick={handleSave} disabled={loading || saving} className="font-semibold">
+                  {saving ? 'Salvando...' : 'Salvar configurações'}
                 </Button>
-                <Badge variant="outline" className="rounded-full px-3 py-2">
-                  Aprovacao configuravel ativa
-                </Badge>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Aba 2: Cotações */}
         <TabsContent value="quotations" className="space-y-6">
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">Politica de cotacoes</CardTitle>
+          <Card className="app-section-card p-6">
+            <CardHeader className="p-0 mb-6">
+              <CardTitle className="text-lg">Política de cotações mínimas</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Critérios de compliance para homologação e emissão de ordens de compra.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-0 space-y-5">
               <div className="field-stack max-w-sm">
-                <Label htmlFor="minimum-quotation-count">Quantidade minima de cotacoes</Label>
+                <Label htmlFor="minimum-quotation-count" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Quantidade mínima de cotações
+                </Label>
                 {loading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-9 w-full rounded-md" />
                 ) : (
                   <Input
                     id="minimum-quotation-count"
@@ -322,19 +362,19 @@ export default function ProcurementSettingsPage() {
                     max={10}
                     value={minimumQuotationCount}
                     onChange={(event) => setMinimumQuotationCount(event.target.value)}
+                    className="h-9 text-sm"
                   />
                 )}
-                <p className="text-sm leading-6 text-muted-foreground">
-                  A escolha da cotacao vencedora já passa a bloquear processos abaixo desta quantidade.
+                <p className="text-xs text-muted-foreground">
+                  O sistema exigirá este número mínimo de propostas preenchidas antes de homologar a vencedora.
                 </p>
               </div>
 
-              <div className="flex items-start justify-between rounded-[20px] border border-border/70 bg-muted/35 p-4">
-                <div className="space-y-1">
-                  <p className="font-medium">Excecao para urgencia</p>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Este parametro já fica salvo por empresa e prepara a proxima camada de tratamento
-                    diferenciado para urgencias no fluxo de cotacao.
+              <div className="flex items-start justify-between rounded-lg border bg-muted/20 p-4 max-w-xl">
+                <div className="space-y-1 pr-4">
+                  <p className="text-sm font-semibold text-foreground">Dispensar cotação em caso de urgência</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Permite homologar cotação direta sem cumprir a quantidade mínima quando a requisição for classificada como Urgente.
                   </p>
                 </div>
                 <Switch
@@ -344,31 +384,34 @@ export default function ProcurementSettingsPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={handleSave} disabled={loading || saving}>
-                  {saving ? 'Salvando...' : 'Salvar configuracoes'}
+              <div className="flex items-center gap-3 pt-3 border-t">
+                <Button size="sm" onClick={handleSave} disabled={loading || saving} className="font-semibold">
+                  {saving ? 'Salvando...' : 'Salvar política de cotações'}
                 </Button>
-                <Badge variant="outline" className="rounded-full px-3 py-2">
-                  Base para proxima onda de governanca
-                </Badge>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Aba 3: Departamentos */}
         <TabsContent value="departments" className="space-y-6">
-          <Card className="app-section-card">
-            <CardHeader>
-              <CardTitle className="text-xl">Overrides por departamento</CardTitle>
+          <Card className="app-section-card p-6">
+            <CardHeader className="p-0 mb-6">
+              <CardTitle className="text-lg">Exceções e regras por departamento</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Configure políticas personalizadas para áreas específicas ou mantenha a herança da empresa.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="field-stack">
-                <Label htmlFor="department-select">Departamento</Label>
+            <CardContent className="p-0 space-y-5">
+              <div className="field-stack max-w-lg">
+                <Label htmlFor="department-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Departamento a configurar
+                </Label>
                 {loading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-9 w-full rounded-md" />
                 ) : (
                   <Select value={selectedDepartmentId} onValueChange={setSelectedDepartmentId}>
-                    <SelectTrigger id="department-select">
+                    <SelectTrigger id="department-select" className="h-9 text-sm">
                       <SelectValue placeholder="Selecione o departamento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -380,21 +423,21 @@ export default function ProcurementSettingsPage() {
                     </SelectContent>
                   </Select>
                 )}
-                {selectedDepartment ? (
-                  <p className="text-sm leading-6 text-muted-foreground">
+                {selectedDepartment && (
+                  <p className="text-xs text-muted-foreground">
                     Filial: {selectedDepartment.branchName}
                     {selectedDepartment.headManagerName
-                      ? ` · Gestor atual: ${selectedDepartment.headManagerName}`
+                      ? ` · Gestor: ${selectedDepartment.headManagerName}`
                       : ''}
                   </p>
-                ) : null}
+                )}
               </div>
 
-              <div className="flex items-start justify-between rounded-[20px] border border-border/70 bg-muted/35 p-4">
-                <div className="space-y-1">
-                  <p className="font-medium">Herdar configuracao da empresa</p>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Quando ativo, este departamento usa exatamente a governanca global da empresa.
+              <div className="flex items-start justify-between rounded-lg border bg-muted/20 p-4 max-w-xl">
+                <div className="space-y-1 pr-4">
+                  <p className="text-sm font-semibold text-foreground">Herdar governança global da empresa</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Quando ativo, o departamento segue automaticamente as configurações gerais da empresa.
                   </p>
                 </div>
                 <Switch
@@ -404,10 +447,12 @@ export default function ProcurementSettingsPage() {
                 />
               </div>
 
-              <div className={departmentInheritFromCompany ? 'pointer-events-none opacity-60' : ''}>
-                <div className="grid gap-6 lg:grid-cols-2">
+              <div className={departmentInheritFromCompany ? 'pointer-events-none opacity-50 space-y-4' : 'space-y-4'}>
+                <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
                   <div className="field-stack">
-                    <Label htmlFor="department-approval-mode">Modo base</Label>
+                    <Label htmlFor="department-approval-mode" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Modo de aprovação local
+                    </Label>
                     <Select
                       value={departmentApprovalMode}
                       onValueChange={(value) =>
@@ -417,28 +462,30 @@ export default function ProcurementSettingsPage() {
                       }
                       disabled={loading || departmentInheritFromCompany}
                     >
-                      <SelectTrigger id="department-approval-mode">
-                        <SelectValue placeholder="Selecione o modo de aprovacao" />
+                      <SelectTrigger id="department-approval-mode" className="h-9 text-sm">
+                        <SelectValue placeholder="Selecione o modo de aprovação" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="department-manager">Gestor do departamento</SelectItem>
                         <SelectItem value="delegated-approver">Aprovador delegado</SelectItem>
                         <SelectItem value="manager-with-hierarchy">
-                          Gestor com escalonamento hierarquico
+                          Gestor com escalonamento
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {departmentApprovalMode === 'delegated-approver' ? (
+                  {departmentApprovalMode === 'delegated-approver' && (
                     <div className="field-stack">
-                      <Label htmlFor="department-delegated-approver">Aprovador delegado</Label>
+                      <Label htmlFor="department-delegated-approver" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Aprovador delegado
+                      </Label>
                       <Select
                         value={departmentDelegatedApproverId}
                         onValueChange={setDepartmentDelegatedApproverId}
                         disabled={loading || departmentInheritFromCompany}
                       >
-                        <SelectTrigger id="department-delegated-approver">
+                        <SelectTrigger id="department-delegated-approver" className="h-9 text-sm">
                           <SelectValue placeholder="Selecione um aprovador" />
                         </SelectTrigger>
                         <SelectContent>
@@ -452,10 +499,12 @@ export default function ProcurementSettingsPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                  ) : null}
+                  )}
 
                   <div className="field-stack">
-                    <Label htmlFor="department-threshold">Escalonar acima de</Label>
+                    <Label htmlFor="department-threshold" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Escalonar acima de (R$)
+                    </Label>
                     <Input
                       id="department-threshold"
                       type="number"
@@ -464,12 +513,13 @@ export default function ProcurementSettingsPage() {
                       value={departmentHierarchyThreshold}
                       onChange={(event) => setDepartmentHierarchyThreshold(event.target.value)}
                       disabled={loading || departmentInheritFromCompany}
+                      className="h-9 text-sm"
                     />
                   </div>
 
                   <div className="field-stack">
-                    <Label htmlFor="department-minimum-quotations">
-                      Quantidade minima de cotacoes
+                    <Label htmlFor="department-minimum-quotations" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Mínimo de cotações
                     </Label>
                     <Input
                       id="department-minimum-quotations"
@@ -481,15 +531,16 @@ export default function ProcurementSettingsPage() {
                         setDepartmentMinimumQuotationCount(event.target.value)
                       }
                       disabled={loading || departmentInheritFromCompany}
+                      className="h-9 text-sm"
                     />
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-start justify-between rounded-[20px] border border-border/70 bg-muted/35 p-4">
-                  <div className="space-y-1">
-                    <p className="font-medium">Excecao para urgencia</p>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      Mantem um parametro proprio do departamento para a proxima camada de enforcement.
+                <div className="flex items-start justify-between rounded-lg border bg-muted/20 p-4 max-w-xl">
+                  <div className="space-y-1 pr-4">
+                    <p className="text-sm font-semibold text-foreground">Dispensar em caso de urgência</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Permite exceção de cotação única no departamento para urgências.
                     </p>
                   </div>
                   <Switch
@@ -500,18 +551,20 @@ export default function ProcurementSettingsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-3 pt-3 border-t">
                 <Button
+                  size="sm"
                   onClick={handleDepartmentSave}
                   disabled={loading || departmentSaving || !selectedDepartment}
+                  className="font-semibold"
                 >
-                  {departmentSaving ? 'Salvando...' : 'Salvar configuracoes do departamento'}
+                  {departmentSaving ? 'Salvando...' : 'Salvar configurações do departamento'}
                 </Button>
-                <Badge variant="outline" className="rounded-full px-3 py-2">
+                <span className="text-xs text-muted-foreground">
                   {departmentInheritFromCompany
-                    ? 'Herdando da empresa'
-                    : 'Override local ativo'}
-                </Badge>
+                    ? 'Departamento herdando da empresa'
+                    : 'Regras personalizadas ativas'}
+                </span>
               </div>
             </CardContent>
           </Card>

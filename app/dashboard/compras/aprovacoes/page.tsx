@@ -2,24 +2,47 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Loader2, MessageSquareWarning, Search, XCircle } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileCheck,
+  Loader2,
+  RotateCw,
+  Search,
+  XCircle,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { TablePagination } from '@/components/ui/table-pagination'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Label } from '@/components/ui/label'
+import { FilterPopover } from '@/components/ui/filter-popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -44,12 +67,19 @@ type PurchaseRequest = {
 export default function ApprovalsPage() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState('ALL')
+
+  // Modais de Ação
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+
+  // Paginação
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const pageSize = 10
 
   const [approveConfirm, setApproveConfirm] = useState<{
     open: boolean
@@ -74,7 +104,7 @@ export default function ApprovalsPage() {
   }
 
   useEffect(() => {
-    fetchPending()
+    void fetchPending()
   }, [])
 
   const executeApprove = async () => {
@@ -92,11 +122,11 @@ export default function ApprovalsPage() {
 
   const handleReject = async () => {
     if (!rejectId || !reason.trim()) {
+      toast.error('Informe o motivo da reprovação.')
       return
     }
 
     setActionLoading(true)
-
     try {
       await api.patch(`/purchase-requests/${rejectId}/reject`, {
         reason: reason.trim(),
@@ -112,204 +142,424 @@ export default function ApprovalsPage() {
     }
   }
 
+  const departmentOptions = useMemo(() => {
+    const depts = new Set<string>()
+    requests.forEach((r) => {
+      if (r.department?.name) depts.add(r.department.name)
+    })
+    return Array.from(depts)
+  }, [requests])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (searchTerm.trim()) count++
+    if (departmentFilter !== 'ALL') count++
+    return count
+  }, [searchTerm, departmentFilter])
+
+  function handleClearFilters() {
+    setSearchTerm('')
+    setDepartmentFilter('ALL')
+    setPage(1)
+  }
+
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
-      const haystack = [
-        request.justification,
-        request.requester.user.name,
-        request.department?.name ?? '',
-        String(request.code),
-      ]
-        .join(' ')
-        .toLowerCase()
+      if (searchTerm.trim()) {
+        const haystack = [
+          request.justification,
+          request.requester.user.name,
+          request.department?.name ?? '',
+          String(request.code),
+        ]
+          .join(' ')
+          .toLowerCase()
 
-      return haystack.includes(searchTerm.toLowerCase())
+        if (!haystack.includes(searchTerm.toLowerCase())) {
+          return false
+        }
+      }
+
+      if (departmentFilter !== 'ALL' && request.department?.name !== departmentFilter) {
+        return false
+      }
+
+      return true
     })
-  }, [requests, searchTerm])
+  }, [requests, searchTerm, departmentFilter])
+
+  const totalPages = Math.ceil(filteredRequests.length / pageSize) || 1
 
   const paginatedRequests = useMemo(() => {
     const start = (page - 1) * pageSize
     return filteredRequests.slice(start, start + pageSize)
   }, [filteredRequests, page, pageSize])
 
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(1)
+    }
+  }, [totalPages, page])
+
   const metrics = useMemo(() => {
     const totalEstimated = requests.reduce((total, request) => {
       return total + Number(request.estimatedTotal || 0)
     }, 0)
 
+    const deptsCount = new Set(requests.map((r) => r.department?.name).filter(Boolean)).size
+
     return {
       count: requests.length,
       totalEstimated,
+      deptsCount,
     }
   }, [requests])
 
   return (
-    <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-3">
-          <div className="app-badge-row">
-            <span className="app-badge">Módulo de Compras</span>
-            <span className="app-badge app-badge-warning">Fila de Decisão</span>
-          </div>
-          <div className="space-y-1">
-            <h1 className="page-title">Aprovações de compras</h1>
-            <p className="page-description">
-              Revise as solicitações do seu escopo, confirme a necessidade do pedido e libere o fluxo para a área de cotação.
-            </p>
-          </div>
+    <div className="app-page space-y-6">
+      {/* 1. Cabeçalho Padronizado */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Aprovações de Compras
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Revise solicitações da sua alçada, valide justificativas e decida sobre a aprovação.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Menu Flutuante de Filtro */}
+          <FilterPopover
+            activeCount={activeFilterCount}
+            onClear={handleClearFilters}
+            onApply={() => setPage(1)}
+          >
+            <div className="field-stack">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Palavra-chave
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  className="pl-9 h-9 text-sm"
+                  placeholder="Número, solicitante, justificativa..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setPage(1)
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {departmentOptions.length > 0 && (
+              <div className="field-stack">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Departamento
+                </span>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos os departamentos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os departamentos</SelectItem>
+                    {departmentOptions.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </FilterPopover>
+
+          {/* Atualização */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void fetchPending()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
         </div>
       </section>
 
-      <section className="app-kpi-grid">
-        <Card className="app-kpi-card">
-          <CardContent className="space-y-2 p-0">
-            <p className="kpi-label">Pendentes de aprovação</p>
-            <p className="kpi-value">{metrics.count}</p>
-            <p className="text-xs text-muted-foreground">pedidos aguardando sua análise</p>
+      {/* 2. Cards de Indicadores (KPIs em 4 colunas) */}
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Card 1: Pendentes */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Pendentes de aprovação
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {metrics.count}
+            </span>
+            {metrics.count > 0 && (
+              <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                Ação necessária
+              </span>
+            )}
           </CardContent>
         </Card>
-        <Card className="app-kpi-card">
-          <CardContent className="space-y-2 p-0">
-            <p className="kpi-label">Volume total estimado</p>
-            <p className="kpi-value">
+
+        {/* Card 2: Volume Total Estimado */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Volume estimado
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-2xl font-bold tracking-tight text-foreground">
               R${' '}
               {metrics.totalEstimated.toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
               })}
-            </p>
-            <p className="text-xs text-muted-foreground">soma das solicitações em fila</p>
+            </span>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Departamentos envolvidos */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Departamentos
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {metrics.deptsCount}
+            </span>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Status do Fluxo */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Próxima etapa
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
+            <span className="text-base font-semibold text-muted-foreground">
+              Cotação com compras
+            </span>
+            <FileCheck className="size-5 text-muted-foreground/60" />
           </CardContent>
         </Card>
       </section>
 
-      <Card className="app-section-card">
-        <CardContent className="space-y-4 p-0">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por solicitante, justificativa..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setPage(1)
-                }}
-              />
-            </div>
+      {/* 3. Tabela Responsiva Sem Scroll Horizontal */}
+      <Card className="app-section-card overflow-hidden">
+        {loading ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">
+            Carregando pedidos pendentes de aprovação...
           </div>
-
-          {loading ? (
-            <div className="flex min-h-[240px] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        ) : filteredRequests.length === 0 ? (
+          <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-8 text-center">
+            <FileCheck className="size-12 text-muted-foreground/50" />
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground">Nenhum pedido pendente</p>
+              <p className="text-sm text-muted-foreground">
+                {activeFilterCount > 0
+                  ? 'Nenhum resultado corresponde aos filtros aplicados.'
+                  : 'Todas as solicitações de compra da sua alçada já foram avaliadas.'}
+              </p>
             </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pedido / Solicitante</TableHead>
-                    <TableHead>Departamento</TableHead>
-                    <TableHead>Itens solicitados</TableHead>
-                    <TableHead>Estimativa</TableHead>
-                    <TableHead>Data de abertura</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedRequests.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                        Nenhum pedido pendente de aprovação.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedRequests.map((request) => (
-                      <TableRow key={request.id}>
-                        <TableCell className="align-top">
-                          <div className="space-y-1">
-                            <p className="font-medium text-foreground">Pedido #{request.code}</p>
-                            <p className="text-sm text-muted-foreground">{request.justification}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Por: {request.requester.user.name}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{request.department?.name || 'Não informado'}</TableCell>
-                        <TableCell className="align-top">
-                          <div className="space-y-1 text-sm text-foreground">
-                            {request.items.slice(0, 2).map((item, index) => (
-                              <p key={item.id ?? index} className="text-xs text-muted-foreground">
-                                • {Number(item.quantity)}x{' '}
-                                {item.product?.name || item.description || 'Item sem descrição'}
-                              </p>
-                            ))}
-                            {request.items.length > 2 ? (
-                              <p className="text-xs font-medium text-muted-foreground">
-                                +{request.items.length - 2} outro(s) item(ns)
-                              </p>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
+            {activeFilterCount > 0 && (
+              <Button variant="outline" size="sm" onClick={handleClearFilters} className="mt-2">
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wider">
+                    ID
+                  </TableHead>
+                  <TableHead className="min-w-[240px] text-xs font-semibold uppercase tracking-wider">
+                    Pedido / Justificativa
+                  </TableHead>
+                  <TableHead className="min-w-[180px] text-xs font-semibold uppercase tracking-wider">
+                    Solicitante / Depto
+                  </TableHead>
+                  <TableHead className="w-[160px] text-xs font-semibold uppercase tracking-wider">
+                    Estimativa / Itens
+                  </TableHead>
+                  <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider">
+                    Data
+                  </TableHead>
+                  <TableHead className="w-[200px] text-right text-xs font-semibold uppercase tracking-wider">
+                    Decisão
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedRequests.map((request) => (
+                  <TableRow key={request.id} className="transition-colors">
+                    {/* ID */}
+                    <TableCell className="font-semibold text-muted-foreground text-sm">
+                      #{request.code}
+                    </TableCell>
+
+                    {/* Pedido / Justificativa */}
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <Link
+                          href={`/dashboard/compras/pedidos/${request.id}`}
+                          className="font-semibold text-foreground text-sm hover:underline line-clamp-1"
+                        >
+                          {request.justification}
+                        </Link>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {request.items.map((i) => `${Number(i.quantity)}x ${i.product?.name || i.description || 'Item'}`).join(', ')}
+                        </p>
+                      </div>
+                    </TableCell>
+
+                    {/* Solicitante / Depto */}
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
+                          {request.requester.user.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {request.department?.name || 'Sem departamento'}
+                        </p>
+                      </div>
+                    </TableCell>
+
+                    {/* Estimativa / Itens */}
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
                           {request.estimatedTotal
                             ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
                               })}`
-                            : 'Não informado'}
-                        </TableCell>
-                        <TableCell>{format(new Date(request.createdAt), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button asChild variant="outline" size="sm">
-                              <Link href={`/dashboard/compras/pedidos/${request.id}`}>Detalhes</Link>
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="gap-2"
-                              onClick={() =>
-                                setApproveConfirm({
-                                  open: true,
-                                  requestId: request.id,
-                                  requestNumber: request.code,
-                                })
-                              }
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Aprovar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                              onClick={() => setRejectId(request.id)}
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Reprovar
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                            : 'Não informada'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {request.items.length} {request.items.length === 1 ? 'item' : 'itens'}
+                        </p>
+                      </div>
+                    </TableCell>
 
-              <TablePagination
-                page={page}
-                pageSize={pageSize}
-                totalItems={filteredRequests.length}
-                onPageChange={setPage}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize)
-                  setPage(1)
-                }}
-              />
-            </>
-          )}
-        </CardContent>
+                    {/* Data */}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {format(new Date(request.createdAt), 'dd/MM/yyyy')}
+                    </TableCell>
+
+                    {/* Decisão / Ações Compactas */}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Ver detalhes do pedido"
+                        >
+                          <Link href={`/dashboard/compras/pedidos/${request.id}`}>
+                            <Eye className="size-4" />
+                          </Link>
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          className="h-8 px-2.5 text-xs font-semibold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() =>
+                            setApproveConfirm({
+                              open: true,
+                              requestId: request.id,
+                              requestNumber: request.code,
+                            })
+                          }
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          <span>Aprovar</span>
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2.5 text-xs font-semibold gap-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                          onClick={() => {
+                            setRejectId(request.id)
+                            setReason('')
+                          }}
+                        >
+                          <XCircle className="size-3.5" />
+                          <span>Reprovar</span>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* 4. Rodapé com Paginação Integrada */}
+        {!loading && filteredRequests.length > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-t bg-muted/10 text-xs text-muted-foreground">
+            <div>
+              Exibindo <span className="font-semibold text-foreground">{paginatedRequests.length}</span> de{' '}
+              <span className="font-semibold text-foreground">{filteredRequests.length}</span> registros
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <Button
+                  key={pageNum}
+                  variant={pageNum === page ? 'default' : 'outline'}
+                  size="icon-sm"
+                  className={`size-8 font-medium ${pageNum === page ? 'pointer-events-none' : ''}`}
+                  onClick={() => setPage(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
+      {/* Modal Centralizado de Confirmação de Aprovação */}
       <ConfirmDialog
         open={approveConfirm.open}
         onOpenChange={(open) =>
@@ -321,37 +571,51 @@ export default function ApprovalsPage() {
         onConfirm={executeApprove}
       />
 
+      {/* Modal Centralizado de Reprovação com Justificativa */}
       <Dialog open={Boolean(rejectId)} onOpenChange={(open) => !open && setRejectId(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[460px]">
           <DialogHeader>
-            <DialogTitle>Reprovar pedido</DialogTitle>
-            <DialogDescription>
-              O motivo informado será registrado na trilha do pedido e compartilhado com o solicitante.
-            </DialogDescription>
+            <DialogTitle>Reprovar Pedido de Compra</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <div className="flex items-start gap-2">
-                <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>Use um motivo claro para facilitar o retrabalho do solicitante.</p>
-              </div>
+          <div className="space-y-4 pt-2">
+            <div className="field-stack">
+              <Label htmlFor="reject-reason" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Motivo da reprovação (obrigatório)
+              </Label>
+              <Textarea
+                id="reject-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Explique o motivo da não aprovação para que o solicitante possa ajustar ou arquivar..."
+                className="min-h-[110px] text-sm"
+              />
             </div>
-            <Textarea
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="Explique por que este pedido não pode seguir neste momento..."
-              className="min-h-[120px]"
-            />
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectId(null)}>
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRejectId(null)}
+              disabled={actionLoading}
+            >
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={actionLoading || !reason.trim()}>
-              {actionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Confirmar reprovação
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleReject}
+              disabled={actionLoading || !reason.trim()}
+            >
+              {actionLoading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Reprovando...
+                </>
+              ) : (
+                'Reprovar pedido'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

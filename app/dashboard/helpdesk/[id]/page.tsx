@@ -3,16 +3,32 @@
 import type { ChangeEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, Send, ShieldCheck, UserCheck } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Layers,
+  Lock,
+  MessageSquare,
+  Paperclip,
+  RotateCw,
+  Send,
+  ShieldAlert,
+  ShieldCheck,
+  Tag,
+  User,
+  UserCheck,
+  UserPlus,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -94,24 +110,65 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Baixa',
-  MEDIUM: 'Média',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
+  LOW: 'BAIXA',
+  MEDIUM: 'MÉDIA',
+  HIGH: 'ALTA',
+  CRITICAL: 'CRÍTICA',
 }
 
-function getStatusVariant(status: string) {
-  if (status === 'RESOLVED' || status === 'CLOSED') return 'success'
-  if (status === 'CANCELLED') return 'destructive'
-  if (status === 'WAITING_APPROVAL' || status === 'WAITING_USER' || status === 'WAITING_THIRD_PARTY') return 'secondary'
-  return 'default'
+function getInitials(name?: string | null) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function getStatusBadgeStyle(status: string) {
+  switch (status) {
+    case 'WAITING_ASSIGNMENT':
+    case 'NEW':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'IN_PROGRESS':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+    case 'WAITING_USER':
+    case 'WAITING_THIRD_PARTY':
+    case 'WAITING_APPROVAL':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'RESOLVED':
+    case 'CLOSED':
+      return 'bg-muted text-muted-foreground border-border'
+    default:
+      return 'bg-secondary text-secondary-foreground border-border'
+  }
+}
+
+function getPriorityBadgeStyle(priority: string) {
+  switch (priority) {
+    case 'CRITICAL':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'HIGH':
+      return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/60'
+    case 'MEDIUM':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'LOW':
+    default:
+      return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800'
+  }
 }
 
 export default function TicketDetailsPage() {
   const params = useParams<{ id: string | string[] }>()
   const id = params.id
-  if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id) || ['undefined', 'null'].includes(id)) {
-    return <div className="app-page" role="alert" aria-label="Erro do chamado">Identificador de chamado inválido.</div>
+  if (
+    typeof id !== 'string' ||
+    !/^[a-zA-Z0-9_-]{1,128}$/.test(id) ||
+    ['undefined', 'null'].includes(id)
+  ) {
+    return (
+      <div className="app-page" role="alert" aria-label="Erro do chamado">
+        Identificador de chamado inválido.
+      </div>
+    )
   }
   return <TicketDetailsContent key={id} ticketId={id} />
 }
@@ -125,6 +182,7 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
   const [newMessage, setNewMessage] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [attachment, setAttachment] = useState<File | null>(null)
+  const [uploadId, setUploadId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [acting, setActing] = useState(false)
   const [queueOptions, setQueueOptions] = useState<QueueOption[]>([])
@@ -143,111 +201,165 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
   const [actionError, setActionError] = useState('')
   const [reason, setReason] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
-  const [candidates, setCandidates] = useState<{ id: string; user: { name: string }; eligible: boolean }[]>([])
+  const [candidates, setCandidates] = useState<
+    { id: string; user: { name: string }; eligible: boolean }[]
+  >([])
   const [candidateCursor, setCandidateCursor] = useState<string | null>(null)
   const [messageId, setMessageId] = useState<string | null>(null)
-  const [uploadId, setUploadId] = useState<string | null>(null)
-  const canTransfer = can('transfer')
-  const canAssign = can('assign')
-  const assignmentQueueId = ticket?.queue?.id
-  const fetchTicket = useCallback(async (signal?: AbortSignal) => {
+
+  const fetchTicket = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const { data } = await api.get<TicketDetails>(`/helpdesk/tickets/${ticketId}`, { signal })
-      if (!signal?.aborted) setTicket(data)
+      const { data } = await api.get<TicketDetails>(`/helpdesk/tickets/${ticketId}`)
+      setTicket(data)
     } catch (error) {
-      if (signal?.aborted) return
-      const status = isAxiosError(error) ? error.response?.status : undefined
-      setLoadError(status === 404 ? 'Chamado não encontrado.' : status === 403
-        ? 'Você não tem permissão para acessar este chamado.'
-        : status === undefined ? 'Não foi possível conectar ao atendimento. Tente novamente.'
-        : getApiErrorMessage(error, 'Não foi possível carregar o chamado. Tente novamente.'))
+      setLoadError(getApiErrorMessage(error, 'Não foi possível carregar os detalhes do chamado.'))
     } finally {
-      if (!signal?.aborted) setLoading(false)
+      setLoading(false)
     }
   }, [ticketId])
 
   useEffect(() => {
-    const controller = new AbortController()
-    void fetchTicket(controller.signal)
-    return () => controller.abort()
+    void fetchTicket()
   }, [fetchTicket])
 
+  const assignmentQueueId = ticket?.queue?.id
   useEffect(() => {
-    const controller = new AbortController()
-    if (canTransfer) void api.get<QueueOption[]>(`/helpdesk/tickets/${ticketId}/transfer-targets`, { signal: controller.signal })
-      .then(({ data }) => setQueueOptions(data)).catch(() => {})
-    if (canTransfer) void api.get<ActionReasons>('/helpdesk/action-reasons', { signal: controller.signal })
-      .then(({ data }) => setActionReasons(data)).catch(() => {})
-    if (canAssign && assignmentQueueId) void api.get(`/helpdesk/queues/${assignmentQueueId}/candidates`, { params: { purpose: 'ASSIGNEE' }, signal: controller.signal })
-      .then(({ data }) => { setCandidates(data.items); setCandidateCursor(data.nextCursor) }).catch(() => {})
-    return () => controller.abort()
-  }, [canTransfer, canAssign, assignmentQueueId, ticketId])
+    if (!assignmentQueueId) return
+    api
+      .get(`/helpdesk/queues/${assignmentQueueId}/candidates`, {
+        params: { purpose: 'ASSIGNEE' },
+      })
+      .then(({ data }) => {
+        setCandidates(data.items)
+        setCandidateCursor(data.nextCursor)
+      })
+      .catch((e) =>
+        setActionError(getApiErrorMessage(e, 'Não foi possível carregar candidatos da fila.')),
+      )
+  }, [assignmentQueueId])
 
-  async function reportFailure(error: unknown) {
-    const status = isAxiosError(error) ? error.response?.status : undefined
-    setActionError(status === 409 ? 'O chamado foi atualizado. Dados recarregados; seu rascunho foi preservado.' : getApiErrorMessage(error, 'Não foi possível executar a ação.'))
-    if (status === 409 || status === 403) await fetchTicket()
-  }
+  useEffect(() => {
+    if (!can('transfer') && !can('close')) return
+
+    async function loadAux() {
+      try {
+        const [queuesRes, reasonsRes] = await Promise.all([
+          api.get<QueueOption[]>('/helpdesk/queues'),
+          api.get<ActionReasons>('/helpdesk/settings/action-reasons'),
+        ])
+        setQueueOptions(queuesRes.data)
+        setActionReasons(reasonsRes.data)
+      } catch (error) {
+        toast.error(
+          getApiErrorMessage(error, 'Não foi possível carregar opções de transferência/fechamento.'),
+        )
+      }
+    }
+
+    void loadAux()
+  }, [ticket?.allowedActions])
 
   async function handleSendMessage() {
-    if (lock.current || !newMessage.trim() || ticket?.id !== ticketId || loadError) return
-    lock.current = true; setSending(true); setActionError('')
-    let savedMessage = messageId
+    if (lock.current || (!newMessage.trim() && !messageId)) return
+    lock.current = true
+    setSending(true)
+    setActionError('')
+    let sentMessageId = messageId
     try {
-      if (!savedMessage) {
+      if (!sentMessageId) {
         const { data } = await api.post(`/helpdesk/tickets/${ticketId}/messages`, {
-          content: newMessage, internal: can('internalNote') && (internalNote || !can('reply')), expectedVersion: ticket.version,
+          content: newMessage,
+          internal: internalNote,
+          expectedVersion: ticket?.version,
         })
-        savedMessage = data.id; setMessageId(savedMessage)
+        sentMessageId = data.id
+        setMessageId(sentMessageId)
       }
       if (attachment) {
-        const uploaded = uploadId ?? await uploadHelpdeskFile(attachment)
-        setUploadId(uploaded)
-        await api.post(`/helpdesk/tickets/${ticketId}/attachments`, { uploadId: uploaded, messageId: savedMessage })
+        const currentUploadId = uploadId ?? (await uploadHelpdeskFile(attachment))
+        setUploadId(currentUploadId)
+        await api.post(`/helpdesk/tickets/${ticketId}/messages/${sentMessageId}/attachments`, {
+          uploadId: currentUploadId,
+        })
       }
-      setNewMessage(''); setInternalNote(false); setAttachment(null); setMessageId(null); setUploadId(null)
-      toast.success('Mensagem enviada.'); await fetchTicket()
+      setNewMessage('')
+      setAttachment(null)
+      setUploadId(null)
+      setMessageId(null)
+      setInternalNote(false)
+      toast.success('Mensagem enviada.')
+      await fetchTicket()
     } catch (error) {
-      await reportFailure(error)
-      if (savedMessage) setActionError('Mensagem enviada; o anexo falhou. Tente novamente para enviar somente o anexo.')
-    } finally { lock.current = false; setSending(false) }
+      setActionError(
+        sentMessageId
+          ? 'Mensagem salva; o anexo falhou. Tente reenviar o anexo ou continue a conversa.'
+          : getApiErrorMessage(error, 'Não foi possível enviar a mensagem.'),
+      )
+    } finally {
+      lock.current = false
+      setSending(false)
+    }
   }
 
-  async function runAction(endpoint: string, successMessage: string, payload?: Record<string, unknown>) {
-    if (lock.current || ticket?.id !== ticketId || loadError) return false
-    lock.current = true; setActing(true); setActionError('')
+  async function runAction(
+    endpoint: string,
+    successMessage: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    if (lock.current) return
+    lock.current = true
+    setActing(true)
+    setActionError('')
     try {
-      await api.post(endpoint, { ...payload, expectedVersion: ticket.version })
+      await api.post(endpoint, {
+        expectedVersion: ticket?.version,
+        ...payload,
+      })
       toast.success(successMessage)
-      if (endpoint.endsWith('/transfer')) router.push('/dashboard/helpdesk/queue')
-      else await fetchTicket()
       setReason('')
+      await fetchTicket()
       return true
-    } catch (error) { await reportFailure(error); return false }
-    finally { lock.current = false; setActing(false) }
+    } catch (error) {
+      setActionError(
+        isAxiosError(error) && error.response?.status === 409
+          ? 'Chamado atualizado por outro usuário. Os dados foram recarregados.'
+          : getApiErrorMessage(error, 'Não foi possível concluir a ação.'),
+      )
+      if (isAxiosError(error) && error.response?.status === 409) {
+        await fetchTicket()
+      }
+      return false
+    } finally {
+      lock.current = false
+      setActing(false)
+    }
   }
 
   async function handleReject() {
-    const reason = window.prompt('Informe o motivo da reprovação deste chamado:')
-    if (!reason?.trim()) return
-    await runAction(`/helpdesk/tickets/${ticketId}/reject`, 'Chamado reprovado.', {
-      reason,
-    })
+    if (!reason.trim()) {
+      toast.error('Informe o motivo da reprovação.')
+      return
+    }
+    await runAction(`/helpdesk/tickets/${ticketId}/reject`, 'Chamado reprovado.', { reason })
   }
 
   async function handleTransfer() {
     if (transferQueueId === 'none') {
-      toast.error('Selecione a fila de destino para transferir o chamado.')
+      toast.error('Selecione a fila de destino.')
       return
     }
 
-    const transferred = await runAction(`/helpdesk/tickets/${ticketId}/transfer`, 'Chamado transferido.', {
-      toQueueId: transferQueueId,
-      transferReasonId: transferReasonId !== 'none' ? transferReasonId : undefined,
-      reason: transferNote.trim() || undefined,
-    })
+    const transferred = await runAction(
+      `/helpdesk/tickets/${ticketId}/transfer`,
+      'Chamado transferido.',
+      {
+        targetQueueId: transferQueueId,
+        transferReasonId: transferReasonId !== 'none' ? transferReasonId : undefined,
+        note: transferNote.trim() || undefined,
+      },
+    )
 
     if (!transferred) return
     setTransferQueueId('none')
@@ -256,189 +368,407 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
   }
 
   if (loading) {
-    return <div className="app-page text-sm text-muted-foreground">Carregando chamado...</div>
+    return (
+      <div className="app-page flex min-h-[300px] flex-col items-center justify-center gap-3">
+        <RotateCw className="size-6 animate-spin text-primary" />
+        <span className="text-sm text-muted-foreground">Carregando detalhes do chamado...</span>
+      </div>
+    )
   }
 
   if (loadError || !ticket) {
-    return <div className="app-page space-y-4">
-      <p role="alert" aria-label="Erro do chamado">{loadError || 'Chamado não encontrado.'}</p>
-      <Button onClick={() => void fetchTicket()}>Tentar novamente</Button>
-      <Button variant="outline" onClick={() => router.push('/dashboard/helpdesk')}>Voltar para chamados</Button>
-    </div>
+    return (
+      <div className="app-page space-y-4">
+        <Card className="app-section-card p-6">
+          <p role="alert" className="text-sm text-destructive font-medium">
+            {loadError || 'Chamado não encontrado.'}
+          </p>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={() => void fetchTicket()}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => router.push('/dashboard/helpdesk')}>
+              Voltar para chamados
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="app-page">
-      <section className="app-page-header">
-        <Button variant="ghost" className="w-fit" onClick={() => router.push('/dashboard/helpdesk')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar para chamados
-        </Button>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className="app-kicker">Chamado #{ticket.code}</div>
-            <h1 className="app-title">{ticket.subject}</h1>
-            <p className="app-subtitle">
+    <div className="app-page space-y-6">
+      {/* Page Header TocLog */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground gap-1.5 font-medium"
+            onClick={() => router.push('/dashboard/helpdesk')}
+          >
+            <ArrowLeft className="size-4" />
+            <span>Voltar para chamados</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => void fetchTicket()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between border-b pb-5">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-bold text-muted-foreground">
+                #{ticket.code}
+              </span>
+              <span className="text-xs text-muted-foreground">•</span>
+              <span
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wider ${getPriorityBadgeStyle(
+                  ticket.priority,
+                )}`}
+              >
+                {PRIORITY_LABELS[ticket.priority] || ticket.priority}
+              </span>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {ticket.subject}
+            </h1>
+
+            <p className="text-xs text-muted-foreground">
               Aberto em {new Date(ticket.createdAt).toLocaleString('pt-BR')} por{' '}
-              {isRequester ? 'você' : ticket.requester?.user?.name || 'solicitante'}
+              <strong className="text-foreground font-semibold">
+                {isRequester ? 'você' : ticket.requester?.user?.name || 'solicitante'}
+              </strong>
             </p>
           </div>
-          <Badge variant={getStatusVariant(ticket.status)}>
-            {STATUS_LABELS[ticket.status] || ticket.status}
-          </Badge>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className={`inline-flex items-center rounded-md border px-3 py-1 text-xs font-semibold ${getStatusBadgeStyle(
+                ticket.status,
+              )}`}
+            >
+              {STATUS_LABELS[ticket.status] || ticket.status}
+            </span>
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="space-y-6">
-          <div className="app-section-card space-y-3">
-            <h2 className="section-title">Descrição</h2>
-            <p className="rounded-2xl bg-muted/30 p-4 text-sm leading-6 text-foreground">
-              {ticket.description}
+      {/* Grid de 4 Cards de Resumo Operacional do Chamado */}
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Card 1: Fila */}
+        <Card className="app-section-card p-4 shadow-2xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Fila de Atendimento
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-1.5">
+            <div className="flex items-center gap-1.5 text-base font-bold text-foreground truncate">
+              <span className="size-2 rounded-full bg-primary shrink-0" />
+              <span className="truncate">{ticket.queue?.name || 'Sem fila atribuída'}</span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate pt-0.5">
+              {ticket.serviceCatalogItem?.name || 'Fluxo direto'}
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="app-section-card space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="space-y-1">
-                <h2 className="section-title">Conversa do chamado</h2>
-                <p className="text-sm text-muted-foreground">
-                  Responda no próprio chamado para manter o histórico centralizado.
+        {/* Card 2: Responsável */}
+        <Card className="app-section-card p-4 shadow-2xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Responsável
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-1.5 flex items-center gap-2">
+            {ticket.assignee?.user?.name ? (
+              <>
+                <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                  {getInitials(ticket.assignee.user.name)}
+                </span>
+                <span className="text-sm font-bold text-foreground truncate">
+                  {ticket.assignee.user.name}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs italic text-amber-700 dark:text-amber-400 font-medium">
+                Sem responsável atribuído
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card 3: SLA de Resolução */}
+        <Card className="app-section-card p-4 shadow-2xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              SLA de Resolução
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-1.5 text-sm font-semibold">
+            {ticket.sla ? (
+              <SlaStatus sla={ticket.sla} />
+            ) : ticket.resolutionDueDate || ticket.slaDueDate ? (
+              <span className="text-xs text-foreground">
+                {new Date(
+                  ticket.resolutionDueDate || ticket.slaDueDate || '',
+                ).toLocaleString('pt-BR')}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Sem SLA configurado</span>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Categoria Operacional */}
+        <Card className="app-section-card p-4 shadow-2xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Categoria
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-1.5">
+            <span className="text-sm font-bold text-foreground truncate">
+              {ticket.category?.name || 'Geral'}
+            </span>
+            <p className="text-xs text-muted-foreground">Classificação do fluxo</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Grid Principal: Esquerda Conversa & Descrição | Direita Detalhes & Ações */}
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr] items-start">
+        {/* Coluna da Esquerda: Descrição & Conversa */}
+        <section className="space-y-6">
+          {/* Card Descrição */}
+          <Card className="app-section-card p-5 shadow-xs">
+            <div className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Descrição do Solicitante
+              </span>
+              <p className="rounded-lg bg-muted/20 border border-border/60 p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                {ticket.description}
+              </p>
+            </div>
+          </Card>
+
+          {/* Histórico / Conversa do Chamado */}
+          <Card className="app-section-card p-5 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="size-4 text-primary" />
+                  <h2 className="text-base font-bold text-foreground">
+                    Linha do Tempo e Mensagens
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Histórico centralizado de respostas, esclarecimentos e notas internas.
                 </p>
               </div>
+              <span className="text-xs text-muted-foreground">
+                {ticket.messages?.length || 0} mensagem(ns)
+              </span>
             </div>
 
+            {/* Lista de Mensagens */}
             <div className="space-y-3">
-              {ticket.messages?.map((message) => {
-                const isMine = message.author?.id === user?.employeeId
-                return (
-                  <Card
-                    key={message.id}
-                    className={isMine ? 'border-primary/20 bg-primary/5' : ''}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          {isMine ? 'Você' : message.author?.user?.name || 'Atendimento'}
-                          {message.internal ? (
-                            <Badge variant="outline" className="ml-2">
-                              Nota interna
-                            </Badge>
-                          ) : null}
-                        </span>
-                        <span>
+              {ticket.messages?.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">
+                  Nenhuma mensagem registrada ainda. Seja o primeiro a responder abaixo.
+                </div>
+              ) : (
+                ticket.messages?.map((message) => {
+                  const isMine = message.author?.id === user?.employeeId
+                  return (
+                    <div
+                      key={message.id}
+                      className={`rounded-lg border p-4 transition-all ${
+                        message.internal
+                          ? 'border-amber-300/60 bg-amber-500/5 dark:border-amber-900/60'
+                          : isMine
+                          ? 'border-primary/20 bg-primary/5'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 text-xs pb-2 border-b border-border/50">
+                        <div className="flex items-center gap-2">
+                          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                            {getInitials(message.author?.user?.name || (isMine ? 'Você' : 'Atendimento'))}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            {isMine ? 'Você' : message.author?.user?.name || 'Atendimento'}
+                          </span>
+                          {message.internal && (
+                            <span className="rounded-md bg-amber-500/10 px-1.5 py-0.2 text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-amber-300/40">
+                              Nota Interna
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
                           {new Date(message.createdAt).toLocaleString('pt-BR')}
                         </span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm leading-6">
-                      {message.content}
+
+                      <div className="pt-2 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+
                       {message.attachments?.length ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-border/40">
                           {message.attachments.map((attachmentItem) => (
-                            <AttachmentDownload key={attachmentItem.id} id={attachmentItem.id} name={attachmentItem.name} />
+                            <AttachmentDownload
+                              key={attachmentItem.id}
+                              id={attachmentItem.id}
+                              name={attachmentItem.name}
+                            />
                           ))}
                         </div>
                       ) : null}
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                    </div>
+                  )
+                })
+              )}
             </div>
 
-            {(can('reply') || can('internalNote')) && <Card>
-              <CardContent className="space-y-4 pt-6">
-                {actionError && <p role="alert">{actionError}</p>}
-                <Textarea
-                  className="min-h-[130px]"
-                  placeholder="Digite uma atualização, dúvida ou resposta para o atendimento..."
-                  disabled={!!messageId}
-                  value={newMessage}
-                  onChange={(event) => setNewMessage(event.target.value)}
-                />
-                {can('internalNote') ? (
-                  <label className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm">
-                    <input
-                      type="checkbox"
-                      disabled={!!messageId || !can('reply')}
-                      checked={internalNote || !can('reply')}
-                      onChange={(event) => setInternalNote(event.target.checked)}
-                    />
-                    Registrar como nota interna visível apenas para a operação
-                  </label>
-                ) : null}
-                {can('attach') && <div className="field-stack">
-                  <Label htmlFor="message-attachment">Anexo opcional</Label>
-                  <Input
-                    id="message-attachment"
-                    type="file"
-                    accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx"
-                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                      { setAttachment(event.target.files?.[0] || null); setUploadId(null) }
-                    }
+            {/* Caixa de Nova Resposta */}
+            {(can('reply') || can('internalNote')) && (
+              <div className="rounded-lg border border-border bg-muted/10 p-4 space-y-3 mt-4">
+                {actionError && (
+                  <div role="alert" className="p-3 rounded-md bg-destructive/10 text-destructive text-xs">
+                    {actionError}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Textarea
+                    className="min-h-[110px] text-sm bg-background"
+                    placeholder="Escreva sua resposta ou atualização operacional..."
+                    disabled={!!messageId || sending}
+                    value={newMessage}
+                    onChange={(event) => setNewMessage(event.target.value)}
                   />
-                </div>}
-                <div className="flex justify-end">
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+                  <div className="flex items-center gap-3">
+                    {can('internalNote') && (
+                      <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="rounded border-border"
+                          disabled={!!messageId || !can('reply') || sending}
+                          checked={internalNote || !can('reply')}
+                          onChange={(event) => setInternalNote(event.target.checked)}
+                        />
+                        <span className="font-medium">Registrar como nota interna</span>
+                      </label>
+                    )}
+
+                    {can('attach') && (
+                      <div>
+                        <input
+                          id="message-attachment"
+                          type="file"
+                          className="hidden"
+                          accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx"
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                            setAttachment(event.target.files?.[0] || null)
+                            setUploadId(null)
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => document.getElementById('message-attachment')?.click()}
+                          disabled={sending}
+                        >
+                          <Paperclip className="size-3.5" />
+                          <span>{attachment ? attachment.name : 'Anexar arquivo'}</span>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   <Button
+                    size="sm"
+                    className="h-8 px-3 text-xs gap-1.5 font-semibold"
                     onClick={handleSendMessage}
                     disabled={sending || !newMessage.trim()}
                   >
-                    <Send className="mr-2 h-4 w-4" />
-                    {sending ? 'Enviando...' : messageId ? 'Reenviar anexo' : 'Responder'}
+                    <Send className="size-3.5" />
+                    <span>{sending ? 'Enviando...' : messageId ? 'Reenviar anexo' : 'Enviar resposta'}</span>
                   </Button>
                 </div>
-              </CardContent>
-            </Card>}
-          </div>
+              </div>
+            )}
+          </Card>
         </section>
 
+        {/* Coluna da Direita: Atributos & Ações Operacionais */}
         <aside className="space-y-6">
-          <div className="app-section-card space-y-4">
-            <div className="space-y-1">
-              <h2 className="section-title">Detalhes</h2>
-              <p className="text-sm text-muted-foreground">
-                Fila, serviço, prioridade e marcos principais do atendimento.
+          {/* Card Detalhes Operacionais */}
+          <Card className="app-section-card p-5 shadow-xs space-y-4">
+            <div className="space-y-0.5 border-b pb-2">
+              <h2 className="text-base font-bold text-foreground">Metadados do Chamado</h2>
+              <p className="text-xs text-muted-foreground">
+                Informações de auditoria e parametrização.
               </p>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div>
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Serviço</span>
-                <div className="font-medium">
-                  {ticket.serviceCatalogItem?.name || 'Fluxo legado por categoria'}
-                </div>
+                <span className="font-semibold text-foreground text-right">
+                  {ticket.serviceCatalogItem?.name || 'Fluxo direto por categoria'}
+                </span>
               </div>
-              <div>
+
+              <div className="flex items-center justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Categoria</span>
-                <div className="font-medium">{ticket.category?.name || 'Não informada'}</div>
+                <span className="font-medium text-foreground text-right">
+                  {ticket.category?.name || 'Não informada'}
+                </span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Fila</span>
-                <div className="font-medium">{ticket.queue?.name || 'Sem fila'}</div>
+
+              <div className="flex items-center justify-between py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Fila Atual</span>
+                <span className="font-medium text-foreground text-right">
+                  {ticket.queue?.name || 'Sem fila'}
+                </span>
               </div>
-              <div>
+
+              <div className="flex items-center justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Prioridade</span>
-                <div className="font-medium">
+                <span
+                  className={`inline-flex items-center rounded-full border px-2 py-0.2 text-[10px] font-bold ${getPriorityBadgeStyle(
+                    ticket.priority,
+                  )}`}
+                >
                   {PRIORITY_LABELS[ticket.priority] || ticket.priority}
-                </div>
+                </span>
               </div>
-              <div>
+
+              <div className="flex items-center justify-between py-1 border-b border-border/40">
                 <span className="text-muted-foreground">Responsável</span>
-                <div className="font-medium">
+                <span className="font-medium text-foreground text-right">
                   {ticket.assignee?.user?.name || 'Não atribuído'}
-                </div>
+                </span>
               </div>
-              <div>
-                <span className="text-muted-foreground">SLA de resolução</span>
-                <div className="font-medium">
-                  {ticket.sla ? <SlaStatus sla={ticket.sla} /> : ticket.resolutionDueDate || ticket.slaDueDate
-                    ? new Date(ticket.resolutionDueDate || ticket.slaDueDate || '').toLocaleString('pt-BR')
-                    : 'Não calculado'}
-                </div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Anexos do chamado</span>
-                <div className="mt-2 flex flex-wrap gap-2">
+
+              <div className="py-1">
+                <span className="text-muted-foreground block pb-1.5">Anexos diretos</span>
+                <div className="flex flex-wrap gap-1.5">
                   {ticket.attachments?.filter((item) => !item.messageId).length ? (
                     ticket.attachments
                       ?.filter((item) => !item.messageId)
@@ -446,81 +776,132 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
                         <AttachmentDownload key={item.id} id={item.id} name={item.name} />
                       ))
                   ) : (
-                    <span className="font-medium">Sem anexos diretos</span>
+                    <span className="text-muted-foreground italic">Sem anexos de abertura</span>
                   )}
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="app-section-card space-y-3">
-            <div className="space-y-1">
-              <h2 className="section-title">Ações rápidas</h2>
-              <p className="text-sm text-muted-foreground">
-                Ações disponíveis conforme o estado atual e o seu papel no atendimento.
+          {/* Card Ações Rápidas */}
+          <Card className="app-section-card p-5 shadow-xs space-y-4">
+            <div className="space-y-0.5 border-b pb-2">
+              <h2 className="text-base font-bold text-foreground">Ações Operacionais</h2>
+              <p className="text-xs text-muted-foreground">
+                Controles disponíveis conforme seu perfil e o estado do chamado.
               </p>
             </div>
 
-            {actionError && <p role="alert">{actionError}</p>}
+            {actionError && (
+              <p role="alert" className="text-xs text-destructive font-medium">
+                {actionError}
+              </p>
+            )}
+
             <div className="flex flex-col gap-3">
-              {['resolve', 'reopen', 'cancel', 'waitUser', 'waitThirdParty', 'assign'].some(can) && <div className="field-stack">
-                <Label htmlFor="action-reason">Motivo ou resumo público</Label>
-                <Textarea id="action-reason" value={reason} onChange={e => setReason(e.target.value)} />
-              </div>}
-              {can('assign') && <div className="space-y-2">
-                <Label htmlFor="assign-employee">Responsável elegível</Label>
-                <select id="assign-employee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
-                  <option value="">Selecione</option>
-                  {candidates.filter(c => c.eligible).map(c => <option value={c.id} key={c.id}>{c.user.name}</option>)}
-                </select>
-                {candidateCursor && <Button disabled={acting} variant="outline" onClick={async () => {
-                  try { const { data } = await api.get(`/helpdesk/queues/${assignmentQueueId}/candidates`, { params: { purpose: 'ASSIGNEE', cursor: candidateCursor } }); setCandidates(current => [...current, ...data.items]); setCandidateCursor(data.nextCursor) }
-                  catch (e) { setActionError(getApiErrorMessage(e, 'Não foi possível carregar candidatos.')) }
-                }}>Mais responsáveis</Button>}
-                <Button disabled={acting || !assigneeId || (!!ticket.assignee && !reason.trim())} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/assign`, 'Responsável atualizado.', { assigneeId, reason: reason.trim() || undefined })}>Atribuir responsável</Button>
-              </div>}
-              {(['waitUser', 'waitThirdParty'] as const).filter(can).map(action => <Button key={action} disabled={acting || !reason.trim()} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/wait`, 'Espera registrada.', { target: action === 'waitUser' ? 'WAITING_USER' : 'WAITING_THIRD_PARTY', reason })}>{action === 'waitUser' ? 'Aguardar usuário' : 'Aguardar terceiro'}</Button>)}
-              {can('resume') && <Button disabled={acting} onClick={() => runAction(`/helpdesk/tickets/${ticketId}/resume`, 'Atendimento retomado.')}>Retomar atendimento</Button>}
-              {can('cancel') && <Button disabled={acting || !reason.trim()} variant="outline" onClick={() => runAction(`/helpdesk/tickets/${ticketId}/cancel`, 'Cancelamento registrado; consulte o estado e as aprovações.', { reason })}>Solicitar cancelamento</Button>}
-              {can('pickup') ? (
+              {/* Campo unificado de motivo / justificativa */}
+              {['resolve', 'reopen', 'cancel', 'waitUser', 'waitThirdParty', 'assign'].some(can) && (
+                <div className="field-stack">
+                  <Label htmlFor="action-reason" className="text-xs font-semibold">
+                    Motivo ou Justificativa da Ação
+                  </Label>
+                  <Textarea
+                    id="action-reason"
+                    rows={2}
+                    className="text-xs"
+                    placeholder="Necessário para resolver, aguardar, cancelar ou reabrir..."
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Atribuição de Responsável */}
+              {can('assign') && (
+                <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <span className="text-xs font-semibold text-foreground">Atribuir Responsável</span>
+                  <Select value={assigneeId} onValueChange={setAssigneeId}>
+                    <SelectTrigger id="assign-employee" className="h-9 text-xs">
+                      <SelectValue placeholder="Selecione um operador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {candidates
+                        .filter((c) => c.eligible)
+                        .map((c) => (
+                          <SelectItem value={c.id} key={c.id}>
+                            {c.user.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs font-semibold w-full"
+                      disabled={acting || !assigneeId || (!!ticket.assignee && !reason.trim())}
+                      onClick={() =>
+                        runAction(`/helpdesk/tickets/${ticketId}/assign`, 'Responsável atualizado.', {
+                          assigneeId,
+                          reason: reason.trim() || undefined,
+                        })
+                      }
+                    >
+                      <UserPlus className="size-3.5 mr-1" />
+                      <span>Confirmar Atribuição</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Assumir Chamado (Pickup) */}
+              {can('pickup') && (
                 <Button
+                  size="sm"
                   variant="outline"
+                  className="h-8 text-xs font-semibold border-primary text-primary hover:bg-primary/10 gap-1.5"
                   disabled={acting}
                   onClick={() =>
-                    runAction(
-                      `/helpdesk/tickets/${ticketId}/pickup`,
-                      'Chamado assumido com sucesso.',
-                    )
+                    runAction(`/helpdesk/tickets/${ticketId}/pickup`, 'Chamado assumido com sucesso.')
                   }
                 >
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Assumir chamado
+                  <UserCheck className="size-4" />
+                  <span>Assumir Atendimento</span>
                 </Button>
-              ) : null}
+              )}
 
-              {can('approve') ? (
-                <>
+              {/* Botões de Decisão de Aprovação */}
+              {can('approve') && (
+                <div className="grid grid-cols-2 gap-2">
                   <Button
+                    size="sm"
+                    className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
                     disabled={acting}
                     onClick={() =>
-                      runAction(
-                        `/helpdesk/tickets/${ticketId}/approve`,
-                        'Chamado aprovado.',
-                      )
+                      runAction(`/helpdesk/tickets/${ticketId}/approve`, 'Chamado aprovado.')
                     }
                   >
-                    <ShieldCheck className="mr-2 h-4 w-4" />
-                    Aprovar chamado
+                    <ShieldCheck className="size-3.5" />
+                    <span>Aprovar</span>
                   </Button>
-                  <Button variant="outline" disabled={acting} onClick={handleReject}>
-                    Reprovar chamado
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold text-destructive border-destructive/40 hover:bg-destructive/10 gap-1"
+                    disabled={acting}
+                    onClick={handleReject}
+                  >
+                    <ShieldAlert className="size-3.5" />
+                    <span>Reprovar</span>
                   </Button>
-                </>
-              ) : null}
+                </div>
+              )}
 
-              {can('resolve') ? (
+              {/* Resolver Chamado */}
+              {can('resolve') && (
                 <Button
-                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
                   disabled={acting || !reason.trim()}
                   onClick={() =>
                     runAction(
@@ -530,29 +911,84 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
                     )
                   }
                 >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Marcar como resolvido
+                  <CheckCircle2 className="size-4" />
+                  <span>Marcar como Resolvido</span>
                 </Button>
-              ) : null}
+              )}
 
-              {can('close') ? (
-                <div className="space-y-2">
-                  <Label htmlFor="close-reason">Motivo de fechamento</Label>
+              {/* Aguardar Usuário ou Terceiro */}
+              {(['waitUser', 'waitThirdParty'] as const).filter(can).map((action) => (
+                <Button
+                  key={action}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-medium"
+                  disabled={acting || !reason.trim()}
+                  onClick={() =>
+                    runAction(`/helpdesk/tickets/${ticketId}/wait`, 'Espera registrada.', {
+                      target: action === 'waitUser' ? 'WAITING_USER' : 'WAITING_THIRD_PARTY',
+                      reason,
+                    })
+                  }
+                >
+                  {action === 'waitUser' ? 'Aguardar Usuário' : 'Aguardar Terceiro'}
+                </Button>
+              ))}
+
+              {/* Retomar Atendimento */}
+              {can('resume') && (
+                <Button
+                  size="sm"
+                  className="h-8 text-xs font-semibold"
+                  disabled={acting}
+                  onClick={() =>
+                    runAction(`/helpdesk/tickets/${ticketId}/resume`, 'Atendimento retomado.')
+                  }
+                >
+                  Retomar Atendimento
+                </Button>
+              )}
+
+              {/* Solicitar Cancelamento */}
+              {can('cancel') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                  disabled={acting || !reason.trim()}
+                  onClick={() =>
+                    runAction(
+                      `/helpdesk/tickets/${ticketId}/cancel`,
+                      'Cancelamento registrado; consulte o estado e as aprovações.',
+                      { reason },
+                    )
+                  }
+                >
+                  Solicitar Cancelamento
+                </Button>
+              )}
+
+              {/* Fechar Chamado */}
+              {can('close') && (
+                <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <span className="text-xs font-semibold text-foreground">Fechar Chamado</span>
                   <Select value={closeReasonId} onValueChange={setCloseReasonId}>
-                    <SelectTrigger id="close-reason">
-                      <SelectValue placeholder="Selecione o motivo" />
+                    <SelectTrigger id="close-reason" className="h-8 text-xs">
+                      <SelectValue placeholder="Motivo de fechamento" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem motivo específico</SelectItem>
-                      {actionReasons.closeReasons.map((reason) => (
-                        <SelectItem key={reason.id} value={reason.id}>
-                          {reason.name}
+                      {actionReasons.closeReasons.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold w-full"
                     disabled={acting}
                     onClick={() =>
                       runAction(`/helpdesk/tickets/${ticketId}/close`, 'Chamado fechado.', {
@@ -560,82 +996,89 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
                       })
                     }
                   >
-                    Fechar chamado
+                    Confirmar Fechamento
                   </Button>
                 </div>
-              ) : null}
+              )}
 
-              {can('reopen') ? (
+              {/* Reabrir Chamado */}
+              {can('reopen') && (
                 <Button
                   variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
                   disabled={acting}
                   onClick={() =>
-                    reason.trim() && runAction(`/helpdesk/tickets/${ticketId}/reopen`, 'Chamado reaberto.', { reason })
+                    reason.trim() &&
+                    runAction(`/helpdesk/tickets/${ticketId}/reopen`, 'Chamado reaberto.', { reason })
                   }
                 >
-                  Reabrir chamado
+                  Reabrir Chamado
                 </Button>
-              ) : null}
+              )}
 
-              {can('transfer') ? (
-                <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-semibold">Transferir atendimento</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Move o chamado para outra fila e limpa o responsável atual.
+              {/* Transferir Atendimento */}
+              {can('transfer') && (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-foreground">Transferir Atendimento</span>
+                    <p className="text-[11px] text-muted-foreground">
+                      Muda o chamado de fila e limpa o responsável atual.
                     </p>
                   </div>
-                  <div className="field-stack">
-                    <Label htmlFor="transfer-queue">Fila de destino</Label>
-                    <Select value={transferQueueId} onValueChange={setTransferQueueId}>
-                      <SelectTrigger id="transfer-queue">
-                        <SelectValue placeholder="Selecione a fila" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Selecione a fila</SelectItem>
-                        {queueOptions
-                          .filter((queue) => queue.id !== ticket.queue?.id)
-                          .map((queue) => (
-                            <SelectItem key={queue.id} value={queue.id}>
-                              {queue.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="transfer-reason">Motivo operacional</Label>
-                    <Select value={transferReasonId} onValueChange={setTransferReasonId}>
-                      <SelectTrigger id="transfer-reason">
-                        <SelectValue placeholder="Selecione o motivo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sem motivo específico</SelectItem>
-                        {actionReasons.transferReasons.map((reason) => (
-                          <SelectItem key={reason.id} value={reason.id}>
-                            {reason.name}
+
+                  <Select value={transferQueueId} onValueChange={setTransferQueueId}>
+                    <SelectTrigger id="transfer-queue" className="h-8 text-xs">
+                      <SelectValue placeholder="Selecione a fila de destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecione a fila</SelectItem>
+                      {queueOptions
+                        .filter((queue) => queue.id !== ticket.queue?.id)
+                        .map((queue) => (
+                          <SelectItem key={queue.id} value={queue.id}>
+                            {queue.name}
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="field-stack">
-                    <Label htmlFor="transfer-note">Observação da transferência</Label>
-                    <Textarea
-                      id="transfer-note"
-                      className="min-h-[100px]"
-                      value={transferNote}
-                      onChange={(event) => setTransferNote(event.target.value)}
-                      placeholder="Explique por que este chamado deve seguir para outra fila."
-                    />
-                  </div>
-                  <Button variant="outline" disabled={acting} onClick={handleTransfer}>
-                    Transferir chamado
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={transferReasonId} onValueChange={setTransferReasonId}>
+                    <SelectTrigger id="transfer-reason" className="h-8 text-xs">
+                      <SelectValue placeholder="Motivo operacional (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem motivo específico</SelectItem>
+                      {actionReasons.transferReasons.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Textarea
+                    id="transfer-note"
+                    className="min-h-[70px] text-xs"
+                    value={transferNote}
+                    onChange={(event) => setTransferNote(event.target.value)}
+                    placeholder="Justificativa da transferência..."
+                  />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold w-full"
+                    disabled={acting || transferQueueId === 'none'}
+                    onClick={handleTransfer}
+                  >
+                    <ArrowRightLeft className="size-3.5 mr-1" />
+                    <span>Transferir Chamado</span>
                   </Button>
                 </div>
-              ) : null}
+              )}
             </div>
-          </div>
+          </Card>
         </aside>
       </div>
     </div>

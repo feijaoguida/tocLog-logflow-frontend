@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { GovernanceFields, QueueGovernance, CategoryEditor, GOVERNANCE_DEFAULTS, type Governance, type GovernanceContext, type Category } from './governance'
 
-import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,7 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { AlertCircle, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertCircle, Plus, RotateCw, Search, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -420,32 +419,132 @@ export default function HelpdeskSettingsPage() {
     }
   }
 
-  if (!loading && !context?.capabilities.settings) return <div className="app-page">
-    <MenuFunctionHeader title="Helpdesk > Gestão de filas" description="Administre somente as filas sob sua responsabilidade." />
-    {loadError ? <p role="alert">{loadError}</p> : context?.capabilities.manageQueues ? <QueueGovernance context={context} /> : <p role="alert">Você não tem permissão para administrar o Helpdesk.</p>}
-    <Button variant="outline" onClick={() => void loadOverview()}>Atualizar</Button>
-  </div>
+  if (!loading && !context?.capabilities.settings) {
+    return (
+      <div className="app-page space-y-6">
+        <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Gestão de Filas
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Administre somente as filas sob sua responsabilidade operacional.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void loadOverview()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </section>
+
+        {loadError ? (
+          <p role="alert" className="text-destructive text-sm">{loadError}</p>
+        ) : context?.capabilities.manageQueues ? (
+          <QueueGovernance context={context} />
+        ) : (
+          <p role="alert" className="text-muted-foreground text-sm">
+            Você não tem permissão para administrar o Helpdesk.
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div className="app-page">
-      <MenuFunctionHeader
-        title="Helpdesk > Configurações"
-        description="Área de governança da Central de Atendimento. Aqui a empresa controla limites operacionais, filas e catálogo de serviços do helpdesk."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="rounded-full px-4 py-2">
-              Governança por empresa
-            </Badge>
-            <Button variant="outline" onClick={() => void loadOverview()}>
-              Atualizar
-            </Button>
-          </div>
-        }
-      />
+    <div className="app-page space-y-6">
+      {/* Page Header TocLog */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Configurações do HelpDesk
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Área de governança da Central de Atendimento: limites operacionais, filas e catálogo de serviços.
+          </p>
+        </div>
 
-      {loadError && <p role="alert">{loadError}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+            Governança por empresa
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void loadOverview()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </div>
+      </section>
+
+      {/* Cards de Resumo Operacional (KPIs em 4 colunas) */}
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Filas Ativas
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {overview?.queues.filter((q) => q.active).length ?? 0}
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Serviços no Catálogo
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {overview?.catalogItems.filter((c) => c.active).length ?? 0}
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Categorias
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {overview?.categories.length ?? 0}
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Limite Global por Usuário
+            </span>
+          </CardHeader>
+          <CardContent className="p-0 pt-2">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {settings.globalOpenLimit}
+            </span>
+          </CardContent>
+        </Card>
+      </section>
+
+      {loadError && <p role="alert" className="text-destructive text-sm">{loadError}</p>}
+
       <Tabs defaultValue="settings" className="space-y-6">
-        <TabsList className="grid w-full max-w-[720px] grid-cols-3">
+        <TabsList className="grid w-full max-w-[540px] grid-cols-3">
           <TabsTrigger value="settings">Configurações</TabsTrigger>
           <TabsTrigger value="queues">Filas</TabsTrigger>
           <TabsTrigger value="catalog">Catálogo</TabsTrigger>

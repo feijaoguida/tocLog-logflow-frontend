@@ -19,17 +19,18 @@ import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { uploadHelpdeskFile, type HelpdeskContext } from '../operations'
 import { 
+  AlertCircle,
+  ArrowLeft,
+  Building2, 
+  Clock, 
+  FileText, 
   Headphones, 
   Layers, 
+  Loader2,
   Send, 
-  UploadCloud, 
-  FileText, 
-  X, 
-  Building2, 
   Tag, 
-  Clock, 
-  AlertCircle,
-  Loader2
+  UploadCloud, 
+  X
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -126,15 +127,29 @@ export default function NewTicketPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="app-page space-y-6">
       {/* Page Header */}
-      <div className="space-y-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-primary">Helpdesk</span>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Abrir chamado</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Escolha o serviço correto para que o chamado seja roteado para a fila responsável com o SLA e as regras adequadas.
-        </p>
-      </div>
+      <section className="space-y-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 -ml-2 text-xs text-muted-foreground hover:text-foreground gap-1.5 font-medium"
+          onClick={() => router.push('/dashboard/helpdesk')}
+        >
+          <ArrowLeft className="size-4" />
+          <span>Voltar para chamados</span>
+        </Button>
+
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Abrir Chamado
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Escolha o serviço correto para que o chamado seja roteado para a fila responsável com o SLA e as regras adequadas.
+          </p>
+        </div>
+      </section>
 
       {error && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">

@@ -2,10 +2,21 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Clock3, LifeBuoy, ShieldCheck, TimerReset } from 'lucide-react'
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  Clock3,
+  Eye,
+  Inbox,
+  LifeBuoy,
+  RotateCw,
+  ShieldAlert,
+  ShieldCheck,
+  TimerReset,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
-import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -89,17 +100,30 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Cancelado',
 }
 
-function getStatusVariant(status: string) {
-  if (status === 'RESOLVED' || status === 'CLOSED') return 'success'
-  if (status === 'CANCELLED') return 'destructive'
-  if (
-    status === 'WAITING_APPROVAL' ||
-    status === 'WAITING_USER' ||
-    status === 'WAITING_THIRD_PARTY'
-  ) {
-    return 'secondary'
+function getInitials(name?: string | null) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function getStatusBadgeStyle(status: string) {
+  switch (status) {
+    case 'WAITING_ASSIGNMENT':
+    case 'NEW':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'IN_PROGRESS':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+    case 'WAITING_USER':
+    case 'WAITING_THIRD_PARTY':
+    case 'WAITING_APPROVAL':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'RESOLVED':
+    case 'CLOSED':
+      return 'bg-muted text-muted-foreground border-border'
+    default:
+      return 'bg-secondary text-secondary-foreground border-border'
   }
-  return 'default'
 }
 
 export default function HelpdeskMetricsPage() {
@@ -131,305 +155,469 @@ export default function HelpdeskMetricsPage() {
   }, [summary?.statusCounts])
 
   return (
-    <div className="app-page">
-      <MenuFunctionHeader
-        title="Helpdesk > Dashboard"
-        description="Resumo inicial da operação do helpdesk por fila, backlog e risco de SLA. Esta visão ajuda a liderança a localizar gargalos e pendências."
-        actions={
-          <Button variant="outline" onClick={() => void fetchSummary()}>
-            Atualizar métricas
+    <div className="app-page space-y-6">
+      {/* Page Header */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Métricas e Indicadores
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Visão executiva da operação por fila, gargalos de atendimento e riscos de SLA.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 font-semibold">
+            <Link href="/dashboard/helpdesk/queue">
+              <Inbox className="size-4" />
+              <span>Ver Fila Operacional</span>
+            </Link>
           </Button>
-        }
-      >
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Painel inicial focado em volume, filas mais carregadas, aprovações pendentes e
-          chamados com risco operacional.
-        </p>
-      </MenuFunctionHeader>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void fetchSummary()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </div>
+      </section>
 
       {loading ? (
-        <div className="app-page text-sm text-muted-foreground">Carregando métricas...</div>
+        <Card className="app-section-card p-12 text-center text-sm text-muted-foreground">
+          <RotateCw className="mx-auto mb-2 size-6 animate-spin text-primary" />
+          <span>Carregando métricas operacionais...</span>
+        </Card>
       ) : !summary ? (
-        <div className="app-page text-sm text-muted-foreground">Nenhuma métrica disponível.</div>
+        <Card className="app-section-card p-12 text-center text-sm text-muted-foreground">
+          Nenhuma métrica disponível para o seu escopo no momento.
+        </Card>
       ) : (
         <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card className="app-section-card">
+          {/* Cards de Resumo Operacional (KPIs em 4 colunas) */}
+          <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {/* Card 1: Visíveis */}
+            <Card className="app-section-card p-4 transition-all hover:shadow-xs">
               <CardHeader className="p-0">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <LifeBuoy className="h-4 w-4" />
-                  Chamados visíveis
-                </CardTitle>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Chamados Visíveis
+                </span>
               </CardHeader>
-              <CardContent className="p-0 pt-3 text-3xl font-semibold">
-                {summary.totals.totalVisible}
+              <CardContent className="p-0 pt-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">
+                  {summary.totals.totalVisible}
+                </span>
               </CardContent>
             </Card>
-            <Card className="app-section-card">
+
+            {/* Card 2: Ativos */}
+            <Card className="app-section-card p-4 transition-all hover:shadow-xs">
               <CardHeader className="p-0">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <TimerReset className="h-4 w-4" />
-                  Ativos
-                </CardTitle>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Em Andamento (Ativos)
+                </span>
               </CardHeader>
-              <CardContent className="p-0 pt-3 text-3xl font-semibold">
-                {summary.totals.active}
+              <CardContent className="p-0 pt-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">
+                  {summary.totals.active}
+                </span>
               </CardContent>
             </Card>
-            <Card className="app-section-card">
+
+            {/* Card 3: SLA Violado */}
+            <Card className="app-section-card p-4 transition-all hover:shadow-xs">
               <CardHeader className="p-0">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Clock3 className="h-4 w-4" />
-                  SLA resolução violado
-                </CardTitle>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  SLA Resolução Violado
+                </span>
               </CardHeader>
-              <CardContent className="p-0 pt-3 text-3xl font-semibold">
-                {summary.totals.overdueResolution}
+              <CardContent className="p-0 pt-2 flex items-baseline gap-2">
+                <span
+                  className={`text-3xl font-bold tracking-tight ${
+                    summary.totals.overdueResolution > 0
+                      ? 'text-destructive'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  }`}
+                >
+                  {summary.totals.overdueResolution}
+                </span>
+                {summary.totals.overdueResolution > 0 && (
+                  <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                    Crítico
+                  </span>
+                )}
               </CardContent>
             </Card>
-            <Card className="app-section-card">
+
+            {/* Card 4: Minhas Aprovações */}
+            <Card className="app-section-card p-4 transition-all hover:shadow-xs">
               <CardHeader className="p-0">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4" />
-                  Minhas aprovações
-                </CardTitle>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Minhas Aprovações
+                </span>
               </CardHeader>
-              <CardContent className="p-0 pt-3 text-3xl font-semibold">
-                {summary.totals.pendingMyApprovals}
+              <CardContent className="p-0 pt-2 flex items-baseline gap-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">
+                  {summary.totals.pendingMyApprovals}
+                </span>
+                {summary.totals.pendingMyApprovals > 0 && (
+                  <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    Ação necessária
+                  </span>
+                )}
               </CardContent>
             </Card>
           </section>
 
-          <section aria-label="Estados de SLA e aprovações" className="grid gap-3 md:grid-cols-3">
-            {[
-              ['SLA em execução', summary.slaStateCounts.ACTIVE ?? 0],
-              ['SLA pausado', summary.slaStateCounts.PAUSED ?? 0],
-              ['SLA não iniciado', summary.slaStateCounts.NOT_STARTED ?? 0],
-              ['Primeira resposta cumprida', summary.totals.completedFirstResponse],
-              ['Resolução cumprida', summary.totals.completedResolution],
-              ['Violação em ciclo anterior', summary.totals.historicalResolutionViolations],
-              ['Abertura pendente', summary.totals.waitingApproval],
-              ['Cancelamento pendente', summary.totals.waitingCancellation],
-              ['Aprovação sem responsável', summary.totals.approvalNeedsAssignment],
-              ['SLA legado', summary.slaStateCounts.LEGACY ?? 0],
-            ].map(([label, count]) => (
-              <div key={label} className="rounded-2xl border border-border p-4">
-                <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="text-2xl font-semibold">{count}</p>
-              </div>
-            ))}
-            <p className="text-sm text-muted-foreground md:col-span-3">
-              Cumprido indica relógio encerrado; violações permanecem contabilizadas mesmo após pausa ou conclusão.
-              Ciclos anteriores são contabilizados separadamente. Dados legados preservam os prazos conhecidos.
+          {/* Grid de Métricas Secundárias / Estados de SLA */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Métricas de SLA, Ciclos e Governança
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {[
+                ['SLA em execução', summary.slaStateCounts.ACTIVE ?? 0, 'text-foreground'],
+                ['SLA pausado', summary.slaStateCounts.PAUSED ?? 0, 'text-muted-foreground'],
+                ['SLA não iniciado', summary.slaStateCounts.NOT_STARTED ?? 0, 'text-muted-foreground'],
+                ['1ª resposta cumprida', summary.totals.completedFirstResponse, 'text-emerald-600 dark:text-emerald-400'],
+                ['Resolução cumprida', summary.totals.completedResolution, 'text-emerald-600 dark:text-emerald-400'],
+                ['Violação ciclo anterior', summary.totals.historicalResolutionViolations, 'text-amber-600 dark:text-amber-400'],
+                ['Abertura pendente', summary.totals.waitingApproval, 'text-foreground'],
+                ['Cancelamento pendente', summary.totals.waitingCancellation, 'text-foreground'],
+                ['Aprovação sem resp.', summary.totals.approvalNeedsAssignment, summary.totals.approvalNeedsAssignment > 0 ? 'text-destructive' : 'text-foreground'],
+                ['SLA legado', summary.slaStateCounts.LEGACY ?? 0, 'text-muted-foreground'],
+              ].map(([label, count, colorClass]) => (
+                <Card key={label as string} className="app-section-card p-3 shadow-2xs">
+                  <p className="text-[11px] font-medium text-muted-foreground truncate">
+                    {label as string}
+                  </p>
+                  <p className={`mt-1 text-xl font-bold tracking-tight ${colorClass as string}`}>
+                    {count as number}
+                  </p>
+                </Card>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              * Cumprido indica relógio encerrado dentro da meta; violações permanecem contabilizadas mesmo após pausa.
             </p>
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <Card className="app-section-card">
-              <CardHeader className="px-0 pt-0">
-                <CardTitle className="text-xl">Filas com maior carga</CardTitle>
+          {/* Painel Duplo: Filas com Maior Carga & Distribuição por Status */}
+          <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            {/* Tabela de Filas */}
+            <Card className="app-section-card overflow-hidden p-0 shadow-xs">
+              <CardHeader className="px-6 py-4 border-b">
+                <CardTitle className="text-base font-bold">Filas com Maior Carga</CardTitle>
               </CardHeader>
-              <CardContent className="px-0 pb-0">
+              <CardContent className="p-0">
                 {summary.queues.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="p-6 text-sm text-muted-foreground">
                     Nenhuma fila visível para o seu escopo.
                   </p>
                 ) : (
-                  <div className="overflow-hidden rounded-2xl border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fila</TableHead>
-                          <TableHead>Departamento</TableHead>
-                          <TableHead>Ativos</TableHead>
-                          <TableHead>Sem resp.</TableHead>
-                          <TableHead>Aprovação</TableHead>
-                          <TableHead>SLA resolução violado</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="min-w-[160px]">Fila</TableHead>
+                        <TableHead className="text-center w-[70px]">Ativos</TableHead>
+                        <TableHead className="text-center w-[80px]">Sem Resp.</TableHead>
+                        <TableHead className="text-center w-[80px]">Aprovação</TableHead>
+                        <TableHead className="text-right min-w-[110px]">SLA Violado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summary.queues.map((queue) => (
+                        <TableRow key={queue.queueId} className="transition-colors">
+                          <TableCell>
+                            <div className="font-semibold text-foreground text-sm">
+                              {queue.queueName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {queue.departmentName || 'Geral'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {queue.active}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {queue.unassigned > 0 ? (
+                              <span className="inline-flex rounded-md bg-amber-500/10 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                                {queue.unassigned}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center text-xs font-medium">
+                            {queue.waitingApproval}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {queue.overdueResolution > 0 ? (
+                              <span className="inline-flex rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-bold text-destructive">
+                                {queue.overdueResolution}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                0
+                              </span>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {summary.queues.map((queue) => (
-                          <TableRow key={queue.queueId}>
-                            <TableCell className="font-medium">{queue.queueName}</TableCell>
-                            <TableCell>{queue.departmentName || 'Não informado'}</TableCell>
-                            <TableCell>{queue.active}</TableCell>
-                            <TableCell>{queue.unassigned}</TableCell>
-                            <TableCell>{queue.waitingApproval}</TableCell>
-                            <TableCell>{queue.overdueResolution}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="app-section-card">
-              <CardHeader className="px-0 pt-0">
-                <CardTitle className="text-xl">Distribuição por status</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 px-0 pb-0">
-                {topStatuses.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum chamado contabilizado ainda.
-                  </p>
-                ) : (
-                  topStatuses.map(([status, count]) => (
-                    <div
-                      key={status}
-                      className="flex items-center justify-between rounded-2xl border border-border bg-muted/20 px-4 py-3"
-                    >
-                      <Badge variant={getStatusVariant(status)}>
-                        {STATUS_LABELS[status] || status}
-                      </Badge>
-                      <span className="text-lg font-semibold">{count}</span>
-                    </div>
-                  ))
-                )}
+            {/* Distribuição por Status */}
+            <Card className="app-section-card p-5 shadow-xs flex flex-col justify-between">
+              <div className="space-y-4">
+                <CardTitle className="text-base font-bold">Distribuição por Status</CardTitle>
 
-                <div className="grid gap-3 pt-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                    <p className="text-sm text-muted-foreground">1ª resposta vencida</p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      {summary.totals.overdueFirstResponse}
-                    </p>
+                {topStatuses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum chamado contabilizado ainda.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {topStatuses.map(([status, count]) => (
+                      <div
+                        key={status}
+                        className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm"
+                      >
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(
+                            status,
+                          )}`}
+                        >
+                          {STATUS_LABELS[status] || status}
+                        </span>
+                        <span className="font-bold text-foreground">{count}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                    <p className="text-sm text-muted-foreground">Sem responsável</p>
-                    <p className="mt-2 text-2xl font-semibold">
-                      {summary.totals.unassigned}
-                    </p>
-                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t mt-4">
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    1ª Resposta Vencida
+                  </p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight text-destructive">
+                    {summary.totals.overdueFirstResponse}
+                  </p>
                 </div>
-              </CardContent>
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Sem Responsável
+                  </p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400">
+                    {summary.totals.unassigned}
+                  </p>
+                </div>
+              </div>
             </Card>
           </section>
 
-          <section className="app-section-card space-y-4">
+          {/* Alertas Operacionais */}
+          <section className="space-y-3">
             <div>
-              <h2 className="section-title">Alertas operacionais</h2>
-              <p className="text-sm text-muted-foreground">
-                Prioridades imediatas para a equipe atuar em SLA, aprovação e triagem.
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Alertas Operacionais Imediatos
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Prioridades imediatas para atuação em SLA, aprovações pendentes ou falta de atribuição.
               </p>
             </div>
 
             {summary.alerts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">
-                Nenhum alerta operacional crítico no momento.
-              </div>
+              <Card className="app-section-card p-8 text-center text-sm text-muted-foreground">
+                <ShieldCheck className="mx-auto mb-2 size-8 text-emerald-600 dark:text-emerald-400" />
+                <p className="font-semibold text-foreground">Nenhum alerta operacional crítico</p>
+                <p className="text-xs text-muted-foreground">Todos os chamados estão dentro dos parâmetros normais.</p>
+              </Card>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {summary.alerts.map((alert) => (
-                  <div
+                  <Card
                     key={`${alert.type}-${alert.ticketId}`}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-4 lg:flex-row lg:items-center lg:justify-between"
+                    className="app-section-card p-4 flex flex-col justify-between transition-all hover:shadow-xs"
                   >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant={
-                            alert.type === 'overdue-resolution' ||
-                            alert.type === 'overdue-first-response'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+                            alert.type === 'overdue-resolution' || alert.type === 'overdue-first-response'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+                              : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                          }`}
                         >
                           {alert.type === 'overdue-resolution'
-                            ? 'SLA resolução'
+                            ? 'SLA Resolução'
                             : alert.type === 'overdue-first-response'
-                              ? '1ª resposta'
-                              : alert.type === 'waiting-approval'
-                                ? 'Aprovação'
-                                : 'Sem responsável'}
-                        </Badge>
-                        <span className="text-sm font-semibold">{alert.title}</span>
+                            ? '1ª Resposta'
+                            : alert.type === 'waiting-approval'
+                            ? 'Aprovação'
+                            : 'Sem Responsável'}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          #{alert.code}
+                        </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{alert.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {alert.queueName || 'Sem fila'} · prioridade {alert.priority}
-                      </p>
+
+                      <p className="text-sm font-semibold text-foreground line-clamp-1">{alert.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{alert.description}</p>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/dashboard/helpdesk/${alert.ticketId}`}>Abrir chamado</Link>
-                    </Button>
-                  </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t mt-3">
+                      <span className="text-[11px] text-muted-foreground truncate max-w-[160px]">
+                        {alert.queueName || 'Sem fila'} · Prio {alert.priority}
+                      </span>
+                      <Button asChild variant="outline" size="sm" className="h-7 text-xs gap-1">
+                        <Link href={`/dashboard/helpdesk/${alert.ticketId}`}>
+                          <span>Ver</span>
+                          <ArrowRight className="size-3" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
                 ))}
               </div>
             )}
           </section>
 
-          <section className="app-section-card space-y-4">
-            <div className="flex items-center justify-between gap-3">
+          {/* Tabela de Chamados que Exigem Atenção */}
+          <section className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="section-title">Chamados que exigem atenção</h2>
-                <p className="text-sm text-muted-foreground">
-                  Últimos itens atualizados dentro do seu escopo visível.
+                <h2 className="text-lg font-bold tracking-tight text-foreground">
+                  Chamados que Exigem Atenção
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Últimos chamados movimentados que demandam ação ou acompanhamento.
                 </p>
               </div>
-              <Button asChild variant="outline">
-                <Link href="/dashboard/helpdesk/queue">Abrir fila operacional</Link>
+              <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 font-medium">
+                <Link href="/dashboard/helpdesk/queue">
+                  <Inbox className="size-4" />
+                  <span>Abrir Fila Operacional</span>
+                </Link>
               </Button>
             </div>
 
-            {summary.recentTickets.length === 0 ? (
-              <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-6 text-center">
-                <AlertTriangle className="h-10 w-10 text-muted-foreground/60" />
-                <div className="space-y-1">
-                  <p className="text-lg font-semibold">Sem chamados recentes</p>
-                  <p className="text-sm text-muted-foreground">
-                    Quando a operação começar a movimentar tickets, eles aparecerão aqui.
-                  </p>
+            <Card className="app-section-card overflow-hidden p-0 shadow-xs">
+              {summary.recentTickets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">
+                  <AlertTriangle className="size-8 text-muted-foreground/50" />
+                  <p className="text-sm font-medium">Sem chamados recentes no seu escopo.</p>
                 </div>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-border">
+              ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Chamado</TableHead>
-                      <TableHead>Fila</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead>Atualizado</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[80px]">ID</TableHead>
+                      <TableHead className="min-w-[240px]">Chamado / Catálogo</TableHead>
+                      <TableHead className="min-w-[180px]">Fila / Solicitante</TableHead>
+                      <TableHead className="min-w-[200px]">Status / Responsável</TableHead>
+                      <TableHead className="w-[100px] text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary.recentTickets.map((ticket) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell className="font-medium">#{ticket.code}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium">{ticket.subject}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {ticket.serviceCatalogItem?.name || 'Fluxo legado'}
+                    {summary.recentTickets.map((ticket) => {
+                      const assigneeName = ticket.assignee?.name
+
+                      return (
+                        <TableRow key={ticket.id} className="transition-colors">
+                          <TableCell className="font-semibold text-muted-foreground text-sm">
+                            #{ticket.code}
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <Link
+                                href={`/dashboard/helpdesk/${ticket.id}`}
+                                className="font-semibold text-foreground text-sm hover:underline line-clamp-1"
+                              >
+                                {ticket.subject}
+                              </Link>
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {ticket.serviceCatalogItem?.name || 'Fluxo direto'}
+                              </p>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{ticket.queue?.name || 'Sem fila'}</TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusVariant(ticket.status)}>
-                            {STATUS_LABELS[ticket.status] || ticket.status}
-                          </Badge>
-                          <TicketIndicatorsView indicators={ticket.indicators} />
-                        </TableCell>
-                        <TableCell>{ticket.assignee?.name || 'Não atribuído'}</TableCell>
-                        <TableCell>
-                          {new Date(ticket.updatedAt).toLocaleString('pt-BR')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/dashboard/helpdesk/${ticket.id}`}>Detalhe</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                                <span className="size-2 rounded-full bg-primary shrink-0" />
+                                <span className="truncate">{ticket.queue?.name || 'Sem fila'}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {ticket.requester?.name || 'Solicitante não identificado'}
+                              </p>
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(
+                                    ticket.status,
+                                  )}`}
+                                >
+                                  {STATUS_LABELS[ticket.status] || ticket.status}
+                                </span>
+                                <TicketIndicatorsView indicators={ticket.indicators} />
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {assigneeName ? (
+                                  <>
+                                    <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                                      {getInitials(assigneeName)}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground truncate">
+                                      {assigneeName}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    Atendimento sem responsável
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground hover:text-foreground"
+                              title="Ver detalhes do chamado"
+                            >
+                              <Link href={`/dashboard/helpdesk/${ticket.id}`}>
+                                <Eye className="size-4" />
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
-              </div>
-            )}
+              )}
+            </Card>
           </section>
         </>
       )}

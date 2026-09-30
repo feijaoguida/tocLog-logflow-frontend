@@ -3,12 +3,26 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { ArrowRight, FileBarChart2, FileClock, Receipt, ShoppingCart } from 'lucide-react'
+import {
+  ArrowRight,
+  FileBarChart2,
+  FileClock,
+  Plus,
+  Receipt,
+  RotateCw,
+  ShoppingCart,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -59,8 +73,44 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
 const ORDER_STATUS_LABELS: Record<string, string> = {
   OPEN: 'Em aberto',
   SENT: 'Enviada',
+  PARTIALLY_RECEIVED: 'Recebimento parcial',
   CONFIRMED: 'Recebida',
+  CLOSED: 'Encerrada',
   CANCELLED: 'Cancelada',
+}
+
+function getRequestStatusBadgeStyle(status: string) {
+  switch (status) {
+    case 'PENDING':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'APPROVED':
+    case 'ORDERED':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+    case 'IN_QUOTATION':
+      return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900/60'
+    case 'REJECTED':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'DRAFT':
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
+}
+
+function getOrderStatusBadgeStyle(status: string) {
+  switch (status) {
+    case 'CONFIRMED':
+    case 'CLOSED':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+    case 'SENT':
+    case 'PARTIALLY_RECEIVED':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'OPEN':
+      return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900/60'
+    case 'CANCELLED':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
 }
 
 export default function ProcurementDashboardPage() {
@@ -68,20 +118,21 @@ export default function ProcurementDashboardPage() {
   const [summary, setSummary] = useState<ProcurementSummary | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const { data } = await api.get<ProcurementSummary>('/dashboard/procurement/summary')
-        setSummary(data)
-      } catch (error) {
-        toast.error(
-          getApiErrorMessage(error, 'Nao foi possivel carregar o dashboard de compras.'),
-        )
-      } finally {
-        setLoading(false)
-      }
+  const fetchSummary = async () => {
+    setLoading(true)
+    try {
+      const { data } = await api.get<ProcurementSummary>('/dashboard/procurement/summary')
+      setSummary(data)
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, 'Não foi possível carregar o dashboard de compras.'),
+      )
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     void fetchSummary()
   }, [])
 
@@ -94,7 +145,7 @@ export default function ProcurementDashboardPage() {
         value: summary.requestStatusCounts.DRAFT || 0,
       },
       {
-        label: 'Pendentes',
+        label: 'Pendentes de aprovação',
         value: summary.requestStatusCounts.PENDING || 0,
       },
       {
@@ -103,287 +154,283 @@ export default function ProcurementDashboardPage() {
           summary.requestStatusCounts.IN_QUOTATION || summary.requestStatusCounts.QUOTING || 0,
       },
       {
-        label: 'Ordenados',
+        label: 'Com ordem de compra',
         value: summary.requestStatusCounts.ORDERED || 0,
       },
     ]
   }, [summary])
 
-  if (loading) {
+  if (loading && !summary) {
     return (
-      <div className="app-page">
-        <Card className="app-section-card">
-          <CardContent className="flex min-h-[260px] items-center justify-center p-0 text-sm text-muted-foreground">
-            Carregando dashboard de compras...
-          </CardContent>
-        </Card>
+      <div className="app-page space-y-6">
+        <div className="py-20 text-center text-sm text-muted-foreground">
+          Carregando dashboard de compras...
+        </div>
       </div>
     )
   }
 
   if (!summary) {
     return (
-      <div className="app-page">
-        <Card className="app-section-card">
-          <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-0 text-center">
-            <p className="text-base font-medium text-foreground">
-              Não foi possível carregar o resumo de compras.
-            </p>
-            <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
-          </CardContent>
+      <div className="app-page space-y-6">
+        <Card className="app-section-card p-8 text-center space-y-4">
+          <p className="text-base font-medium text-foreground">
+            Não foi possível carregar o resumo de compras.
+          </p>
+          <Button onClick={() => void fetchSummary()}>Tentar novamente</Button>
         </Card>
       </div>
     )
   }
 
   return (
-    <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-2">
-          <p className="app-kicker">Compras</p>
-          <h1 className="app-title">Dashboard de compras</h1>
-          <p className="app-subtitle">
-            Acompanhe solicitações, cotações, ordens e pendências operacionais do fluxo de compras.
+    <div className="app-page space-y-6">
+      {/* 1. Cabeçalho Padronizado */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Dashboard de Compras
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Acompanhe solicitações, cotações, ordens e pendências operacionais do fluxo de suprimentos.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline" className="gap-2">
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" className="h-9 gap-1.5 font-semibold">
+            <Link href="/dashboard/compras/pedidos/new">
+              <Plus className="size-4" />
+              <span>Novo pedido</span>
+            </Link>
+          </Button>
+
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
             <Link href="/dashboard/compras/pedidos">
-              Pedidos
-              <ArrowRight className="h-4 w-4" />
+              <span>Pedidos</span>
             </Link>
           </Button>
-          <Button asChild variant="outline" className="gap-2">
+
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
             <Link href="/dashboard/compras/cotacoes">
-              Cotações
-              <ArrowRight className="h-4 w-4" />
+              <span>Cotações</span>
             </Link>
           </Button>
-          {hasPermission('procurement.settings.manage') ? (
-            <Button asChild variant="outline" className="gap-2">
+
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+            <Link href="/dashboard/compras/ordens">
+              <span>Ordens</span>
+            </Link>
+          </Button>
+
+          {hasPermission('procurement.settings.manage') && (
+            <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
               <Link href="/dashboard/compras/configuracoes">
-                Configurações
-                <ArrowRight className="h-4 w-4" />
+                <span>Configurações</span>
               </Link>
             </Button>
-          ) : null}
-          <Button asChild className="gap-2">
-            <Link href="/dashboard/compras/ordens">
-              Ordens
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void fetchSummary()}
+            disabled={loading}
+          >
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
           </Button>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-4">
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-base">Minhas solicitações</CardTitle>
+      {/* 2. Cards de Indicadores Operacionais (KPIs) */}
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Card 1: Minhas solicitações */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Minhas solicitações
+            </span>
           </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3 px-0 pb-0">
-            <div>
-              <p className="text-3xl font-semibold tracking-tight">{summary.kpis.myRequests}</p>
-              <p className="text-sm text-muted-foreground">histórico próprio no módulo</p>
-            </div>
-            <Receipt className="h-5 w-5 text-primary" />
+          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {summary.kpis.myRequests}
+            </span>
+            <Receipt className="size-5 text-muted-foreground/60" />
           </CardContent>
         </Card>
 
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-base">Pendências</CardTitle>
+        {/* Card 2: Pendências de aprovação com Tag âmbar */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Pendências
+            </span>
           </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3 px-0 pb-0">
-            <div>
-              <p className="text-3xl font-semibold tracking-tight">
+          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight text-foreground">
                 {summary.kpis.pendingApprovals}
-              </p>
-              <p className="text-sm text-muted-foreground">pedidos aguardando decisão</p>
+              </span>
+              {summary.kpis.pendingApprovals > 0 && (
+                <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                  Ação necessária
+                </span>
+              )}
             </div>
-            <FileClock className="h-5 w-5 text-primary" />
+            <FileClock className="size-5 text-muted-foreground/60" />
           </CardContent>
         </Card>
 
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-base">Em cotação</CardTitle>
+        {/* Card 3: Em cotação */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Em cotação
+            </span>
           </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3 px-0 pb-0">
-            <div>
-              <p className="text-3xl font-semibold tracking-tight">
-                {summary.kpis.requestsInQuotation}
-              </p>
-              <p className="text-sm text-muted-foreground">processos em tratamento por compras</p>
-            </div>
-            <FileBarChart2 className="h-5 w-5 text-primary" />
+          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-bold tracking-tight text-foreground">
+              {summary.kpis.requestsInQuotation}
+            </span>
+            <FileBarChart2 className="size-5 text-muted-foreground/60" />
           </CardContent>
         </Card>
 
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-base">Ordens recebidas</CardTitle>
+        {/* Card 4: Ordens recebidas / Fechadas */}
+        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
+          <CardHeader className="p-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Ordens confirmadas
+            </span>
           </CardHeader>
-          <CardContent className="flex items-end justify-between gap-3 px-0 pb-0">
-            <div>
-              <p className="text-2xl font-semibold tracking-tight">
-                {summary.kpis.confirmedOrdersTotal.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                })}
-              </p>
-              <p className="text-sm text-muted-foreground">valor acumulado confirmado</p>
-            </div>
-            <ShoppingCart className="h-5 w-5 text-primary" />
+          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+              {summary.kpis.confirmedOrdersTotal.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              })}
+            </span>
+            <ShoppingCart className="size-5 text-muted-foreground/60" />
           </CardContent>
         </Card>
       </section>
 
+      {/* Grid de Pipeline e Requisições Recentes */}
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle>Distribuição das solicitações</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Visão rápida do pipeline atual de requisições dentro do módulo.
+        {/* Distribuição das solicitações */}
+        <Card className="app-section-card p-5">
+          <div className="space-y-1 mb-4">
+            <h2 className="text-base font-semibold text-foreground">
+              Distribuição das solicitações
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Visão rápida do pipeline atual de requisições no módulo.
             </p>
-          </CardHeader>
-          <CardContent className="grid gap-3 px-0 pb-0">
+          </div>
+          <div className="space-y-2.5">
             {requestDistribution.map((item) => (
               <div
                 key={item.label}
-                className="flex items-center justify-between rounded-[20px] border border-border/60 bg-muted/20 px-4 py-3"
+                className="flex items-center justify-between rounded-lg border px-3.5 py-2.5 transition-colors hover:bg-muted/30"
               >
                 <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className="font-semibold text-foreground">{item.value}</span>
+                <span className="text-sm font-semibold text-foreground">{item.value}</span>
               </div>
             ))}
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="app-section-card">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle>Requisições recentes</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Últimas solicitações registradas no contexto da empresa atual.
-            </p>
-          </CardHeader>
-          <CardContent className="px-0 pb-0">
-            {summary.recentRequests.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
-                <p className="font-medium text-foreground">Sem requisições recentes</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Quando houver novos pedidos, eles aparecerão neste painel.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-[24px] border border-border/70">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Pedido</TableHead>
-                      <TableHead>Solicitante</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {summary.recentRequests.map((request) => (
-                      <TableRow key={request.id}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium text-foreground">Pedido #{request.code}</p>
-                            <p className="max-w-[320px] truncate text-sm text-muted-foreground">
-                              {request.justification}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p>{request.requesterName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {request.departmentName || 'Sem departamento'}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={request.status === 'REJECTED' ? 'destructive' : 'outline'}>
-                            {REQUEST_STATUS_LABELS[request.status] || request.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {request.estimatedTotal
-                            ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                              })}`
-                            : 'Não informado'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="app-section-card">
-        <CardHeader className="px-0 pt-0">
-          <CardTitle>Ordens recentes</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Acompanhe as últimas ordens emitidas e o status operacional de cada uma.
-          </p>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          {summary.recentOrders.length === 0 ? (
-            <div className="rounded-[24px] border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
-              <p className="font-medium text-foreground">Sem ordens recentes</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                As ordens de compra geradas a partir das cotações aparecerão aqui.
+        {/* Requisições recentes */}
+        <Card className="app-section-card overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                Requisições recentes
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Últimas solicitações registradas no sistema.
               </p>
             </div>
+            <Button asChild variant="ghost" size="sm" className="text-xs font-medium gap-1 text-muted-foreground hover:text-foreground">
+              <Link href="/dashboard/compras/pedidos">
+                <span>Ver todos</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+            </Button>
+          </div>
+
+          {summary.recentRequests.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Nenhuma requisição recente encontrada.
+            </div>
           ) : (
-            <div className="overflow-hidden rounded-[24px] border border-border/70">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Ordem</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Emissão</TableHead>
-                    <TableHead>Total</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wider">
+                      ID
+                    </TableHead>
+                    <TableHead className="min-w-[200px] text-xs font-semibold uppercase tracking-wider">
+                      Pedido / Justificativa
+                    </TableHead>
+                    <TableHead className="min-w-[150px] text-xs font-semibold uppercase tracking-wider">
+                      Solicitante
+                    </TableHead>
+                    <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider">
+                      Status
+                    </TableHead>
+                    <TableHead className="w-[120px] text-right text-xs font-semibold uppercase tracking-wider">
+                      Valor
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summary.recentOrders.map((order) => (
-                    <TableRow key={order.id}>
+                  {summary.recentRequests.map((request) => (
+                    <TableRow key={request.id} className="transition-colors">
+                      <TableCell className="font-semibold text-muted-foreground text-sm">
+                        #{request.code}
+                      </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium text-foreground">OC #{order.number}</p>
+                        <div className="space-y-0.5">
+                          <Link
+                            href={`/dashboard/compras/pedidos/${request.id}`}
+                            className="font-medium text-foreground text-sm hover:underline line-clamp-1"
+                          >
+                            {request.justification}
+                          </Link>
                           <p className="text-xs text-muted-foreground">
-                            Pedido #{order.requestCode}
+                            {format(new Date(request.createdAt), 'dd/MM/yyyy')}
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>{order.supplierName}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            order.status === 'CONFIRMED'
-                              ? 'default'
-                              : order.status === 'CANCELLED'
-                                ? 'destructive'
-                                : 'outline'
-                          }
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium text-foreground">
+                            {request.requesterName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {request.departmentName || 'Sem departamento'}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getRequestStatusBadgeStyle(
+                            request.status,
+                          )}`}
                         >
-                          {ORDER_STATUS_LABELS[order.status] || order.status}
-                        </Badge>
+                          {REQUEST_STATUS_LABELS[request.status] || request.status}
+                        </span>
                       </TableCell>
-                      <TableCell>
-                        {format(new Date(order.issueDate || order.createdAt), 'dd/MM/yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        R$ {Number(order.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <TableCell className="text-right font-medium text-sm">
+                        {request.estimatedTotal
+                          ? Number(request.estimatedTotal).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })
+                          : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -391,7 +438,93 @@ export default function ProcurementDashboardPage() {
               </Table>
             </div>
           )}
-        </CardContent>
+        </Card>
+      </div>
+
+      {/* Ordens Recentes */}
+      <Card className="app-section-card overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Ordens de compra recentes
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Acompanhe as últimas ordens emitidas e o status de recebimento.
+            </p>
+          </div>
+          <Button asChild variant="ghost" size="sm" className="text-xs font-medium gap-1 text-muted-foreground hover:text-foreground">
+            <Link href="/dashboard/compras/ordens">
+              <span>Ver todas as ordens</span>
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
+        </div>
+
+        {summary.recentOrders.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            Nenhuma ordem de compra recente emitida.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider">
+                    Ordem
+                  </TableHead>
+                  <TableHead className="min-w-[180px] text-xs font-semibold uppercase tracking-wider">
+                    Fornecedor
+                  </TableHead>
+                  <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider">
+                    Origem
+                  </TableHead>
+                  <TableHead className="w-[110px] text-xs font-semibold uppercase tracking-wider">
+                    Emissão
+                  </TableHead>
+                  <TableHead className="w-[140px] text-xs font-semibold uppercase tracking-wider">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-[130px] text-right text-xs font-semibold uppercase tracking-wider">
+                    Total
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary.recentOrders.map((order) => (
+                  <TableRow key={order.id} className="transition-colors">
+                    <TableCell className="font-semibold text-foreground text-sm">
+                      OC #{order.number}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {order.supplierName}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      Pedido #{order.requestCode}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {format(new Date(order.issueDate || order.createdAt), 'dd/MM/yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getOrderStatusBadgeStyle(
+                          order.status,
+                        )}`}
+                      >
+                        {ORDER_STATUS_LABELS[order.status] || order.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-sm">
+                      {Number(order.totalValue).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
     </div>
   )

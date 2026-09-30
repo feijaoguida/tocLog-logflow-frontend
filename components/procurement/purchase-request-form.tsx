@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
+  ChevronRight,
   Loader2,
   PackagePlus,
   Plus,
@@ -339,33 +340,30 @@ export function PurchaseRequestForm({
   }
 
   return (
-    <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href="/dashboard/compras/pedidos" className="transition hover:text-foreground">
+    <div className="app-page space-y-6">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+            <Link href="/dashboard/compras/pedidos" className="hover:text-foreground transition-colors">
               Compras
             </Link>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span className="text-primary">
+            <ChevronRight className="size-3 text-muted-foreground/60" />
+            <span className="text-foreground font-medium">
               {mode === 'edit' ? 'Editar pedido' : 'Novo pedido'}
             </span>
           </div>
-          <div className="space-y-2">
-            <p className="app-kicker">Compras</p>
-            <h1 className="app-title">
-              {mode === 'edit' ? 'Editar Pedido de Compra' : 'Novo Pedido de Compra'}
-            </h1>
-            <p className="app-subtitle">
-              Registre a necessidade de compra com clareza, descreva os itens e mantenha o
-              rascunho pronto para envio ao aprovador do departamento.
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {mode === 'edit' ? 'Editar Pedido de Compra' : 'Novo Pedido de Compra'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Registre a necessidade de compra com clareza, descreva os itens e mantenha o rascunho pronto para envio.
+          </p>
         </div>
-        <Button asChild variant="outline" className="gap-2">
+
+        <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 font-medium">
           <Link href="/dashboard/compras/pedidos">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para a listagem
+            <ArrowLeft className="size-4" />
+            <span>Voltar para a listagem</span>
           </Link>
         </Button>
       </section>

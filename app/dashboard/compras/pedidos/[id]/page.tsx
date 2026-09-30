@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Loader2, Printer, RotateCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { PurchaseRequestTimeline } from '@/components/dashboard/widgets/PurchaseRequestTimeline'
 import { EventTimeline } from '@/components/dashboard/widgets/EventTimeline'
 import { QuotationsList } from '@/components/dashboard/widgets/QuotationsList'
 import { QuotationForm } from '@/components/dashboard/widgets/QuotationForm'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -66,10 +65,40 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Baixa',
-  NORMAL: 'Normal',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
+  LOW: 'BAIXA',
+  NORMAL: 'NORMAL',
+  HIGH: 'ALTA',
+  URGENT: 'URGENTE',
+}
+
+function getStatusBadgeStyle(status: string) {
+  switch (status) {
+    case 'PENDING':
+      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/60'
+    case 'APPROVED':
+    case 'ORDERED':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+    case 'IN_QUOTATION':
+      return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900/60'
+    case 'REJECTED':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'DRAFT':
+    default:
+      return 'bg-muted text-muted-foreground border-border'
+  }
+}
+
+function getPriorityBadgeStyle(priority: string) {
+  switch (priority) {
+    case 'URGENT':
+      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60'
+    case 'HIGH':
+      return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/60'
+    case 'NORMAL':
+    case 'LOW':
+    default:
+      return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800'
+  }
 }
 
 export default function RequestDetailsPage() {
@@ -166,8 +195,10 @@ export default function RequestDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="app-page space-y-6">
+        <div className="flex min-h-[320px] items-center justify-center">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     )
   }
@@ -177,119 +208,159 @@ export default function RequestDetailsPage() {
   }
 
   return (
-    <div className="app-page">
-      <section className="app-page-header">
-        <div className="space-y-3">
-          <div className="app-badge-row">
-            <span className="app-badge">Modulo de Compras</span>
-            <span className="app-badge app-badge-info">Auditoria Integrada</span>
+    <div className="app-page space-y-6">
+      {/* 1. Cabeçalho Padronizado */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Pedido #{request.code}
+            </h1>
+            <span
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getStatusBadgeStyle(
+                request.status,
+              )}`}
+            >
+              {STATUS_LABELS[request.status] || request.status}
+            </span>
+            {request.priority && (
+              <span
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.2 text-[10px] font-bold tracking-wider ${getPriorityBadgeStyle(
+                  request.priority,
+                )}`}
+              >
+                {PRIORITY_LABELS[request.priority] || request.priority}
+              </span>
+            )}
           </div>
-          <div className="space-y-1">
-            <h1 className="page-title">Requisicao #{request.code}</h1>
-            <p className="page-description">
-              Solicitacao aberta em {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')} por{' '}
-              {request.requester?.user?.name || 'Solicitante'}.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Aberto em {format(new Date(request.createdAt), 'dd/MM/yyyy HH:mm')} por{' '}
+            <strong className="text-foreground">{request.requester?.user?.name || 'Solicitante'}</strong>
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge
-            variant={
-              request.status === 'APPROVED' || request.status === 'ORDERED'
-                ? 'default'
-                : request.status === 'REJECTED'
-                  ? 'destructive'
-                  : 'secondary'
-            }
-          >
-            {STATUS_LABELS[request.status] || request.status}
-          </Badge>
-          <Button asChild variant="outline" className="gap-2">
-            <Link href={`/dashboard/compras/pedidos/${request.id}/print?autoprint=1`} target="_blank">
-              <Printer className="h-4 w-4" />
-              Imprimir
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 font-medium">
+            <Link
+              href={`/dashboard/compras/pedidos/${request.id}/print?autoprint=1`}
+              target="_blank"
+            >
+              <Printer className="size-4" />
+              <span>Imprimir</span>
             </Link>
           </Button>
-          <Button asChild variant="outline" className="gap-2">
+
+          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 font-medium">
             <Link href="/dashboard/compras/pedidos">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar
+              <ArrowLeft className="size-4" />
+              <span>Voltar</span>
             </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => {
+              void fetchDetails()
+              void fetchQuotations()
+            }}
+          >
+            <RotateCw className="size-4" />
+            <span>Atualizar</span>
           </Button>
         </div>
       </section>
 
-      <Card className="app-section-card">
-        <CardContent className="space-y-6 p-0">
-          <div className="space-y-1">
-            <h2 className="section-title">Andamento do pedido</h2>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe a etapa atual e a jornada passo a passo do fluxo desde a submissão.
-            </p>
-          </div>
-          <PurchaseRequestTimeline
-            status={request.status}
-            createdAt={request.createdAt}
-            approvalDate={request.approvalDate}
-            rejectedDate={request.events?.[request.events.length - 1]?.createdAt}
-          />
-        </CardContent>
+      {/* 2. Andamento do Pedido (Timeline) */}
+      <Card className="app-section-card p-5">
+        <div className="space-y-1 mb-4">
+          <h2 className="text-base font-semibold text-foreground">
+            Andamento da solicitação
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Jornada passo a passo desde a abertura até a conclusão do processo.
+          </p>
+        </div>
+        <PurchaseRequestTimeline
+          status={request.status}
+          createdAt={request.createdAt}
+          approvalDate={request.approvalDate}
+          rejectedDate={request.events?.[request.events.length - 1]?.createdAt}
+        />
       </Card>
 
+      {/* 3. Grid de Conteúdo */}
       <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
         <div className="space-y-6">
-          <Card className="app-section-card">
-            <CardHeader className="px-0 pt-0">
-              <CardTitle>Itens solicitados</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 px-0 pb-0">
+          {/* Itens Solicitados */}
+          <Card className="app-section-card p-5">
+            <div className="space-y-1 mb-4">
+              <h2 className="text-base font-semibold text-foreground">
+                Itens solicitados ({request.items.length})
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Especificação dos materiais ou serviços requeridos.
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
               {request.items.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[20px] border border-border/60 bg-muted/20 px-4 py-4"
+                  className="rounded-lg border bg-muted/20 p-3.5 flex flex-wrap items-start justify-between gap-3"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {item.product?.name || item.description || 'Item sem descricao'}
-                      </p>
-                      {item.observation ? (
-                        <p className="mt-1 text-sm text-muted-foreground">{item.observation}</p>
-                      ) : null}
-                    </div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {Number(item.quantity)} {item.unit?.symbol || 'unid'}
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-foreground text-sm">
+                      {item.product?.name || item.description || 'Item sem descrição'}
                     </p>
+                    {item.observation && (
+                      <p className="text-xs text-muted-foreground">{item.observation}</p>
+                    )}
                   </div>
+                  <span className="inline-flex items-center rounded-full bg-background border px-2.5 py-0.5 text-xs font-bold text-foreground">
+                    {Number(item.quantity)} {item.unit?.symbol || 'un'}
+                  </span>
                 </div>
               ))}
-            </CardContent>
+            </div>
           </Card>
 
-          <Card className="app-section-card">
-            <CardHeader className="px-0 pt-0">
-              <CardTitle>Detalhes e contexto</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-5 px-0 pb-0 md:grid-cols-2">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Justificativa</p>
-                <p className="text-sm text-muted-foreground">{request.justification}</p>
+          {/* Justificativa e Observações */}
+          <Card className="app-section-card p-5">
+            <div className="space-y-1 mb-4">
+              <h2 className="text-base font-semibold text-foreground">
+                Justificativa e contexto
+              </h2>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 text-sm">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Justificativa
+                </span>
+                <p className="text-foreground leading-relaxed">{request.justification}</p>
               </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Observacoes gerais</p>
-                <p className="text-sm text-muted-foreground">
-                  {request.observation || 'Nenhuma observacao adicional informada.'}
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Observações adicionais
+                </span>
+                <p className="text-muted-foreground leading-relaxed">
+                  {request.observation || 'Nenhuma observação informada.'}
                 </p>
               </div>
-            </CardContent>
+            </div>
           </Card>
 
-          {isQuotationEnabled ? (
+          {/* Cotações vinculadas */}
+          {isQuotationEnabled && (
             <QuotationsList
               quotations={quotations as any[]}
               requestId={request.id}
-              isRequestApproved={request.status !== 'PENDING' && request.status !== 'REJECTED' && request.status !== 'DRAFT'}
+              isRequestApproved={
+                request.status !== 'PENDING' &&
+                request.status !== 'REJECTED' &&
+                request.status !== 'DRAFT'
+              }
               onAddClick={() => {
                 setEditingQuote(null)
                 setIsQuoteFormOpen(true)
@@ -301,77 +372,87 @@ export default function RequestDetailsPage() {
               onSetWinner={handleSetWinner}
               onGenerateOrder={handleGenerateOrder}
             />
-          ) : null}
+          )}
         </div>
 
+        {/* Coluna Lateral: Resumo e Trilha de Eventos */}
         <div className="space-y-6">
-          <Card className="app-section-card">
-            <CardHeader className="px-0 pt-0">
-              <CardTitle>Resumo operacional</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 px-0 pb-0 text-sm">
-              <div className="flex items-center justify-between gap-3">
+          <Card className="app-section-card p-5 space-y-4 text-sm">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-foreground">
+                Resumo operacional
+              </h2>
+            </div>
+
+            <div className="space-y-3 divide-y">
+              <div className="flex items-center justify-between pt-2">
                 <span className="text-muted-foreground">Departamento</span>
                 <span className="font-medium text-foreground">
-                  {request.department?.name || 'Nao informado'}
+                  {request.department?.name || 'Não informado'}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between pt-2">
                 <span className="text-muted-foreground">Prioridade</span>
                 <span className="font-medium text-foreground">
                   {PRIORITY_LABELS[request.priority || 'NORMAL'] || 'Normal'}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between pt-2">
                 <span className="text-muted-foreground">Valor estimado</span>
-                <span className="font-medium text-foreground">
+                <span className="font-semibold text-foreground">
                   {request.estimatedTotal
-                    ? `R$ ${Number(request.estimatedTotal).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                      })}`
-                    : 'Nao informado'}
+                    ? Number(request.estimatedTotal).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })
+                    : 'Não informado'}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between pt-2">
                 <span className="text-muted-foreground">Data desejada</span>
                 <span className="font-medium text-foreground">
                   {request.desiredDate
                     ? format(new Date(request.desiredDate), 'dd/MM/yyyy')
-                    : 'Nao informada'}
+                    : 'Não informada'}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Itens cadastrados</span>
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-muted-foreground">Total de itens</span>
                 <span className="font-medium text-foreground">{request.items.length}</span>
               </div>
+            </div>
 
-              {request.approvedBy?.user?.name ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
-                  <p className="text-sm font-medium">Aprovado por</p>
-                  <p className="mt-1 text-sm">{request.approvedBy.user.name}</p>
-                </div>
-              ) : null}
+            {request.approvedBy?.user?.name && (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+                <p className="font-semibold">Aprovado por:</p>
+                <p className="mt-0.5">{request.approvedBy.user.name}</p>
+              </div>
+            )}
 
-              {request.status === 'REJECTED' && request.rejectionReason ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
-                  <p className="text-sm font-medium">Motivo da reprovacao</p>
-                  <p className="mt-1 text-sm">{request.rejectionReason}</p>
-                </div>
-              ) : null}
-            </CardContent>
+            {request.status === 'REJECTED' && request.rejectionReason && (
+              <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-800 dark:text-rose-300">
+                <p className="font-semibold">Motivo da reprovação:</p>
+                <p className="mt-0.5">{request.rejectionReason}</p>
+              </div>
+            )}
           </Card>
 
-          <Card className="app-section-card">
-            <CardHeader className="px-0 pt-0">
-              <CardTitle>Trilha de eventos e auditoria</CardTitle>
-            </CardHeader>
-            <CardContent className="px-0 pb-0">
-              <EventTimeline events={request.events} />
-            </CardContent>
+          {/* Trilha de Eventos */}
+          <Card className="app-section-card p-5">
+            <div className="space-y-1 mb-4">
+              <h2 className="text-base font-semibold text-foreground">
+                Auditoria e histórico
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Registro imutável dos eventos do pedido.
+              </p>
+            </div>
+            <EventTimeline events={request.events} />
           </Card>
         </div>
       </div>
 
+      {/* Formulário de Cotação Modal */}
       <QuotationForm
         open={isQuoteFormOpen}
         onOpenChange={setIsQuoteFormOpen}
@@ -384,6 +465,7 @@ export default function RequestDetailsPage() {
         }}
       />
 
+      {/* ConfirmDialog Reutilizável */}
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={(open) => setConfirmDialog((s) => ({ ...s, open }))}
