@@ -38,14 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -72,6 +65,7 @@ import { TablePagination } from '@/components/ui/table-pagination'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { cn } from '@/lib/utils'
 
 // ==========================================
 // TIPAGENS & ENUMS
@@ -229,7 +223,6 @@ export default function VacationsPage() {
   const [teamVacations, setTeamVacations] = useState<VacationRecord[]>([])
   const [hrVacations, setHrVacations] = useState<VacationRecord[]>([])
   const [overdueReport, setOverdueReport] = useState<OverdueReportResponse | null>(null)
-  const [settings, setSettings] = useState<VacationSettingsData | null>(null)
 
   // Filtros flutuantes
   const [searchQuery, setSearchQuery] = useState('')
@@ -274,11 +267,6 @@ export default function VacationsPage() {
   const [responseComment, setResponseComment] = useState('')
   const [responseSubmitting, setResponseSubmitting] = useState(false)
 
-  // Gaveta de Configurações do Módulo (RH)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [newEmailTag, setNewEmailTag] = useState('')
-  const [settingsSubmitting, setSettingsSubmitting] = useState(false)
-
   // Permissões
   const canRequestForOthers = hasPermission('vacation.request.for_others')
   const canApproveManager = hasPermission('vacation.approve.manager') || canRequestForOthers
@@ -307,7 +295,6 @@ export default function VacationsPage() {
       if (canApproveHr) {
         requests.push(api.get('/vacations').then((res) => setHrVacations(res.data)))
         requests.push(api.get('/vacations/overdue-report').then((res) => setOverdueReport(res.data)))
-        requests.push(api.get('/vacations/settings').then((res) => setSettings(res.data)))
       }
 
       if (canRequestForOthers || canApproveHr || canCancelHr) {
@@ -562,45 +549,6 @@ export default function VacationsPage() {
     }
   }
 
-  // ==========================================
-  // SALVAR CONFIGURAÇÕES DO TENANT (RH)
-  // ==========================================
-
-  async function handleSaveSettings(e: React.FormEvent) {
-    e.preventDefault()
-    if (!settings) return
-
-    setSettingsSubmitting(true)
-    try {
-      await api.put('/vacations/settings', settings)
-      toast.success('Configurações de férias atualizadas com sucesso!')
-      setSettingsOpen(false)
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Falha ao salvar configurações do módulo.'))
-    } finally {
-      setSettingsSubmitting(false)
-    }
-  }
-
-  function handleAddEmailTag() {
-    if (!newEmailTag.trim() || !settings) return
-    const email = newEmailTag.trim().toLowerCase()
-    if (!settings.hrNotificationEmails.includes(email)) {
-      setSettings({
-        ...settings,
-        hrNotificationEmails: [...settings.hrNotificationEmails, email],
-      })
-    }
-    setNewEmailTag('')
-  }
-
-  function handleRemoveEmailTag(email: string) {
-    if (!settings) return
-    setSettings({
-      ...settings,
-      hrNotificationEmails: settings.hrNotificationEmails.filter((e) => e !== email),
-    })
-  }
 
   // ==========================================
   // RENDERIZAÇÃO
@@ -628,13 +576,15 @@ export default function VacationsPage() {
           {canApproveHr && (
             <>
               <Button
+                asChild
                 variant="outline"
                 size="sm"
                 className="h-9 gap-1.5"
-                onClick={() => setSettingsOpen(true)}
               >
-                <Settings className="size-4" />
-                <span className="hidden sm:inline">Configurações</span>
+                <Link href="/dashboard/rh/settings?tab=vacations">
+                  <Settings className="size-4" />
+                  <span className="hidden sm:inline">Configurações</span>
+                </Link>
               </Button>
 
               <Button
@@ -1325,39 +1275,155 @@ export default function VacationsPage() {
               )}
             </div>
 
-            {/* Chips Rápidos de Dias */}
+            {/* 1. Seção de Venda de Férias (Abono Pecuniário) - Antecede os dias de descanso */}
+            <div className="rounded-lg border p-3 space-y-3 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="sell-toggle" className="text-sm font-semibold cursor-pointer">
+                    Venda de Férias (Abono Pecuniário)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    A CLT permite vender até 1/3 das férias (máximo 10 dias).
+                  </p>
+                </div>
+                <Switch
+                  id="sell-toggle"
+                  checked={enableSelling}
+                  onCheckedChange={(checked) => {
+                    setEnableSelling(checked)
+                    if (!checked) {
+                      setFormSellDays(0)
+                    } else {
+                      const newSell = formSellDays === 0 ? 5 : formSellDays
+                      setFormSellDays(newSell)
+                      const maxAllowed = 30 - newSell
+                      if (formDaysCount > maxAllowed) {
+                        setFormDaysCount(maxAllowed)
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {enableSelling && (
+                <div className="pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="sell-days" className="text-xs font-medium">
+                      Dias a vender:
+                    </Label>
+                    <div className="flex gap-2">
+                      {[5, 10].map((d) => (
+                        <Button
+                          key={d}
+                          type="button"
+                          size="sm"
+                          variant={formSellDays === d ? 'default' : 'outline'}
+                          className="h-7 text-xs font-semibold"
+                          onClick={() => {
+                            setFormSellDays(d)
+                            const maxAllowed = 30 - d
+                            if (formDaysCount > maxAllowed) {
+                              setFormDaysCount(maxAllowed)
+                            }
+                          }}
+                        >
+                          {d} dias
+                        </Button>
+                      ))}
+                    </div>
+                    <Input
+                      id="sell-days"
+                      type="number"
+                      min={1}
+                      max={10}
+                      className="w-16 h-7 text-xs"
+                      value={formSellDays}
+                      onChange={(e) => {
+                        const val = Math.min(10, Math.max(0, Number(e.target.value)))
+                        setFormSellDays(val)
+                        const maxAllowed = 30 - val
+                        if (formDaysCount > maxAllowed) {
+                          setFormDaysCount(maxAllowed)
+                        }
+                      }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Máx. descanso restante: <strong>{30 - formSellDays} dias</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Quantidade de Dias de Descanso (com bloqueio de dias excedentes) */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Quantidade de Dias de Descanso
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Quantidade de Dias de Descanso
+                </Label>
+                {enableSelling && formSellDays > 0 && (
+                  <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                    Limite: até {30 - formSellDays} dias (30 - {formSellDays}d venda)
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
-                {quickDaysChips.map((chip) => (
-                  <Button
-                    key={chip}
-                    type="button"
-                    variant={formDaysCount === chip ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-8 px-3 text-xs font-semibold"
-                    onClick={() => setFormDaysCount(chip)}
-                  >
-                    {chip} dias
-                  </Button>
-                ))}
+                {quickDaysChips.map((chip) => {
+                  const maxAllowed = enableSelling ? 30 - formSellDays : 30
+                  const isBlocked = chip > maxAllowed
+
+                  return (
+                    <Button
+                      key={chip}
+                      type="button"
+                      variant={formDaysCount === chip ? 'default' : 'outline'}
+                      size="sm"
+                      disabled={isBlocked}
+                      className={cn(
+                        'h-8 px-3 text-xs font-semibold transition-all',
+                        isBlocked && 'opacity-35 cursor-not-allowed bg-muted/40 text-muted-foreground border-dashed'
+                      )}
+                      onClick={() => {
+                        if (!isBlocked) {
+                          setFormDaysCount(chip)
+                        }
+                      }}
+                      title={
+                        isBlocked
+                          ? `Período de ${chip} dias indisponível: somado aos ${formSellDays} dias vendidos ultrapassaria o limite legal de 30 dias.`
+                          : undefined
+                      }
+                    >
+                      {chip} dias
+                    </Button>
+                  )
+                })}
               </div>
               <div className="pt-1 flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Outro período:</span>
                 <Input
                   type="number"
                   min={5}
-                  max={30}
+                  max={enableSelling ? 30 - formSellDays : 30}
                   className="w-20 h-8 text-xs"
                   value={formDaysCount}
-                  onChange={(e) => setFormDaysCount(Number(e.target.value))}
+                  onChange={(e) => {
+                    const maxAllowed = enableSelling ? 30 - formSellDays : 30
+                    const val = Number(e.target.value)
+                    if (val > maxAllowed) {
+                      setFormDaysCount(maxAllowed)
+                    } else {
+                      setFormDaysCount(val)
+                    }
+                  }}
                 />
+                <span className="text-[11px] text-muted-foreground">
+                  (Mín. 5 dias CLT{enableSelling && formSellDays > 0 ? `, máx. ${30 - formSellDays} dias` : ', máx. 30 dias'})
+                </span>
               </div>
             </div>
 
-            {/* Card Reativo de Previsão de Retorno */}
+            {/* 3. Card Reativo de Previsão de Retorno e Duração Total */}
             {formStartDate && calculatedEndDate && (
               <div className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between text-xs">
                 <div className="space-y-0.5">
@@ -1374,64 +1440,16 @@ export default function VacationsPage() {
                   </span>
                   <div className="font-bold text-sm text-foreground">
                     {formDaysCount} dias corridos
+                    {enableSelling && formSellDays > 0 ? (
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 block font-normal">
+                        (+ {formSellDays}d venda = {formDaysCount + formSellDays}/30 dias)
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Seção de Venda de Férias (Abono Pecuniário) */}
-            <div className="rounded-lg border p-3 space-y-3 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="sell-toggle" className="text-sm font-semibold cursor-pointer">
-                    Venda de Férias (Abono Pecuniário)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    A CLT permite vender até 1/3 das férias (máximo 10 dias).
-                  </p>
-                </div>
-                <Switch
-                  id="sell-toggle"
-                  checked={enableSelling}
-                  onCheckedChange={(checked) => {
-                    setEnableSelling(checked)
-                    if (!checked) setFormSellDays(0)
-                    else if (formSellDays === 0) setFormSellDays(10)
-                  }}
-                />
-              </div>
-
-              {enableSelling && (
-                <div className="pt-2 border-t flex items-center gap-3">
-                  <Label htmlFor="sell-days" className="text-xs font-medium">
-                    Dias a vender:
-                  </Label>
-                  <div className="flex gap-2">
-                    {[5, 10].map((d) => (
-                      <Button
-                        key={d}
-                        type="button"
-                        size="sm"
-                        variant={formSellDays === d ? 'default' : 'outline'}
-                        className="h-7 text-xs font-semibold"
-                        onClick={() => setFormSellDays(d)}
-                      >
-                        {d} dias
-                      </Button>
-                    ))}
-                  </div>
-                  <Input
-                    id="sell-days"
-                    type="number"
-                    min={1}
-                    max={10}
-                    className="w-16 h-7 text-xs"
-                    value={formSellDays}
-                    onChange={(e) => setFormSellDays(Number(e.target.value))}
-                  />
-                </div>
-              )}
-            </div>
 
             {/* Parcela */}
             <div className="space-y-1.5">
@@ -1797,165 +1815,7 @@ export default function VacationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ============================================================== */}
-      {/* 9. GAVETA DE CONFIGURAÇÕES DE FÉRIAS (RH - VAC26-T12)          */}
-      {/* ============================================================== */}
-      <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Configurações do Módulo de Férias</SheetTitle>
-            <SheetDescription>
-              Ajuste as regras de negócio e a lista de e-mails de notificação corporativa.
-            </SheetDescription>
-          </SheetHeader>
 
-          {settings && (
-            <form onSubmit={handleSaveSettings} className="space-y-5 py-4">
-              {/* Toggle de Aceite Formal */}
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5 pr-2">
-                  <Label htmlFor="cfg-req-accept" className="text-sm font-semibold cursor-pointer">
-                    Exigir Aceite em Ressalvas
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Se ativado, solicitações com ressalva exigem aceite formal do colaborador antes de prosseguir.
-                  </p>
-                </div>
-                <Switch
-                  id="cfg-req-accept"
-                  checked={settings.requireEmployeeAcceptanceOnReservation}
-                  onCheckedChange={(checked) =>
-                    setSettings({ ...settings, requireEmployeeAcceptanceOnReservation: checked })
-                  }
-                />
-              </div>
-
-              {/* Aviso Prévio CLT */}
-              <div className="space-y-1.5">
-                <Label htmlFor="cfg-notice" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Aviso Prévio Mínimo (Dias)
-                </Label>
-                <Input
-                  id="cfg-notice"
-                  type="number"
-                  min={0}
-                  max={90}
-                  className="h-9 text-sm"
-                  value={settings.minNoticeDays}
-                  onChange={(e) =>
-                    setSettings({ ...settings, minNoticeDays: Number(e.target.value) })
-                  }
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Padrão CLT: 30 dias de antecedência para comunicação de férias.
-                </p>
-              </div>
-
-              {/* Venda de Férias (Abono) */}
-              <div className="space-y-3 rounded-lg border p-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="cfg-allow-sell" className="text-sm font-semibold cursor-pointer">
-                    Permitir Venda de Férias (Abono)
-                  </Label>
-                  <Switch
-                    id="cfg-allow-sell"
-                    checked={settings.allowCashAllowance}
-                    onCheckedChange={(checked) =>
-                      setSettings({ ...settings, allowCashAllowance: checked })
-                    }
-                  />
-                </div>
-                {settings.allowCashAllowance && (
-                  <div className="space-y-1 pt-2 border-t">
-                    <Label htmlFor="cfg-max-sell" className="text-xs text-muted-foreground">
-                      Limite Máximo de Dias de Venda
-                    </Label>
-                    <Input
-                      id="cfg-max-sell"
-                      type="number"
-                      min={1}
-                      max={10}
-                      className="h-8 text-xs w-24"
-                      value={settings.maxCashAllowanceDays}
-                      onChange={(e) =>
-                        setSettings({ ...settings, maxCashAllowanceDays: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* E-mails do RH para Notificações Transacionais */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lista de E-mails do RH Destinatários
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Estes e-mails receberão alertas sobre abertura, aprovação e ressalvas de férias.
-                </p>
-
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    placeholder="novo-email-rh@empresa.com"
-                    className="h-8 text-xs"
-                    value={newEmailTag}
-                    onChange={(e) => setNewEmailTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddEmailTag()
-                      }
-                    }}
-                  />
-                  <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleAddEmailTag}>
-                    Adicionar
-                  </Button>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  {settings.hrNotificationEmails.length === 0 ? (
-                    <span className="text-xs text-muted-foreground italic">Nenhum e-mail cadastrado ainda.</span>
-                  ) : (
-                    settings.hrNotificationEmails.map((email) => (
-                      <span
-                        key={email}
-                        className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-xs text-secondary-foreground"
-                      >
-                        <Mail className="size-3 text-muted-foreground" />
-                        {email}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEmailTag(email)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <SheetFooter className="pt-4 border-t">
-                <Button type="button" variant="outline" size="sm" onClick={() => setSettingsOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" size="sm" disabled={settingsSubmitting}>
-                  {settingsSubmitting ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin mr-1.5" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Configurações'
-                  )}
-                </Button>
-              </SheetFooter>
-            </form>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   )
 }
