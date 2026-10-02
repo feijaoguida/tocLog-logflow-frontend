@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = (permission: string) => {
       if (!user) return false
-      
+      if (user.accessType === 'SAAS_ADMIN' || user.accessType === 'COMPANY_ADMIN') return true
       const permissions = user.permissions || []
       return permissions.includes(permission)
   }

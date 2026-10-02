@@ -293,6 +293,21 @@ export function AppSidebar() {
             { title: "Patrimônio", url: "/dashboard/logistics/assets", permission: "logistics.assets.view" },
         ]
       },
+      {
+        title: "Portaria",
+        url: "/dashboard/portaria",
+        icon: "badge",
+        items: [
+            { title: "Painel Geral", url: "/dashboard/portaria" },
+            { title: "Visitas e Recepção", url: "/dashboard/portaria/visitas" },
+            { title: "Grupos e Caravanas", url: "/dashboard/portaria/grupos", permission: "portaria.group.manage" },
+            { title: "Roteiros e Áreas", url: "/dashboard/portaria/roteiros", permission: "portaria.visit.view" },
+            { title: "Veículos", url: "/dashboard/portaria/veiculos" },
+            { title: "Presentes no Local", url: "/dashboard/portaria/presentes", permission: "portaria.access.operate" },
+            { title: "Ocorrências e Turno", url: "/dashboard/portaria/ocorrencias", permission: "portaria.access.operate" },
+            { title: "Configurações", url: "/dashboard/portaria/configuracoes", permission: "portaria.settings.manage" },
+        ]
+      },
   ]
 
   const filteredGroups = menuGroups
