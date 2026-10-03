@@ -166,6 +166,12 @@ export function AppSidebar() {
           icon: "home",
       },
       {
+          title: "Assistente de IA",
+          url: "/dashboard/ai",
+          icon: "smart_toy",
+          permission: "ai.use",
+      },
+      {
           title: "Cadastros",
           url: "#",
           icon: "dataset",

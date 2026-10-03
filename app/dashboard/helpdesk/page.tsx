@@ -45,6 +45,7 @@ import { useAuth } from '@/context/auth-context'
 import { TicketIndicatorsView, type TicketIndicators } from './indicators'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { AiContextualChatDialog } from '@/components/ai/ai-contextual-chat-dialog'
 
 type HelpdeskTicket = {
   indicators?: TicketIndicators
@@ -284,6 +285,8 @@ export default function HelpdeskPage() {
               <span>Abrir chamado</span>
             </Button>
           ) : null}
+
+          <AiContextualChatDialog module="helpdesk" title="Assistente de Helpdesk" />
 
           {/* Botão de Filtro com Popover Flutuante Reutilizável */}
           <FilterPopover

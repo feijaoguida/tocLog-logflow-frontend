@@ -26,6 +26,7 @@ import {
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { AiContextualChatDialog } from '@/components/ai/ai-contextual-chat-dialog'
 
 type ProcurementSummary = {
   kpis: {
@@ -203,6 +204,8 @@ export default function ProcurementDashboardPage() {
               <span>Novo pedido</span>
             </Link>
           </Button>
+
+          <AiContextualChatDialog module="compras" title="Assistente de Compras" />
 
           <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
             <Link href="/dashboard/compras/pedidos">
