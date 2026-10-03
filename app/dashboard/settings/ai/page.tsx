@@ -103,7 +103,7 @@ export default function AiGeneralSettingsPage() {
 
     setSaving(true)
     try {
-      await api.put('/ai/settings', {
+      const payload: any = {
         enabled: formData.enabled,
         defaultConnectionId: formData.defaultConnectionId || null,
         defaultModelId: formData.defaultModelId || null,
@@ -112,8 +112,16 @@ export default function AiGeneralSettingsPage() {
         maxToolIterations: Number(formData.maxToolIterations),
         defaultDailyTokenQuota: Number(formData.defaultDailyTokenQuota),
         retentionDays: Number(formData.retentionDays),
-      })
-      toast.success('Configurações salvas com sucesso!')
+      }
+      if ((formData as any).version) {
+        payload.version = (formData as any).version
+      }
+
+      const { data } = await api.put('/ai/settings', payload)
+      if (data?.version) {
+        setFormData((prev: any) => ({ ...prev, version: data.version }))
+      }
+      toast.success('Configurações de inteligência artificial atualizadas com sucesso.')
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Falha ao salvar configurações.')
     } finally {

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Send,
   RotateCw,
@@ -16,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
+import { toast } from 'sonner'
 import { AiMarkdownRenderer } from './ai-markdown-renderer'
 
 export interface AiChatInterfaceProps {
@@ -73,8 +76,13 @@ export function AiChatInterface({
   className = '',
   compact = false,
 }: AiChatInterfaceProps) {
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
   const currentCompanyId = user?.companyId
+  const canManageAi =
+    user?.accessType === 'SAAS_ADMIN' ||
+    user?.accessType === 'COMPANY_ADMIN' ||
+    hasPermission('ai.settings.manage') ||
+    hasPermission('ai.settings.view')
 
   // Conversations state
   const [conversations, setConversations] = useState<ConversationItem[]>([])
@@ -313,13 +321,15 @@ export function AiChatInterface({
 
       // 2. Postar mensagem com idempotência (clientRequestId)
       const { data: postResult } = await api.post(`/ai/conversations/${convId}/messages`, {
+        text: content,
         content,
         clientRequestId,
       })
 
       // 3. Se retornou runId para execução assíncrona
-      if (postResult.run?.id && convId) {
-        startPollingRun(postResult.run.id, convId)
+      const runId = postResult.runId || postResult.run?.id
+      if (runId && convId) {
+        startPollingRun(runId, convId)
       } else {
         // Se a resposta já foi síncrona
         setStatus('IDLE')
@@ -334,6 +344,11 @@ export function AiChatInterface({
       setStatusMessage('')
       const msg = err.response?.data?.message || 'Falha ao processar solicitação.'
       setErrorMessage(msg)
+      toast.error(msg)
+      // Restaurar o texto digitado se a mensagem não pôde ser enviada
+      if (!textToSend) {
+        setInputText(content)
+      }
     }
   }
 
@@ -469,6 +484,21 @@ export function AiChatInterface({
               </select>
             )}
 
+            {canManageAi && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                title="Configurações de IA, Provedores e Chaves"
+              >
+                <Link href="/dashboard/settings/ai/connections">
+                  <Settings className="size-3.5" />
+                  <span className="hidden sm:inline">Configurar IA</span>
+                </Link>
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -489,6 +519,43 @@ export function AiChatInterface({
 
         {/* Mensagens */}
         <ScrollArea className="flex-1 p-4 md:p-6 overflow-y-auto">
+          {/* Mensagem de Erro com Ações */}
+          {errorMessage && (
+            <div className="max-w-3xl mx-auto mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-destructive">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Não foi possível processar a consulta</p>
+                  <p className="text-muted-foreground mt-0.5">{errorMessage}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {canManageAi && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/10 gap-1"
+                  >
+                    <Link href="/dashboard/settings/ai/connections">
+                      <Settings className="size-3" />
+                      <span>Configurações de IA</span>
+                    </Link>
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs border-destructive/30 hover:bg-destructive/10 text-destructive gap-1"
+                  onClick={handleRetry}
+                >
+                  <RotateCw className="size-3" />
+                  <span>Tentar novamente</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 max-w-md mx-auto my-auto">
               <div className="size-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
@@ -504,17 +571,38 @@ export function AiChatInterface({
               {/* Pílulas de sugestões */}
               <div className="w-full pt-2 flex flex-col gap-1.5 text-left">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1">
-                  Sugestões
+                  Sugestões (clique para preencher o texto)
                 </span>
                 {suggestedPrompts.map((prompt, idx) => (
-                  <button
+                  <div
                     key={idx}
-                    onClick={() => handleSendMessage(prompt)}
-                    className="p-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-muted/50 text-xs text-foreground text-left transition-all hover:border-primary/40 flex items-center justify-between group"
+                    className="p-2.5 rounded-lg border border-border bg-surface-subtle hover:bg-muted/50 text-xs text-foreground transition-all hover:border-primary/40 flex items-center justify-between group gap-2"
                   >
-                    <span>{prompt}</span>
-                    <Send className="size-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText(prompt)
+                        setTimeout(() => {
+                          textareaRef.current?.focus()
+                        }, 0)
+                      }}
+                      className="flex-1 text-left cursor-pointer hover:text-primary transition-colors select-none"
+                      title="Clique para colocar este texto no bloco de digitação"
+                    >
+                      <span>{prompt}</span>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-primary gap-1 shrink-0"
+                      onClick={() => void handleSendMessage(prompt)}
+                      title="Enviar diretamente"
+                    >
+                      <span className="hidden sm:inline">Enviar</span>
+                      <Send className="size-3" />
+                    </Button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -597,28 +685,6 @@ export function AiChatInterface({
                       <span>Cancelar</span>
                     </Button>
                   </div>
-                </div>
-              )}
-
-              {/* Mensagem de Erro com Ação de Retry */}
-              {errorMessage && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-start justify-between gap-3 text-xs text-destructive">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold">Não foi possível completar a consulta</p>
-                      <p className="text-muted-foreground mt-0.5">{errorMessage}</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs border-destructive/30 hover:bg-destructive/10 text-destructive gap-1 shrink-0"
-                    onClick={handleRetry}
-                  >
-                    <RotateCw className="size-3" />
-                    <span>Tentar novamente</span>
-                  </Button>
                 </div>
               )}
 

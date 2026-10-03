@@ -26,16 +26,22 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.info("[Auth] Tentando login para:", email)
       const { data } = await api.post('/auth/login', { email, password })
+      console.info("[Auth] Login bem-sucedido! Usuário:", data.user?.email, "AccessType:", data.user?.accessType)
       
       login(data.access_token, data.user)
       toast.success("Login realizado com sucesso")
       
-    } catch (err) {
-        if (err instanceof Error) {
+    } catch (err: any) {
+        console.error("[Auth] Erro ao autenticar:", err?.response?.data || err?.message || err)
+        const apiMessage = err?.response?.data?.message
+        if (apiMessage) {
+            setError(Array.isArray(apiMessage) ? apiMessage.join(', ') : apiMessage)
+        } else if (err instanceof Error) {
             setError(err.message)
         } else {
-            setError('Ocorreu um erro inesperado.')
+            setError('Ocorreu um erro inesperado ao conectar ao servidor.')
         }
     } finally {
       setLoading(false)

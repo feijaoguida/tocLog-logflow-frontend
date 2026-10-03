@@ -36,11 +36,20 @@ export function PublicFeed() {
     useEffect(() => {
         const fetchPosts = async () => {
             try {
-                // Public endpoint
-                const { data } = await api.get('/feed')
-                setPosts(data)
-            } catch (error) {
-                console.error("Failed to fetch public feed", error)
+                // Endpoint público da landing page
+                const { data } = await api.get('/feed/public')
+                setPosts(Array.isArray(data) ? data : [])
+            } catch (error: any) {
+                // Tenta fallback para /feed se /feed/public não responder
+                try {
+                    const { data } = await api.get('/feed')
+                    setPosts(Array.isArray(data) ? data : [])
+                } catch (fallbackErr: any) {
+                    if (fallbackErr?.response?.status !== 401) {
+                        console.error("Failed to fetch public feed", fallbackErr)
+                    }
+                    setPosts([])
+                }
             } finally {
                 setLoading(false)
             }

@@ -53,10 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localStorage.setItem('user', JSON.stringify(data))
               setUser(data)
             }
-        } catch (error) {
-            console.error("Auth check failed", error)
+        } catch (error: any) {
+            // Se o token expirou ou é inválido (401), limpa silenciosamente as credenciais locais
+            if (error?.response?.status !== 401) {
+              console.error("Auth check failed", error)
+            }
             localStorage.removeItem('user')
             localStorage.removeItem('token')
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
             setUser(null)
         } finally {
             setIsLoading(false)

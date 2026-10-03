@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Loader2, MonitorCog, MoonStar, Palette, SunMedium } from "lucide-react"
+import Link from 'next/link'
+import { Loader2, MonitorCog, MoonStar, Palette, SunMedium, Sparkles, Cpu, Bot, Key, Shield } from "lucide-react"
 
 import { useSettings } from "@/context/settings-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -145,11 +146,12 @@ export default function SettingsPage() {
             />
 
             <Tabs defaultValue="theme" className="w-full space-y-6">
-                <TabsList className="grid w-full max-w-[680px] grid-cols-4">
+                <TabsList className="grid w-full max-w-[850px] grid-cols-5">
                     <TabsTrigger value="theme">Tema</TabsTrigger>
                     <TabsTrigger value="interface">Interface</TabsTrigger>
                     <TabsTrigger value="company">Empresa</TabsTrigger>
                     <TabsTrigger value="email">E-mail e Alertas</TabsTrigger>
+                    <TabsTrigger value="ai">Inteligência Artificial</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="theme" className="space-y-6">
@@ -366,6 +368,92 @@ export default function SettingsPage() {
 
                 <TabsContent value="email" className="space-y-6">
                     <EmailSettingsPanel />
+                </TabsContent>
+
+                <TabsContent value="ai" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="size-4 text-primary" />
+                                <CardTitle>Inteligência Artificial & Assistentes</CardTitle>
+                            </div>
+                            <CardDescription>
+                                Gerencie integrações com provedores de LLM, credenciais criptografadas de API, catálogo de assistentes e cotas de uso da sua empresa.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="rounded-lg border border-border p-4 flex flex-col justify-between space-y-3 bg-surface-subtle">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                                            <Cpu className="size-4 text-primary" />
+                                            <span>Conexões e Chaves de API</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Configure suas chaves da OpenAI, Google Gemini, Anthropic ou OpenRouter de forma criptografada e segura.
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm" variant="default" className="w-full gap-1.5 font-medium">
+                                        <Link href="/dashboard/settings/ai/connections">
+                                            <Key className="size-3.5" />
+                                            <span>Configurar Conexões e Chaves</span>
+                                        </Link>
+                                    </Button>
+                                </div>
+
+                                <div className="rounded-lg border border-border p-4 flex flex-col justify-between space-y-3 bg-surface-subtle">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                                            <Shield className="size-4 text-primary" />
+                                            <span>Parâmetros Globais e Limites</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Ative o serviço para a empresa, defina cotas diárias de tokens, retenção de histórico e provedor padrão.
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm" variant="outline" className="w-full gap-1.5 font-medium">
+                                        <Link href="/dashboard/settings/ai">
+                                            <span>Acessar Parâmetros Globais</span>
+                                        </Link>
+                                    </Button>
+                                </div>
+
+                                <div className="rounded-lg border border-border p-4 flex flex-col justify-between space-y-3 bg-surface-subtle">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                                            <Bot className="size-4 text-primary" />
+                                            <span>Catálogo de Assistentes</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Crie e personalize assistentes por área (Compras, Helpdesk, Geral) com instruções e ferramentas dedicadas.
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm" variant="outline" className="w-full gap-1.5 font-medium">
+                                        <Link href="/dashboard/settings/ai/assistants">
+                                            <span>Gerenciar Assistentes</span>
+                                        </Link>
+                                    </Button>
+                                </div>
+
+                                <div className="rounded-lg border border-border p-4 flex flex-col justify-between space-y-3 bg-surface-subtle">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                                            <Sparkles className="size-4 text-primary" />
+                                            <span>Métricas de Uso e Auditoria</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Acompanhe o volume de chamadas, tokens consumidos, custos estimados e execuções de ferramentas.
+                                        </p>
+                                    </div>
+                                    <Button asChild size="sm" variant="outline" className="w-full gap-1.5 font-medium">
+                                        <Link href="/dashboard/settings/ai/usage">
+                                            <span>Visualizar Relatórios de Uso</span>
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
