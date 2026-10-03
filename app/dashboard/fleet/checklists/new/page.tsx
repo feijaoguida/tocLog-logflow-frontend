@@ -3,10 +3,9 @@
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, CheckCircle2, ChevronRight, FileCheck, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, FileCheck, RotateCw, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { MenuFunctionHeader } from '@/components/layout/menu-function-header'
 import { WorkspaceInlineAlert } from '@/components/layout/workspace-inline-alert'
 import { WorkspaceStateCard } from '@/components/layout/workspace-state-card'
 import { useAuth } from '@/context/auth-context'
@@ -193,24 +192,46 @@ function NewChecklistPageContent() {
   }
 
   return (
-    <div className="app-page">
-      <MenuFunctionHeader
-        title="Frota > Checklists > Novo"
-        description="Fluxo guiado para iniciar e concluir um checklist operacional da frota interna."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="rounded-full px-4 py-2">
-              Passo {step} de 2
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => void loadVehicles(false)} disabled={loadingVehicles || refreshingVehicles}>
-              {refreshingVehicles ? 'Atualizando...' : 'Atualizar leitura'}
-            </Button>
+    <div className="app-page space-y-6 p-4 md:p-6">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard/fleet/checklists">Voltar</Link>
+              <Link href="/dashboard/fleet/checklists">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Checklists
+              </Link>
             </Button>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-sm font-semibold">Novo Checklist</span>
           </div>
-        }
-      />
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+            Novo Checklist Operacional
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Fluxo guiado para iniciar e concluir uma inspeção veicular da frota.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="px-3 py-1 text-xs">
+            Passo {step} de 2
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() => void loadVehicles(false)}
+            disabled={loadingVehicles || refreshingVehicles}
+          >
+            <RotateCw className={`size-4 ${refreshingVehicles ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-9">
+            <Link href="/dashboard/fleet/checklists">Voltar</Link>
+          </Button>
+        </div>
+      </section>
 
       {loadError ? (
         <WorkspaceStateCard

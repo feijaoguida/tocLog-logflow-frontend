@@ -20,6 +20,7 @@ export interface User {
   inheritedPermissions?: string[]
   directPermissions?: string[]
   avatarUrl?: string
+  isOnboardingOnly?: boolean
 }
 
 interface AuthContextType {
