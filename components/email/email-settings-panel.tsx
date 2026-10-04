@@ -40,6 +40,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { reportError } from '@/lib/error-reporter'
 
 type ProviderConfig = {
   strategy: 'RESEND_FIRST' | 'SMTP_FIRST' | 'RESEND_ONLY' | 'SMTP_ONLY'
@@ -195,7 +196,14 @@ export function EmailSettingsPanel() {
       setNotifications(notifRes.data)
       loadLogs()
     } catch (err: any) {
-      toast.error('Erro ao carregar configurações de e-mail: ' + getApiErrorMessage(err))
+      const msg = 'Erro ao carregar configurações de e-mail: ' + getApiErrorMessage(err)
+      toast.error(msg)
+      reportError(err, {
+        module: 'EMAIL_SETTINGS',
+        screen: '/dashboard/settings/email',
+        action: 'loadInitialData',
+        errorMessage: msg,
+      })
     } finally {
       setLoading(false)
     }
@@ -208,6 +216,12 @@ export function EmailSettingsPanel() {
       setLogs(res.data)
     } catch (err) {
       console.error(err)
+      reportError(err, {
+        module: 'EMAIL_SETTINGS',
+        screen: '/dashboard/settings/email',
+        action: 'loadLogs',
+        errorMessage: 'Erro ao carregar logs de e-mail',
+      })
     } finally {
       setLoadingLogs(false)
     }
@@ -242,7 +256,14 @@ export function EmailSettingsPanel() {
       const updated = await api.get('/email/config')
       setConfig(updated.data)
     } catch (err: any) {
-      toast.error('Falha ao salvar provedores: ' + getApiErrorMessage(err))
+      const msg = 'Falha ao salvar provedores: ' + getApiErrorMessage(err)
+      toast.error(msg)
+      reportError(err, {
+        module: 'EMAIL_SETTINGS',
+        screen: '/dashboard/settings/email',
+        action: 'handleSaveConfig',
+        errorMessage: msg,
+      })
     } finally {
       setSavingConfig(false)
     }
@@ -264,7 +285,15 @@ export function EmailSettingsPanel() {
       toast.success(res.data.message || 'E-mail de teste enviado com sucesso!')
       loadLogs()
     } catch (err: any) {
-      toast.error(getApiErrorMessage(err))
+      const msg = getApiErrorMessage(err)
+      toast.error(msg)
+      reportError(err, {
+        module: 'EMAIL_SETTINGS',
+        screen: '/dashboard/settings/email',
+        action: 'handleTestConnection',
+        errorMessage: msg,
+        requestPayload: { to: testEmailAddress, provider: testProvider },
+      })
     } finally {
       setTestingConnection(false)
     }
@@ -306,7 +335,15 @@ export function EmailSettingsPanel() {
       })
       toast.success(`Regra do evento "${item.name}" salva com sucesso!`)
     } catch (err: any) {
-      toast.error(`Erro ao salvar evento: ${getApiErrorMessage(err)}`)
+      const msg = `Erro ao salvar evento: ${getApiErrorMessage(err)}`
+      toast.error(msg)
+      reportError(err, {
+        module: 'EMAIL_SETTINGS',
+        screen: '/dashboard/settings/email',
+        action: 'handleSaveNotifications',
+        errorMessage: msg,
+        requestPayload: item,
+      })
     } finally {
       setSavingEvents((prev) => ({ ...prev, [item.event]: false }))
     }

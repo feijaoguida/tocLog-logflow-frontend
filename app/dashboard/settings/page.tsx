@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, MonitorCog, MoonStar, Palette, SunMedium, Sparkles, Cpu, Bot, Key, Shield } from "lucide-react"
+import { Loader2, MonitorCog, MoonStar, Palette, SunMedium, Sparkles, Cpu, Bot, Key, Shield, Database, FileText } from "lucide-react"
 
 import { useSettings } from "@/context/settings-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -77,8 +77,13 @@ export default function SettingsPage() {
     const [companyDoc, setCompanyDoc] = useState("")
     const [companyDesc, setCompanyDesc] = useState("")
 
+    const [retentionDays, setRetentionDays] = useState<number>(180)
+    const [loadingRetention, setLoadingRetention] = useState(false)
+    const [savingRetention, setSavingRetention] = useState(false)
+
     useEffect(() => {
         fetchCompanyProfile()
+        fetchRetentionDays()
     }, [])
 
     useEffect(() => {
@@ -104,6 +109,42 @@ export default function SettingsPage() {
             }
         } catch {
             // profile/company can fail gracefully if user has no company
+        }
+    }
+
+    const fetchRetentionDays = async () => {
+        setLoadingRetention(true)
+        try {
+            const res = await api.get<Array<{ key: string; value: string }>>('/settings')
+            const setting = res.data?.find((s) => s.key === 'error_logs.retention_days')
+            if (setting?.value) {
+                setRetentionDays(Number(setting.value))
+            }
+        } catch {
+            // default fallback 180
+        } finally {
+            setLoadingRetention(false)
+        }
+    }
+
+    const handleSaveRetention = async () => {
+        if (retentionDays < 7 || retentionDays > 3650) {
+            toast.error("O período de retenção deve ser entre 7 e 3650 dias.")
+            return
+        }
+        setSavingRetention(true)
+        try {
+            await api.post('/settings', {
+                key: 'error_logs.retention_days',
+                value: String(retentionDays),
+                description: 'Dias de retenção dos logs de erro do sistema antes de expurgo automático',
+                isPublic: false,
+            })
+            toast.success("Retenção de logs atualizada com sucesso!")
+        } catch {
+            toast.error("Erro ao salvar configuração de retenção.")
+        } finally {
+            setSavingRetention(false)
         }
     }
 
@@ -146,12 +187,13 @@ export default function SettingsPage() {
             />
 
             <Tabs defaultValue="theme" className="w-full space-y-6">
-                <TabsList className="grid w-full max-w-[850px] grid-cols-5">
+                <TabsList className="grid w-full max-w-[950px] grid-cols-6">
                     <TabsTrigger value="theme">Tema</TabsTrigger>
                     <TabsTrigger value="interface">Interface</TabsTrigger>
                     <TabsTrigger value="company">Empresa</TabsTrigger>
                     <TabsTrigger value="email">E-mail e Alertas</TabsTrigger>
                     <TabsTrigger value="ai">Inteligência Artificial</TabsTrigger>
+                    <TabsTrigger value="system">Sistema</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="theme" className="space-y-6">
@@ -451,6 +493,63 @@ export default function SettingsPage() {
                                         </Link>
                                     </Button>
                                 </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="system" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <Database className="size-4 text-primary" />
+                                <CardTitle>Gestão e Retenção de Logs</CardTitle>
+                            </div>
+                            <CardDescription>
+                                Políticas de ciclo de vida de dados e expurgo de erros operacionais do sistema.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border p-4 bg-surface-subtle">
+                                <div className="space-y-1">
+                                    <Label htmlFor="retention-days" className="text-sm font-semibold">
+                                        Dias de Retenção de Logs de Erro
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground max-w-xl">
+                                        Logs de erro (Frontend, Backend e Mobile) mais antigos que essa quantidade de dias serão apagados automaticamente todas as noites pela rotina agendada (Cron às 03:00).
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Input
+                                        id="retention-days"
+                                        type="number"
+                                        min="7"
+                                        max="3650"
+                                        className="w-24 text-center font-semibold"
+                                        value={retentionDays}
+                                        disabled={loadingRetention || savingRetention}
+                                        onChange={(e) => setRetentionDays(Number(e.target.value))}
+                                    />
+                                    <span className="text-xs text-muted-foreground">dias</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2">
+                                <Button asChild variant="outline" size="sm" className="gap-1.5 font-medium">
+                                    <Link href="/dashboard/settings/error-logs">
+                                        <FileText className="size-3.5" />
+                                        <span>Acessar Central de Logs de Erro</span>
+                                    </Link>
+                                </Button>
+
+                                <Button
+                                    onClick={handleSaveRetention}
+                                    disabled={loadingRetention || savingRetention}
+                                    size="sm"
+                                >
+                                    {savingRetention && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                    Salvar Retenção
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

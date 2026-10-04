@@ -182,6 +182,7 @@ export function AppSidebar() {
               { title: "Design System", url: "/dashboard/cadastros/design-system", permission: "system.settings.view" },
               { title: "Filiais", url: "/dashboard/cadastros/branches", permission: "system.branches.view" },
               { title: "Inteligência Artificial", url: "/dashboard/settings/ai/connections", permission: "ai.settings.view" },
+              { title: "Logs de Erro", url: "/dashboard/settings/error-logs", permission: "system.error_logs.view" },
           ]
       },
       {

@@ -6,11 +6,11 @@ import {
   Save,
   RotateCw,
   AlertTriangle,
-  CheckCircle2,
   Sliders,
   Shield,
   Clock,
   Cpu,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -18,10 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
+import { reportError } from '@/lib/error-reporter'
 
 interface AiSettingsData {
   id?: string
   companyId?: string
+  version?: number
   enabled: boolean
   defaultConnectionId?: string | null
   defaultModelId?: string | null
@@ -36,14 +38,43 @@ interface ConnectionOption {
   id: string
   name: string
   provider: string
-  defaultModelId?: string
+  defaultModel?: string | null
   active: boolean
+}
+
+const KNOWN_MODELS_BY_PROVIDER: Record<string, Array<{ id: string; name: string }>> = {
+  OPENROUTER: [
+    { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Rápido & Econômico)' },
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet (Raciocínio & Código)' },
+    { id: 'openai/gpt-4o', name: 'OpenAI GPT-4o' },
+    { id: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
+    { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3' },
+    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B Instruct' },
+    { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B Instruct' },
+  ],
+  OPENAI: [
+    { id: 'gpt-4o', name: 'GPT-4o (Recomendado)' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Econômico)' },
+    { id: 'o1', name: 'OpenAI o1' },
+    { id: 'o3-mini', name: 'OpenAI o3-mini' },
+  ],
+  ANTHROPIC: [
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recomendado)' },
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Rápido)' },
+    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+  ],
+  GEMINI: [
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Recomendado)' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+  ],
 }
 
 export default function AiGeneralSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [connections, setConnections] = useState<ConnectionOption[]>([])
+  const [isCustomModel, setIsCustomModel] = useState(false)
   const [formData, setFormData] = useState<AiSettingsData>({
     enabled: false,
     defaultConnectionId: '',
@@ -71,13 +102,14 @@ export default function AiGeneralSettingsPage() {
       setFormData({
         id: s.id,
         companyId: s.companyId,
+        version: s.version,
         enabled: Boolean(s.enabled),
         defaultConnectionId: s.defaultConnectionId || '',
         defaultModelId: s.defaultModelId || '',
         maxOutputTokens: s.maxOutputTokens || 4000,
         timeoutSeconds: s.timeoutSeconds || 60,
         maxToolIterations: s.maxToolIterations || 5,
-        defaultDailyTokenQuota: s.defaultDailyTokenQuota || 100000,
+        defaultDailyTokenQuota: s.defaultDailyTokenQuota ?? s.dailyMessageLimit ?? 100000,
         retentionDays: s.retentionDays || 90,
       })
 
@@ -85,8 +117,14 @@ export default function AiGeneralSettingsPage() {
         ? connectionsRes.data
         : connectionsRes.data?.items || []
       setConnections(list)
-    } catch {
+    } catch (err) {
       toast.error('Erro ao carregar configurações de IA.')
+      reportError(err, {
+        module: 'AI_SETTINGS',
+        screen: '/dashboard/settings/ai',
+        action: 'loadData',
+        errorMessage: 'Erro ao carregar configurações de IA.',
+      })
     } finally {
       setLoading(false)
     }
@@ -102,8 +140,9 @@ export default function AiGeneralSettingsPage() {
     }
 
     setSaving(true)
+    let payload: Record<string, unknown> | null = null
     try {
-      const payload: any = {
+      payload = {
         enabled: formData.enabled,
         defaultConnectionId: formData.defaultConnectionId || null,
         defaultModelId: formData.defaultModelId || null,
@@ -111,19 +150,29 @@ export default function AiGeneralSettingsPage() {
         timeoutSeconds: Number(formData.timeoutSeconds),
         maxToolIterations: Number(formData.maxToolIterations),
         defaultDailyTokenQuota: Number(formData.defaultDailyTokenQuota),
+        dailyMessageLimit: Number(formData.defaultDailyTokenQuota),
         retentionDays: Number(formData.retentionDays),
       }
-      if ((formData as any).version) {
-        payload.version = (formData as any).version
+      if (formData.version !== undefined) {
+        payload.version = formData.version
       }
 
       const { data } = await api.put('/ai/settings', payload)
       if (data?.version) {
-        setFormData((prev: any) => ({ ...prev, version: data.version }))
+        setFormData((prev) => ({ ...prev, version: data.version }))
       }
       toast.success('Configurações de inteligência artificial atualizadas com sucesso.')
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Falha ao salvar configurações.')
+    } catch (err: unknown) {
+      const respData = (err as { response?: { data?: { message?: string } } })?.response?.data
+      const msg = respData?.message || 'Falha ao salvar configurações.'
+      toast.error(msg)
+      reportError(err, {
+        module: 'AI_SETTINGS',
+        screen: '/dashboard/settings/ai',
+        action: 'handleSave',
+        errorMessage: msg,
+        requestPayload: payload,
+      })
     } finally {
       setSaving(false)
     }
@@ -190,36 +239,81 @@ export default function AiGeneralSettingsPage() {
               </Label>
               <select
                 value={formData.defaultConnectionId || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    defaultConnectionId: e.target.value || null,
-                  })
-                }
+                onChange={(e) => {
+                  const connId = e.target.value
+                  const conn = connections.find((c) => c.id === connId)
+                  setFormData((prev) => ({
+                    ...prev,
+                    defaultConnectionId: connId || null,
+                    defaultModelId: conn?.defaultModel || prev.defaultModelId,
+                  }))
+                }}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs sm:text-sm text-foreground outline-none focus:border-primary"
               >
                 <option value="">Nenhuma selecionada</option>
                 {connections.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.provider}) {c.active ? '— Ativa' : '— Inativa'}
+                    {c.name} ({c.provider}) {c.defaultModel ? `[${c.defaultModel}]` : ''} {c.active ? '— Ativa' : '— Inativa'}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Identificador do Modelo Padrão
-              </Label>
-              <Input
-                value={formData.defaultModelId || ''}
-                onChange={(e) => setFormData({ ...formData, defaultModelId: e.target.value })}
-                placeholder="Ex: gpt-4o, claude-3-5-sonnet, gemini-1.5-pro"
-                className="h-9 text-xs sm:text-sm"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Deixe em branco para utilizar o modelo padrão recomendado pelo provedor.
-              </p>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-primary" />
+                  Modelo Padrão
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModel((v) => !v)}
+                  className="text-[11px] text-primary hover:underline font-medium"
+                >
+                  {isCustomModel ? '← Escolher da lista' : '+ Digitar outro modelo'}
+                </button>
+              </div>
+
+              {(() => {
+                const activeConn = connections.find((c) => c.id === formData.defaultConnectionId)
+                const providerModels = activeConn ? (KNOWN_MODELS_BY_PROVIDER[activeConn.provider] || []) : []
+
+                if (!isCustomModel && providerModels.length > 0) {
+                  return (
+                    <div className="space-y-1">
+                      <select
+                        value={formData.defaultModelId || ''}
+                        onChange={(e) => setFormData({ ...formData, defaultModelId: e.target.value })}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs sm:text-sm text-foreground outline-none focus:border-primary font-mono"
+                      >
+                        <option value="">Padrão do Provedor (Recomendado)</option>
+                        {providerModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} ({m.id})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Modelo que responderá por padrão às requisições do sistema.
+                      </p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-1">
+                    <Input
+                      value={formData.defaultModelId || ''}
+                      onChange={(e) => setFormData({ ...formData, defaultModelId: e.target.value })}
+                      placeholder="Ex: google/gemini-2.0-flash-001, gpt-4o, claude-3-5-sonnet"
+                      className="h-9 text-xs sm:text-sm font-mono"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Deixe em branco para utilizar o modelo padrão recomendado pelo provedor.
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </CardContent>
