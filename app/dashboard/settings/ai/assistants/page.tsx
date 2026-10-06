@@ -37,18 +37,22 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { api } from '@/lib/api'
+import { reportError } from '@/lib/error-reporter'
 
 interface AssistantItem {
   id: string
+  key?: string
   name: string
   description?: string
   module?: string
-  audience: string
+  audience?: string
+  currentRevisionId?: string | null
   currentRevisionNumber?: number
-  isPublished: boolean
-  toolsCount: number
-  knowledgeCount: number
-  updatedAt: string
+  latestRevisionNumber?: number
+  isPublished?: boolean
+  toolsCount?: number
+  knowledgeCount?: number
+  updatedAt?: string
 }
 
 export default function AiAssistantsPage() {
@@ -64,14 +68,15 @@ export default function AiAssistantsPage() {
   const [saving, setSaving] = useState(false)
 
   const [formData, setFormData] = useState({
+    key: '',
     name: '',
     description: '',
     module: 'GERAL',
-    audience: 'TODOS',
     instructions: '',
     tools: [] as string[],
     knowledgeIds: [] as string[],
     expectedVersion: 1,
+    publishNow: true,
   })
 
   useEffect(() => {
@@ -90,8 +95,14 @@ export default function AiAssistantsPage() {
       setAssistants(Array.isArray(asstRes.data) ? asstRes.data : asstRes.data.items || [])
       setAvailableTools(Array.isArray(toolsRes.data) ? toolsRes.data : [])
       setAvailableKnowledge(Array.isArray(knowRes.data) ? knowRes.data : knowRes.data.items || [])
-    } catch {
+    } catch (err: unknown) {
       toast.error('Erro ao carregar assistentes.')
+      reportError(err, {
+        module: 'AI_ASSISTANTS',
+        screen: '/dashboard/settings/ai/assistants',
+        action: 'loadData',
+        errorMessage: 'Erro ao carregar catálogo de assistentes.',
+      })
     } finally {
       setLoading(false)
     }
@@ -101,14 +112,15 @@ export default function AiAssistantsPage() {
     setEditingId(null)
     setActiveTab('INFO')
     setFormData({
+      key: '',
       name: '',
       description: '',
       module: 'GERAL',
-      audience: 'TODOS',
       instructions: 'Você é um assistente do sistema TocLog. Responda com clareza e precisão técnica.',
       tools: [],
       knowledgeIds: [],
       expectedVersion: 1,
+      publishNow: true,
     })
     setDialogOpen(true)
   }
@@ -119,18 +131,25 @@ export default function AiAssistantsPage() {
     try {
       const { data } = await api.get(`/ai/assistants/${asst.id}`)
       setFormData({
+        key: data.key || '',
         name: data.name,
         description: data.description || '',
         module: data.module || 'GERAL',
-        audience: data.audience || 'TODOS',
         instructions: data.currentRevision?.instructions || '',
         tools: Array.isArray(data.currentRevision?.tools) ? data.currentRevision.tools : [],
         knowledgeIds: Array.isArray(data.currentRevision?.knowledgeIds) ? data.currentRevision.knowledgeIds : [],
         expectedVersion: data.version || 1,
+        publishNow: true,
       })
       setDialogOpen(true)
-    } catch {
+    } catch (err: unknown) {
       toast.error('Erro ao carregar detalhes do assistente.')
+      reportError(err, {
+        module: 'AI_ASSISTANTS',
+        screen: '/dashboard/settings/ai/assistants',
+        action: 'handleOpenEdit',
+        errorMessage: 'Erro ao carregar detalhes do assistente.',
+      })
     }
   }
 
@@ -160,19 +179,60 @@ export default function AiAssistantsPage() {
     }
 
     setSaving(true)
+    let payloadToLog: Record<string, unknown> | null = null
     try {
       if (editingId) {
-        await api.put(`/ai/assistants/${editingId}`, formData)
-        toast.success('Assistente e revisão salvos com sucesso!')
+        const updatePayload = {
+          name: formData.name.trim(),
+          description: formData.description?.trim() || undefined,
+          module: formData.module,
+          instructions: formData.instructions,
+          tools: formData.tools,
+          knowledgeIds: formData.knowledgeIds,
+          expectedVersion: formData.expectedVersion,
+          publishNow: formData.publishNow,
+        }
+        payloadToLog = updatePayload
+        await api.put(`/ai/assistants/${editingId}`, updatePayload)
+        toast.success(
+          formData.publishNow
+            ? 'Assistente atualizado e publicado com sucesso!'
+            : 'Assistente e revisão salvos como rascunho.',
+        )
       } else {
-        await api.post('/ai/assistants', formData)
-        toast.success('Assistente criado com sucesso!')
+        const createPayload = {
+          key: formData.key?.trim() || undefined,
+          name: formData.name.trim(),
+          description: formData.description?.trim() || undefined,
+          module: formData.module,
+          instructions: formData.instructions,
+          tools: formData.tools,
+          knowledgeIds: formData.knowledgeIds,
+          publishNow: formData.publishNow,
+        }
+        payloadToLog = createPayload
+        await api.post('/ai/assistants', createPayload)
+        toast.success(
+          formData.publishNow
+            ? 'Assistente criado e publicado com sucesso!'
+            : 'Assistente criado como rascunho.',
+        )
       }
 
       setDialogOpen(false)
       void loadData()
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Falha ao salvar assistente.')
+    } catch (err: unknown) {
+      const respData = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data
+      const rawMsg = respData?.message
+      const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg || 'Falha ao salvar assistente.'
+      toast.error(msg)
+      reportError(err, {
+        module: 'AI_ASSISTANTS',
+        screen: '/dashboard/settings/ai/assistants',
+        action: editingId ? 'updateAssistant' : 'createAssistant',
+        errorMessage: msg,
+        requestPayload: payloadToLog,
+      })
     } finally {
       setSaving(false)
     }
@@ -180,13 +240,24 @@ export default function AiAssistantsPage() {
 
   const handlePublish = async (asst: AssistantItem) => {
     try {
+      const targetRev = asst.currentRevisionNumber || asst.latestRevisionNumber || 1
       await api.post(`/ai/assistants/${asst.id}/publish`, {
-        revisionNumber: asst.currentRevisionNumber || 1,
+        revision: targetRev,
+        revisionNumber: targetRev,
       })
       toast.success(`Assistente "${asst.name}" publicado com sucesso!`)
       void loadData()
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Falha ao publicar assistente.')
+    } catch (err: unknown) {
+      const respData = (err as { response?: { data?: { message?: string } } })?.response?.data
+      const msg = respData?.message || 'Falha ao publicar assistente.'
+      toast.error(msg)
+      reportError(err, {
+        module: 'AI_ASSISTANTS',
+        screen: '/dashboard/settings/ai/assistants',
+        action: 'publishRevision',
+        errorMessage: msg,
+        requestPayload: { revisionNumber: asst.currentRevisionNumber || asst.latestRevisionNumber || 1 },
+      })
     }
   }
 
@@ -282,10 +353,10 @@ export default function AiAssistantsPage() {
                   </TableCell>
 
                   <TableCell>
-                    {asst.isPublished ? (
+                    {asst.isPublished || asst.currentRevisionId ? (
                       <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-600 bg-emerald-500/10 gap-1">
                         <CheckCircle2 className="size-3" />
-                        <span>Publicado (v{asst.currentRevisionNumber || 1})</span>
+                        <span>Publicado (v{asst.currentRevisionNumber || asst.latestRevisionNumber || 1})</span>
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -306,7 +377,7 @@ export default function AiAssistantsPage() {
                         <span>Editar</span>
                       </Button>
 
-                      {!asst.isPublished && (
+                      {!(asst.isPublished || asst.currentRevisionId) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -382,7 +453,22 @@ export default function AiAssistantsPage() {
                     </Label>
                     <Input
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => {
+                        const newName = e.target.value
+                        setFormData((prev) => ({
+                          ...prev,
+                          name: newName,
+                          ...(!editingId && (!prev.key || prev.key === prev.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-')) ? {
+                            key: newName
+                              .toLowerCase()
+                              .normalize('NFD')
+                              .replace(/[\u0300-\u036f]/g, '')
+                              .replace(/[^a-z0-9_-]+/g, '-')
+                              .replace(/^-+|-+$/g, '')
+                              .slice(0, 45)
+                          } : {})
+                        }))
+                      }}
                       placeholder="Ex: Suporte de Compras, Helpdesk N1"
                       className="h-9 text-xs sm:text-sm"
                       required
@@ -407,16 +493,31 @@ export default function AiAssistantsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Descrição Pública
-                  </Label>
-                  <Input
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Breve descrição da finalidade para os usuários"
-                    className="h-9 text-xs sm:text-sm"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Identificador / Chave (Slug)
+                    </Label>
+                    <Input
+                      value={formData.key}
+                      onChange={(e) => setFormData({ ...formData, key: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-') })}
+                      placeholder="Ex: compras-suporte"
+                      className="h-9 text-xs sm:text-sm font-mono"
+                      disabled={Boolean(editingId)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Descrição Pública
+                    </Label>
+                    <Input
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Breve descrição da finalidade para os usuários"
+                      className="h-9 text-xs sm:text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -431,6 +532,19 @@ export default function AiAssistantsPage() {
                     className="text-xs font-mono leading-relaxed resize-none"
                     required
                   />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                  <input
+                    type="checkbox"
+                    id="publishNowCheckbox"
+                    checked={formData.publishNow}
+                    onChange={(e) => setFormData({ ...formData, publishNow: e.target.checked })}
+                    className="size-4 accent-primary rounded cursor-pointer"
+                  />
+                  <Label htmlFor="publishNowCheckbox" className="text-xs cursor-pointer font-medium text-foreground">
+                    Publicar imediatamente (disponibilizar esta versão para uso no sistema)
+                  </Label>
                 </div>
               </div>
             )}

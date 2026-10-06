@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { KeyRound } from "lucide-react"
 import { toast } from "sonner"
 
 export const validateCPF = (cpf: string) => {
@@ -116,6 +117,7 @@ type ManagerItem = {
 
 export interface EmployeeData {
   id?: string
+  userId?: string
   name: string
   email: string
   cpf: string
@@ -155,6 +157,8 @@ export interface EmployeeData {
 export interface EmployeeFormProps {
   initialData?: EmployeeData
   isEditMode?: boolean
+  onOpenPasswordReset?: () => void
+  canResetPassword?: boolean
 }
 
 type FieldErrorMap = Record<string, string>
@@ -277,7 +281,12 @@ function Section({
   )
 }
 
-export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormProps) {
+export function EmployeeForm({
+  initialData,
+  isEditMode = false,
+  onOpenPasswordReset,
+  canResetPassword = false,
+}: EmployeeFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [departments, setDepartments] = useState<LookupItem[]>([])
@@ -679,15 +688,48 @@ export function EmployeeForm({ initialData, isEditMode = false }: EmployeeFormPr
           </div>
 
           <div className="field-stack">
-            <Label htmlFor="password">{isEditMode ? "Nova Senha" : "Senha de Acesso"}</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password || ""}
-              onChange={(event) => handleChange("password", event.target.value)}
-              placeholder={isEditMode ? "Deixe em branco para manter a atual" : "Defina uma senha"}
-            />
-            <p className="text-xs text-muted-foreground">Nao bloqueia a edicao se ficar em branco.</p>
+            <Label htmlFor="password">Senha de Acesso</Label>
+            {isEditMode ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="password"
+                    type="password"
+                    disabled
+                    value="••••••••••••"
+                    className="bg-muted text-muted-foreground flex-1 cursor-not-allowed"
+                  />
+                  {canResetPassword && onOpenPasswordReset && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={onOpenPasswordReset}
+                      className="h-9 gap-1.5 whitespace-nowrap border-primary/30 text-primary hover:bg-primary/10"
+                    >
+                      <KeyRound className="size-4" />
+                      <span>Alterar Senha</span>
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {canResetPassword
+                    ? "Para alterar a senha de acesso, utilize o botão acima para abrir a validação de segurança."
+                    : "Você não possui permissão para alterar a senha deste usuário."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password || ""}
+                  onChange={(event) => handleChange("password", event.target.value)}
+                  placeholder="Defina uma senha"
+                />
+                <p className="text-xs text-muted-foreground">Defina a senha inicial de acesso do colaborador.</p>
+              </>
+            )}
           </div>
 
           <div className="field-stack">

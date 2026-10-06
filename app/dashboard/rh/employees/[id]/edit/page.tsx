@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, KeyRound, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,23 +12,33 @@ import {
   formatCPF,
 } from '@/components/employee-form'
 import { api } from '@/lib/api'
+import { useAuth } from '@/context/auth-context'
+import { AdminPasswordResetDialog } from '@/components/rh/admin-password-reset-dialog'
 
 export default function EditEmployeePage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+  const { hasPermission } = useAuth()
+  const canResetPassword = hasPermission('rh.employees.password_reset')
 
   const [loading, setLoading] = useState(true)
   const [initialData, setInitialData] = useState<EmployeeData | null>(null)
+  const [targetUserId, setTargetUserId] = useState<string>('')
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false)
 
   useEffect(() => {
     const fetchEmployee = async () => {
       try {
         const { data } = await api.get(`/employees/${id}`)
 
+        const userId = data.user?.id || data.userId || ''
+        setTargetUserId(userId)
+
         // Transform Backend Model to Frontend Form Model
         const mappedData: EmployeeData = {
           id: data.id,
+          userId,
           name: data.user?.name || '',
           email: data.user?.email || '',
           cpf: formatCPF(data.cpf || ''),
@@ -140,6 +150,18 @@ export default function EditEmployeePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {canResetPassword && targetUserId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setResetPasswordOpen(true)}
+              >
+                <KeyRound className="size-4" />
+                <span>Alterar Senha</span>
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -153,7 +175,23 @@ export default function EditEmployeePage() {
         </div>
       </section>
 
-      {initialData && <EmployeeForm initialData={initialData} isEditMode={true} />}
+      {initialData && (
+        <EmployeeForm
+          initialData={initialData}
+          isEditMode={true}
+          canResetPassword={canResetPassword}
+          onOpenPasswordReset={() => setResetPasswordOpen(true)}
+        />
+      )}
+
+      {targetUserId && (
+        <AdminPasswordResetDialog
+          open={resetPasswordOpen}
+          onOpenChange={setResetPasswordOpen}
+          targetUserId={targetUserId}
+          targetUserName={initialData?.name || ''}
+        />
+      )}
     </div>
   )
 }

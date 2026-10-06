@@ -28,6 +28,7 @@ import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
 import { AiMarkdownRenderer } from './ai-markdown-renderer'
+import { reportError } from '@/lib/error-reporter'
 
 export interface AiChatInterfaceProps {
   initialContext?: {
@@ -300,10 +301,17 @@ export function AiChatInterface({
       // 1. Criar conversa se não existir
       if (!convId) {
         const title = content.length > 40 ? `${content.slice(0, 40)}...` : content
+        const contextType = initialContext?.module ? String(initialContext.module).toUpperCase() : undefined
+        const contextId =
+          (initialContext as any)?.recordId ||
+          (initialContext as any)?.entityId ||
+          undefined
+
         const { data: newConv } = await api.post('/ai/conversations', {
           title,
           assistantId: selectedAssistantId || undefined,
-          context: initialContext,
+          contextType,
+          contextId,
         })
         convId = newConv.id
         setActiveConversationId(newConv.id)
@@ -342,9 +350,17 @@ export function AiChatInterface({
     } catch (err: any) {
       setStatus('ERROR')
       setStatusMessage('')
-      const msg = err.response?.data?.message || 'Falha ao processar solicitação.'
+      const rawMsg = err.response?.data?.message
+      const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg || 'Falha ao processar solicitação.'
       setErrorMessage(msg)
       toast.error(msg)
+      reportError(err, {
+        module: 'AI_CHAT',
+        screen: '/dashboard/ai',
+        action: 'handleSendMessage',
+        errorMessage: msg,
+        requestPayload: { assistantId: selectedAssistantId, convId, contentSnippet: content.slice(0, 100) },
+      })
       // Restaurar o texto digitado se a mensagem não pôde ser enviada
       if (!textToSend) {
         setInputText(content)

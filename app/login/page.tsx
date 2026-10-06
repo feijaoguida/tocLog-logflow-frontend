@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -118,7 +119,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                  <div className="flex items-center justify-between">
                       <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Senha</Label>
-                      <a href="#" className="text-xs font-semibold text-[#c6182e] hover:underline">Esqueci minha senha</a>
+                      <Link href="/forgot-password" className="text-xs font-semibold text-[#c6182e] hover:underline">Esqueci minha senha</Link>
                  </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-2.5 h-5 w-5 text-slate-400 text-[20px]">lock</span>
