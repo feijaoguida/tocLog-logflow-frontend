@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { reportError } from '@/lib/error-reporter'
 
 export interface FleetResourceItem {
   id: string
@@ -183,6 +184,12 @@ export default function FleetPage() {
       setLoadError(message)
       setResources([])
       toast.error(message)
+      reportError(error, {
+        module: 'FLEET',
+        screen: '/dashboard/fleet',
+        action: 'loadResources',
+        errorMessage: message,
+      })
     } finally {
       if (showLoadingState) {
         setLoading(false)
@@ -223,7 +230,21 @@ export default function FleetPage() {
       setNewColor('')
       void loadResources(false)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Falha ao cadastrar veículo parceiro.'))
+      const message = getApiErrorMessage(error, 'Falha ao cadastrar veículo parceiro.')
+      toast.error(message)
+      reportError(error, {
+        module: 'FLEET',
+        screen: '/dashboard/fleet',
+        action: 'createExternalVehicle',
+        errorMessage: message,
+        requestPayload: {
+          tipo: newTipo,
+          placa: newPlaca,
+          brand: newBrand,
+          model: newModel,
+          year: newYear,
+        },
+      })
     } finally {
       setSubmittingExternal(false)
     }
@@ -248,7 +269,19 @@ export default function FleetPage() {
       setSelectedResource(null)
       void loadResources(false)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Falha ao atualizar odômetro.'))
+      const message = getApiErrorMessage(error, 'Falha ao atualizar odômetro.')
+      toast.error(message)
+      reportError(error, {
+        module: 'FLEET',
+        screen: '/dashboard/fleet',
+        action: 'updateKm',
+        errorMessage: message,
+        requestPayload: {
+          resourceId: selectedResource?.id,
+          origin: selectedResource?.origin,
+          km: parsedKm,
+        },
+      })
     } finally {
       setSubmittingKm(false)
     }

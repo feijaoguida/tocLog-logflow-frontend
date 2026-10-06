@@ -15,6 +15,7 @@ import {
   Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AI_MODULE_OPTIONS, getModuleLabel } from '@/lib/ai-modules'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -332,7 +333,7 @@ export default function AiAssistantsPage() {
 
                   <TableCell>
                     <Badge variant="outline" className="text-xs uppercase">
-                      {asst.module || 'GERAL'}
+                      {getModuleLabel(asst.module)}
                     </Badge>
                   </TableCell>
 
@@ -484,11 +485,11 @@ export default function AiAssistantsPage() {
                       onChange={(e) => setFormData({ ...formData, module: e.target.value })}
                       className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs sm:text-sm text-foreground outline-none focus:border-primary"
                     >
-                      <option value="GERAL">Geral (Sistema)</option>
-                      <option value="COMPRAS">Compras e Suprimentos</option>
-                      <option value="HELPDESK">Helpdesk e Chamados</option>
-                      <option value="RH">Recursos Humanos</option>
-                      <option value="FROTAS">Gestão de Frotas</option>
+                      {AI_MODULE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
