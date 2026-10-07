@@ -268,6 +268,53 @@ export default function ErrorLogsPage() {
     }, 2000)
   }
 
+  const handleCopyFullLog = (log: ErrorLogItem) => {
+    const lines: string[] = [
+      `=== LOG DE ERRO [${log.source}] ===`,
+      `ID: ${log.id}`,
+      `Data/Hora: ${formatDate(log.createdAt)}`,
+      `Status HTTP: ${log.statusCode ?? 'N/A'}`,
+      `Módulo: ${log.module || 'N/A'}`,
+      `Ação: ${log.action || 'N/A'}`,
+      `Tela: ${log.screen || 'N/A'}`,
+      `Usuário: ${log.userName || 'Anônimo'} (${log.userId || 'ID N/A'})`,
+    ]
+
+    if (log.companyId) {
+      lines.push(`Empresa ID: ${log.companyId}`)
+    }
+
+    lines.push('', `--- MENSAGEM DO ERRO ---`, log.errorMessage)
+
+    if (log.originalError) {
+      lines.push('', `--- ERRO ORIGINAL / CAUSA RAIZ ---`, log.originalError)
+    }
+
+    if (log.stackTrace) {
+      lines.push('', `--- STACK TRACE ---`, log.stackTrace)
+    }
+
+    if (log.requestPayload) {
+      lines.push(
+        '',
+        `--- PAYLOAD DA REQUISIÇÃO ---`,
+        JSON.stringify(log.requestPayload, null, 2),
+      )
+    }
+
+    if (log.metadata) {
+      lines.push(
+        '',
+        `--- METADADOS ---`,
+        JSON.stringify(log.metadata, null, 2),
+      )
+    }
+
+    lines.push('', `=== FIM DO LOG ===`)
+
+    handleCopy('full', lines.join('\n'))
+  }
+
   // Estatísticas rápidas da lista atual
   const stats = useMemo(() => {
     const backendCount = logs.filter((l) => l.source === 'BACKEND').length
@@ -532,7 +579,11 @@ export default function ErrorLogsPage() {
                   const SourceIcon = sourceConfig.icon
 
                   return (
-                    <TableRow key={log.id} className="hover:bg-muted/40">
+                    <TableRow
+                      key={log.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                      onClick={() => setSelectedLog(log)}
+                    >
                       {/* Data / Hora */}
                       <TableCell className="align-top">
                         <div className="font-mono text-xs font-semibold text-foreground">
@@ -609,7 +660,10 @@ export default function ErrorLogsPage() {
                       </TableCell>
 
                       {/* Ações */}
-                      <TableCell className="align-top text-right">
+                      <TableCell
+                        className="align-top text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant="ghost"
                           size="icon"
@@ -693,34 +747,56 @@ export default function ErrorLogsPage() {
         open={Boolean(selectedLog)}
         onOpenChange={(open) => !open && setSelectedLog(null)}
       >
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           {selectedLog && (
             <>
-              <DialogHeader>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DialogTitle className="text-lg font-bold">
-                    Ocorrência de Erro
-                  </DialogTitle>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${getSourceBadge(selectedLog.source).className}`}
+              <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/10 shrink-0 text-left pr-12">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <DialogTitle className="text-lg font-bold">
+                        Ocorrência de Erro
+                      </DialogTitle>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${getSourceBadge(selectedLog.source).className}`}
+                      >
+                        {getSourceBadge(selectedLog.source).label}
+                      </span>
+                      {selectedLog.statusCode && (
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${getStatusBadge(selectedLog.statusCode)}`}
+                        >
+                          HTTP {selectedLog.statusCode}
+                        </span>
+                      )}
+                    </div>
+                    <DialogDescription className="font-mono text-xs mt-1">
+                      ID: {selectedLog.id} · Ocorrido em{' '}
+                      {formatDate(selectedLog.createdAt)}
+                    </DialogDescription>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 self-start sm:self-center shrink-0 text-xs font-medium"
+                    onClick={() => handleCopyFullLog(selectedLog)}
                   >
-                    {getSourceBadge(selectedLog.source).label}
-                  </span>
-                  {selectedLog.statusCode && (
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${getStatusBadge(selectedLog.statusCode)}`}
-                    >
-                      HTTP {selectedLog.statusCode}
+                    {copiedKey === 'full' ? (
+                      <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                    <span>
+                      {copiedKey === 'full'
+                        ? 'Copiado para Memória'
+                        : 'Copiar Erro Completo'}
                     </span>
-                  )}
+                  </Button>
                 </div>
-                <DialogDescription className="font-mono text-xs">
-                  ID: {selectedLog.id} · Ocorrido em{' '}
-                  {formatDate(selectedLog.createdAt)}
-                </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 pt-2 text-sm">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 text-sm">
                 {/* Metadados de Contexto */}
                 <div className="grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 sm:grid-cols-4 text-xs">
                   <div>
@@ -762,10 +838,27 @@ export default function ErrorLogsPage() {
 
                 {/* Mensagem para o Usuário */}
                 <div className="space-y-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Mensagem Apresentada
-                  </span>
-                  <div className="rounded-md border border-border bg-background p-3 text-sm font-medium text-foreground">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Mensagem Apresentada
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 gap-1 px-2 text-xs"
+                      onClick={() =>
+                        handleCopy('message', selectedLog.errorMessage)
+                      }
+                    >
+                      {copiedKey === 'message' ? (
+                        <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                      <span>Copiar</span>
+                    </Button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background p-3 text-sm font-medium text-foreground whitespace-pre-wrap break-all">
                     {selectedLog.errorMessage}
                   </div>
                 </div>
@@ -787,14 +880,14 @@ export default function ErrorLogsPage() {
                         }
                       >
                         {copiedKey === 'original' ? (
-                          <Check className="size-3 text-emerald-600" />
+                          <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
                         ) : (
                           <Copy className="size-3" />
                         )}
                         <span>Copiar</span>
                       </Button>
                     </div>
-                    <pre className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground whitespace-pre-wrap break-all">
+                    <pre className="max-h-48 overflow-y-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground whitespace-pre-wrap break-all">
                       {selectedLog.originalError}
                     </pre>
                   </div>
@@ -817,14 +910,14 @@ export default function ErrorLogsPage() {
                         }
                       >
                         {copiedKey === 'stack' ? (
-                          <Check className="size-3 text-emerald-600" />
+                          <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
                         ) : (
                           <Copy className="size-3" />
                         )}
                         <span>Copiar</span>
                       </Button>
                     </div>
-                    <pre className="max-h-56 overflow-y-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-all">
+                    <pre className="max-h-64 overflow-y-auto rounded-md border border-border bg-muted/50 p-3 font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-all">
                       {selectedLog.stackTrace}
                     </pre>
                   </div>
@@ -853,14 +946,14 @@ export default function ErrorLogsPage() {
                         }
                       >
                         {copiedKey === 'payload' ? (
-                          <Check className="size-3 text-emerald-600" />
+                          <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
                         ) : (
                           <Copy className="size-3" />
                         )}
                         <span>Copiar JSON</span>
                       </Button>
                     </div>
-                    <pre className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs text-foreground whitespace-pre-wrap break-all">
+                    <pre className="max-h-48 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs text-foreground whitespace-pre-wrap break-all">
                       {JSON.stringify(selectedLog.requestPayload, null, 2)}
                     </pre>
                   </div>
@@ -869,18 +962,55 @@ export default function ErrorLogsPage() {
                 {/* Metadados Adicionais */}
                 {selectedLog.metadata && (
                   <div className="space-y-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Metadados / Ambiente
-                    </span>
-                    <pre className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/20 p-3 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Metadados / Ambiente
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 gap-1 px-2 text-xs"
+                        onClick={() =>
+                          handleCopy(
+                            'metadata',
+                            JSON.stringify(selectedLog.metadata, null, 2),
+                          )
+                        }
+                      >
+                        {copiedKey === 'metadata' ? (
+                          <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                        <span>Copiar JSON</span>
+                      </Button>
+                    </div>
+                    <pre className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/20 p-3 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
                       {JSON.stringify(selectedLog.metadata, null, 2)}
                     </pre>
                   </div>
                 )}
               </div>
 
-              <DialogFooter className="pt-3">
-                <Button variant="outline" onClick={() => setSelectedLog(null)}>
+              <DialogFooter className="p-4 px-6 border-t border-border/60 bg-muted/10 shrink-0 flex items-center justify-between sm:justify-between w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs font-medium"
+                  onClick={() => handleCopyFullLog(selectedLog)}
+                >
+                  {copiedKey === 'full' ? (
+                    <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
+                  <span>
+                    {copiedKey === 'full'
+                      ? 'Copiado para memória!'
+                      : 'Copiar Erro Completo'}
+                  </span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectedLog(null)}>
                   Fechar
                 </Button>
               </DialogFooter>

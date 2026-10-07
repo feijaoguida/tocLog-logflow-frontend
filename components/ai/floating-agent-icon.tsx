@@ -7,78 +7,114 @@ interface FloatingAgentIconProps {
   hasNotifications?: boolean;
   className?: string;
   title?: string;
+  pathname?: string;
 }
 
 export function FloatingAgentIcon({
-  themeColorHex,
+  themeColorHex = '#3B82F6',
   onClick,
   hasNotifications = false,
   className,
   title = "Conversar com o Agente IA",
+  pathname,
 }: FloatingAgentIconProps) {
-  // Estado para controlar qual das 3 imagens está ativa
+  // Estado para controlar qual das 3 expressões está ativa
   const [frame, setFrame] = useState<0 | 1 | 2>(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isBouncing, setIsBouncing] = useState(false);
 
-  // Lógica para o robô piscar de tempo em tempo sozinho
+  // 1. Pular quando a tela/rota mudar
   useEffect(() => {
-    if (isHovered) return; // Se o mouse estiver em cima, pausamos a animação automática
+    if (!pathname) return;
+    setIsBouncing(true);
+    setFrame(2); // Sorri ao entrar em nova tela
+    const timer = setTimeout(() => {
+      setIsBouncing(false);
+      setFrame(0);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
-    const interval = setInterval(() => {
-      // Sorteia se vai piscar (frame 1) ou sorrir (frame 2)
-      const randomAction = Math.random() > 0.5 ? 1 : 2;
+  // 2. Pular de tempo em tempo (a cada 30 segundos)
+  useEffect(() => {
+    const bounceInterval = setInterval(() => {
+      if (document.hidden) return; // Não pular se a aba estiver em segundo plano
+      setIsBouncing(true);
+      // Pisca ou sorri durante o salto
+      setFrame(Math.random() > 0.5 ? 1 : 2);
+      setTimeout(() => {
+        setIsBouncing(false);
+        setFrame(0);
+      }, 1500);
+    }, 30000); // Exatamente a cada 30 segundos
+
+    return () => clearInterval(bounceInterval);
+  }, []);
+
+  // 3. Piscar os olhos sutilmente de tempo em tempo quando ocioso (a cada 8 segundos)
+  useEffect(() => {
+    if (isHovered || isBouncing) return;
+
+    const eyeInterval = setInterval(() => {
+      if (document.hidden) return;
+      const randomAction = Math.random() > 0.6 ? 1 : 2;
       setFrame(randomAction);
-      
-      // Volta para o estado normal (frame 0) após 500ms
-      setTimeout(() => setFrame(0), 500);
-    }, 5000); // Executa a cada 5 segundos
+      setTimeout(() => setFrame(0), 400);
+    }, 8000);
 
-    return () => clearInterval(interval);
-  }, [isHovered]);
+    return () => clearInterval(eyeInterval);
+  }, [isHovered, isBouncing]);
 
-  // Imagens do robô na pasta public
+  // Imagens do robô com cache-busting v=3 para garantir alpha transparente em todos os navegadores
   const images = {
-    0: '/assets/agent/robot-normal.webp', // Rosto normal
-    1: '/assets/agent/robot-winking.webp', // Piscando um olho
-    2: '/assets/agent/robot-smiling.webp'  // Sorrindo (olhos fechados)
+    0: '/assets/agent/robot-normal.webp?v=3',
+    1: '/assets/agent/robot-winking.webp?v=3',
+    2: '/assets/agent/robot-smiling.webp?v=3',
   };
 
   return (
-    <div className={cn("fixed bottom-22 right-5 z-40", className)}>
+    <div className={cn("fixed bottom-22 right-5 z-40 select-none", className)}>
       <button
         onClick={onClick}
         title={title}
         aria-label={title}
         onMouseEnter={() => {
           setIsHovered(true);
-          setFrame(1); // Pisca o olho imediatamente ao passar o mouse!
+          setFrame(1); // Pisca o olho imediatamente ao passar o mouse
+          setIsBouncing(true);
+          setTimeout(() => setIsBouncing(false), 1200);
         }}
         onMouseLeave={() => {
           setIsHovered(false);
-          setFrame(0); // Volta ao normal ao tirar o mouse
+          setFrame(0);
         }}
         className={cn(
-          "relative w-16 h-16 rounded-full focus:outline-none focus:ring-4 focus:ring-primary/50 transition-transform duration-300",
-          // Efeito flutuante (sobe e desce suavemente usando tailwind animate)
-          "animate-bounce",
-          "hover:scale-110" 
+          "group relative w-16 h-16 rounded-full focus:outline-none focus:ring-4 focus:ring-primary/40 transition-all duration-300",
+          "hover:scale-110 active:scale-95 shadow-xl hover:shadow-2xl cursor-pointer",
+          // Pula apenas quando o gatilho estiver ativo (a cada 30s, hover ou troca de rota)
+          isBouncing && "animate-bounce"
         )}
       >
-        <img
-          src={images[frame]}
-          alt="Agente Pessoal IA"
-          className="w-full h-full object-contain drop-shadow-xl"
-          style={{
-            // Opcional: injetar dinamicamente via JS se a cor for alterável
-            // filter: `hue-rotate(180deg)`
-          }}
+        {/* Halo de brilho sutil ao redor do robô */}
+        <div
+          className="absolute inset-0 rounded-full blur-md opacity-40 group-hover:opacity-70 transition-opacity"
+          style={{ backgroundColor: themeColorHex }}
         />
-        
+
+        {/* Recipiente estritamente circular com fundo transparente e borda elegante */}
+        <div className="relative w-full h-full rounded-full overflow-hidden bg-transparent border-2 border-primary/30 flex items-center justify-center backdrop-blur-xs">
+          <img
+            src={images[frame]}
+            alt="Agente Pessoal IA"
+            className="w-full h-full object-contain drop-shadow-md select-none pointer-events-none"
+          />
+        </div>
+
         {/* Alerta de notificação ou contexto */}
         {hasNotifications && (
-          <span className="absolute top-0 right-0 flex h-4 w-4">
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-background"></span>
           </span>
         )}
       </button>
