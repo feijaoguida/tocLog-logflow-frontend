@@ -62,7 +62,7 @@ A tela de **Configurações de E-mail** (`/dashboard/settings/email`) permite pa
 
 ## Telas e Imagens
 
-![Configurações de E-mail](/api/help-images/email-settings.png)
+![Configurações de E-mail](/help-images/email-settings.png)
 
 ---
 

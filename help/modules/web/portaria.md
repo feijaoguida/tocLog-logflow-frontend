@@ -65,7 +65,7 @@ A tela de **Portaria** (`/dashboard/portaria`) gerencia o fluxo operacional de e
 
 ## Telas e Imagens
 
-![Portaria e Controle de Acesso](/api/help-images/portaria.png)
+![Portaria e Controle de Acesso](/help-images/portaria.png)
 
 ---
 

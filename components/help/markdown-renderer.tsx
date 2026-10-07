@@ -332,13 +332,18 @@ export function MarkdownRenderer({ content }: { content: string }) {
         }
 
         if (block.type === 'image') {
+          const resolvedSrc =
+            block.src.startsWith('http://') || block.src.startsWith('https://')
+              ? block.src
+              : `/help-images/${block.src.replace(/^\/?(api\/)?help-images\//, '').replace(/^(\.\.\/)*images\//, '').replace(/^\/+/, '')}`
+
           return (
             <figure
               key={index}
               className="overflow-hidden rounded-lg border border-border/70 bg-muted/20 shadow-xs"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={block.src} alt={block.alt} className="w-full object-cover" />
+              <img src={resolvedSrc} alt={block.alt} className="w-full object-cover" />
               <figcaption className="px-4 py-3 text-sm text-muted-foreground">
                 {block.alt}
               </figcaption>

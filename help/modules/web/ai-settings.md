@@ -56,7 +56,7 @@ A tela de **Configurações de IA** permite gerenciar provedores de modelos de l
 
 ## Telas e Imagens
 
-![Configurações de Inteligência Artificial](/api/help-images/ai-settings.png)
+![Configurações de Inteligência Artificial](/help-images/ai-settings.png)
 
 ---
 

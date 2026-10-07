@@ -57,7 +57,7 @@ A tela de **Bases de Conhecimento** (`/dashboard/settings/ai/knowledge`) gerenci
 
 ## Telas e Imagens
 
-![Base de Conhecimento de IA](/api/help-images/ai-knowledge.png)
+![Base de Conhecimento de IA](/help-images/ai-knowledge.png)
 
 ---
 

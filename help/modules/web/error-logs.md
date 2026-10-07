@@ -61,7 +61,7 @@ A tela de **Logs de Erro** (`/dashboard/settings/error-logs`) centraliza o monit
 
 ## Telas e Imagens
 
-![Logs de Erro e Auditoria](/api/help-images/error-logs.png)
+![Logs de Erro e Auditoria](/help-images/error-logs.png)
 
 ---
 

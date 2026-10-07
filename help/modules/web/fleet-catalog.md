@@ -67,7 +67,7 @@ A tela de **Gestão Geral de Frota** (`/dashboard/fleet`) unifica o controle ope
 
 ## Telas e Imagens
 
-![Catálogo Geral de Frotas](/api/help-images/fleet-catalog.png)
+![Catálogo Geral de Frotas](/help-images/fleet-catalog.png)
 
 ---
 

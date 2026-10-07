@@ -47,7 +47,11 @@ async function capture() {
     deviceScaleFactor: 1,
   });
 
-  // Injeta sessão de administrador autenticado
+  // Injeta cookie e sessão de administrador autenticado para passar no middleware do Next.js
+  await context.addCookies([
+    { name: 'token', value: 'preview-token-admin-help', domain: 'localhost', path: '/' }
+  ]);
+
   await context.addInitScript((user) => {
     localStorage.setItem('token', 'preview-token-admin-help');
     localStorage.setItem('user', JSON.stringify(user));

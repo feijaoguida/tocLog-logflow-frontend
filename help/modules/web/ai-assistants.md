@@ -64,7 +64,7 @@ A tela de **Assistentes de IA** (`/dashboard/settings/ai/assistants`) permite cr
 
 ## Telas e Imagens
 
-![Catálogo de Assistentes de IA](/api/help-images/ai-assistants.png)
+![Catálogo de Assistentes de IA](/help-images/ai-assistants.png)
 
 ---
 
