@@ -9,6 +9,7 @@ import {
   Cpu,
   Bot,
   BookOpen,
+  Wrench,
   ShieldCheck,
   ShieldAlert,
 } from 'lucide-react'
@@ -69,6 +70,11 @@ export default function AiSettingsLayout({
       title: 'Bases de Conhecimento',
       href: '/dashboard/settings/ai/knowledge',
       icon: BookOpen,
+    },
+    {
+      title: 'Ferramentas Configuráveis',
+      href: '/dashboard/settings/ai/tools',
+      icon: Wrench,
     },
     {
       title: 'Uso e Auditoria',

@@ -14,6 +14,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { ChatWidget } from "./rh/components/chat-widget"
+import { FloatingAiAgentWidget } from "@/components/ai/floating-ai-agent-widget"
 import { UserProfile } from "@/components/user-profile"
 import { Search } from "lucide-react"
 
@@ -70,6 +71,7 @@ export default function DashboardLayout({
         </main>
         
         <ChatWidget />
+        <FloatingAiAgentWidget />
       </SidebarInset>
     </SidebarProvider>
   )

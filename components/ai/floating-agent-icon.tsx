@@ -5,9 +5,17 @@ interface FloatingAgentIconProps {
   themeColorHex?: string;
   onClick?: () => void;
   hasNotifications?: boolean;
+  className?: string;
+  title?: string;
 }
 
-export function FloatingAgentIcon({ themeColorHex, onClick, hasNotifications = false }: FloatingAgentIconProps) {
+export function FloatingAgentIcon({
+  themeColorHex,
+  onClick,
+  hasNotifications = false,
+  className,
+  title = "Conversar com o Agente IA",
+}: FloatingAgentIconProps) {
   // Estado para controlar qual das 3 imagens está ativa
   const [frame, setFrame] = useState<0 | 1 | 2>(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -36,9 +44,11 @@ export function FloatingAgentIcon({ themeColorHex, onClick, hasNotifications = f
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className={cn("fixed bottom-22 right-5 z-40", className)}>
       <button
         onClick={onClick}
+        title={title}
+        aria-label={title}
         onMouseEnter={() => {
           setIsHovered(true);
           setFrame(1); // Pisca o olho imediatamente ao passar o mouse!

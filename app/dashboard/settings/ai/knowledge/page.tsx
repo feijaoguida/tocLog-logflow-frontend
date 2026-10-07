@@ -20,6 +20,10 @@ interface KnowledgeDocItem {
   id: string;
   title: string;
   module: string | null;
+  category?: string | null;
+  format?: 'TXT' | 'MD' | 'DOCX' | 'PDF' | 'DOC' | null;
+  originalFileName?: string | null;
+  audience?: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   version: number;
   chunksCount: number;
@@ -63,6 +67,94 @@ export default function AiKnowledgePage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyDoc, setHistoryDoc] = useState<KnowledgeDocDetail | null>(null);
   const [isSyncingHelp, setIsSyncingHelp] = useState(false);
+
+  // Dialog State (File Import DOC, DOCX, MD, PDF, TXT)
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    text: string;
+    format: string;
+    originalFileName: string;
+    metadata: { sizeBytes: number; charCount: number; wordCount: number; pageCount?: number; warning?: string };
+  } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [importTitle, setImportTitle] = useState('');
+  const [importModule, setImportModule] = useState('GERAL');
+  const [importCategory, setImportCategory] = useState('Procedimentos');
+  const [importAudience, setImportAudience] = useState('ALL');
+  const [importPublishNow, setImportPublishNow] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleOpenImport = () => {
+    setImportFile(null);
+    setImportPreview(null);
+    setImportTitle('');
+    setImportModule('GERAL');
+    setImportCategory('Procedimentos');
+    setImportAudience('ALL');
+    setImportPublishNow(true);
+    setIsImportOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+    const inferredTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    setImportTitle(inferredTitle);
+
+    try {
+      setIsLoadingPreview(true);
+      setError(null);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/ai/knowledge/upload-preview', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImportPreview(res.data);
+    } catch (err: any) {
+      setImportPreview(null);
+      setError(err?.response?.data?.message || 'Falha ao processar arquivo para pré-visualização.');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importFile) {
+      setError('Por favor, selecione um arquivo para importar.');
+      return;
+    }
+    if (!importTitle.trim()) {
+      setError('O título do documento é obrigatório.');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      setError(null);
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('title', importTitle.trim());
+      formData.append('module', importModule);
+      formData.append('category', importCategory.trim());
+      formData.append('audience', importAudience);
+      formData.append('publishNow', String(importPublishNow));
+
+      const res = await api.post('/ai/knowledge/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setSuccess(`Arquivo '${importFile.name}' importado com sucesso como '${res.data.title}' (${res.data.chunksCount} trechos indexados).`);
+      setIsImportOpen(false);
+      await fetchDocuments();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao importar documento.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const handleSyncHelp = async () => {
     try {
@@ -235,6 +327,15 @@ export default function AiKnowledgePage() {
             </span>
             {isSyncingHelp ? 'Sincronizando...' : 'Sincronizar Manuais da Ajuda'}
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleOpenImport}
+            className="shrink-0 text-xs md:text-sm border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200"
+            title="Importa arquivos nos formatos TXT, MD, DOCX, PDF ou DOC"
+          >
+            <span className="material-symbols-outlined text-sm mr-2 text-primary">upload_file</span>
+            Importar Arquivo
+          </Button>
           <Button onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-white shrink-0 text-xs md:text-sm">
             <span className="material-symbols-outlined text-sm mr-2">add</span>
             Novo Documento
@@ -349,10 +450,23 @@ export default function AiKnowledgePage() {
                   <tr key={doc.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-medium text-slate-900 dark:text-slate-100">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-slate-400 text-lg">description</span>
-                        <span className="truncate max-w-[280px]" title={doc.title}>
-                          {doc.title}
-                        </span>
+                        {doc.format ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-800 text-primary border border-primary/20 shrink-0">
+                            {doc.format}
+                          </span>
+                        ) : (
+                          <span className="material-symbols-outlined text-slate-400 text-lg shrink-0">description</span>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate max-w-[280px]" title={doc.title}>
+                            {doc.title}
+                          </span>
+                          {doc.category && (
+                            <span className="text-[10px] text-slate-400">
+                              {doc.category} {doc.audience && doc.audience !== 'ALL' ? `• ${doc.audience}` : ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
@@ -597,6 +711,170 @@ export default function AiKnowledgePage() {
           <DialogFooter className="border-t border-slate-100 dark:border-slate-800 pt-3">
             <Button variant="secondary" onClick={() => setIsHistoryOpen(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Importar Arquivo (DOC, DOCX, MD, PDF, TXT) */}
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">upload_file</span>
+              Importar Documento de Conhecimento
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+              Envie arquivos corporativos nos formatos suportados: TXT, Markdown (.md), Word (.docx, .doc legados) ou PDF textual (máx 10 MB).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+            {/* File Input Box */}
+            <div className="p-4 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-center space-y-2">
+              <span className="material-symbols-outlined text-3xl text-slate-400">cloud_upload</span>
+              <div className="text-xs text-slate-600 dark:text-slate-300">
+                <label className="font-semibold text-primary hover:underline cursor-pointer">
+                  Clique para selecionar um arquivo
+                  <input
+                    type="file"
+                    accept=".txt,.md,.markdown,.docx,.pdf,.doc"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>{' '}
+                ou arraste para cá
+              </div>
+              <p className="text-[11px] text-slate-400">Formatos aceitos: DOCX, PDF (texto), MD, TXT e DOC (legado OLE2)</p>
+              {importFile && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+                  <span className="material-symbols-outlined text-sm">attach_file</span>
+                  <span>{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</span>
+                </div>
+              )}
+            </div>
+
+            {isLoadingPreview && (
+              <div className="p-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                <span>Extraindo texto e validando integridade do documento...</span>
+              </div>
+            )}
+
+            {/* Extracted Preview & Warning */}
+            {importPreview && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-primary text-white">
+                      {importPreview.format}
+                    </span>
+                    <span className="text-slate-500">
+                      {importPreview.metadata.wordCount} palavras • {importPreview.metadata.charCount} caracteres
+                      {importPreview.metadata.pageCount ? ` • ${importPreview.metadata.pageCount} páginas` : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {importPreview.metadata.warning && (
+                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-600 text-sm">warning</span>
+                    <span>{importPreview.metadata.warning}</span>
+                  </div>
+                )}
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 max-h-36 overflow-y-auto whitespace-pre-wrap">
+                  {importPreview.text.slice(0, 500)}
+                  {importPreview.text.length > 500 ? '...\n[Texto truncado para pré-visualização]' : ''}
+                </div>
+              </div>
+            )}
+
+            {/* Form Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Título do Documento *
+                </label>
+                <Input
+                  value={importTitle}
+                  onChange={(e) => setImportTitle(e.target.value)}
+                  placeholder="Ex: Política Geral de Viagens e Diárias"
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Módulo de Domínio
+                </label>
+                <select
+                  value={importModule}
+                  onChange={(e) => setImportModule(e.target.value)}
+                  className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none"
+                >
+                  {AI_MODULE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Categoria
+                </label>
+                <input
+                  type="text"
+                  value={importCategory}
+                  onChange={(e) => setImportCategory(e.target.value)}
+                  placeholder="Ex: Procedimentos, Políticas, Normas"
+                  className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Público Alvo / Audiência
+                </label>
+                <select
+                  value={importAudience}
+                  onChange={(e) => setImportAudience(e.target.value)}
+                  className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none"
+                >
+                  <option value="ALL">Geral (Todos os Usuários)</option>
+                  <option value="OPERACIONAL">Operacional / Motoristas</option>
+                  <option value="ADMIN">Administrativo / Gestores</option>
+                  <option value="DIRETORIA">Diretoria / Estratégico</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="importPublishCheckbox"
+                  checked={importPublishNow}
+                  onChange={(e) => setImportPublishNow(e.target.checked)}
+                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="importPublishCheckbox" className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                  Publicar e gerar trechos de busca imediatamente
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-slate-100 dark:border-slate-800 pt-3">
+            <Button variant="ghost" onClick={() => setIsImportOpen(false)} disabled={isImporting}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmImport}
+              disabled={isImporting || !importFile || isLoadingPreview}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              {isImporting ? 'Importando...' : 'Confirmar Importação'}
             </Button>
           </DialogFooter>
         </DialogContent>
