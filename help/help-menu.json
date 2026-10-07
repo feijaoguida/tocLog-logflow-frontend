@@ -47,7 +47,25 @@
           "summary": "Gestão de contas, filiais e perfis de acesso.",
           "route": "/dashboard/users",
           "platform": "web",
-          "status": "pending-validation"
+          "status": "ready"
+        },
+        {
+          "title": "Logs de Erro e Auditoria",
+          "slug": "web/error-logs",
+          "file": "modules/web/error-logs.md",
+          "summary": "Monitoramento de exceções, causa raiz forense e expurgo de logs.",
+          "route": "/dashboard/settings/error-logs",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Servidor de E-mail (SMTP)",
+          "slug": "web/email-settings",
+          "file": "modules/web/email-settings.md",
+          "summary": "Parametrização do servidor SMTP institucional e testes de envio.",
+          "route": "/dashboard/settings/email",
+          "platform": "web",
+          "status": "ready"
         },
         {
           "title": "Configurações",
@@ -126,7 +144,7 @@
           "summary": "Caixa operacional do modulo com thread, status e aviso de visibilidade do RH.",
           "route": "/dashboard/feedbacks",
           "platform": "web",
-          "status": "pending-validation"
+          "status": "ready"
         },
         {
           "title": "Dashboard de Feedbacks",
@@ -135,7 +153,7 @@
           "summary": "Painel gerencial do RH com KPIs do modulo e surveys.",
           "route": "/dashboard/rh/feedbacks/dashboard",
           "platform": "web",
-          "status": "pending-validation"
+          "status": "ready"
         },
         {
           "title": "Configurações de RH",
@@ -144,7 +162,7 @@
           "summary": "Governanca de roteamento e visibilidade para o modulo de feedback.",
           "route": "/dashboard/rh/settings",
           "platform": "web",
-          "status": "pending-validation"
+          "status": "ready"
         },
         {
           "title": "Funcionários",
@@ -314,6 +332,15 @@
       "description": "Operações da frota interna de veículos.",
       "items": [
         {
+          "title": "Catálogo Geral e Conjunto",
+          "slug": "web/fleet/catalog",
+          "file": "modules/web/fleet-catalog.md",
+          "summary": "Inventário unificado de frota própria e terceiros, odômetro e bloqueios.",
+          "route": "/dashboard/fleet",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
           "title": "Veículos",
           "slug": "web/fleet/vehicles",
           "file": "modules/web/fleet-vehicles.md",
@@ -482,6 +509,56 @@
           "file": "modules/web/shipments-settings.md",
           "summary": "Governança operacional das regras do domínio shipments por empresa.",
           "route": "/dashboard/shipments/settings",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-ai",
+      "title": "Web · Inteligência Artificial",
+      "description": "Configurações de modelos, catálogo de assistentes e acervo documental.",
+      "items": [
+        {
+          "title": "Configurações de IA",
+          "slug": "web/ai/settings",
+          "file": "modules/web/ai-settings.md",
+          "summary": "Provedores de LLM, chaves criptografadas e limites de consumo.",
+          "route": "/dashboard/settings/ai",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Assistentes de IA",
+          "slug": "web/ai/assistants",
+          "file": "modules/web/ai-assistants.md",
+          "summary": "Catálogo de assistentes especializados, personas, instruções e ferramentas.",
+          "route": "/dashboard/settings/ai/assistants",
+          "platform": "web",
+          "status": "ready"
+        },
+        {
+          "title": "Base de Conhecimento",
+          "slug": "web/ai/knowledge",
+          "file": "modules/web/ai-knowledge.md",
+          "summary": "Acervo de manuais corporativos, revisões, chunks e sincronização com a ajuda.",
+          "route": "/dashboard/settings/ai/knowledge",
+          "platform": "web",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "id": "web-portaria",
+      "title": "Web · Portaria e Acesso",
+      "description": "Controle físico de entrada e saída, crachás e pátio.",
+      "items": [
+        {
+          "title": "Portaria e Acesso",
+          "slug": "web/portaria",
+          "file": "modules/web/portaria.md",
+          "summary": "Check-in, check-out de veículos e pessoas, crachás e evidências fotográficas.",
+          "route": "/dashboard/portaria",
           "platform": "web",
           "status": "ready"
         }

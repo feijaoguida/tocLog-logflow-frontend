@@ -62,6 +62,24 @@ export default function AiKnowledgePage() {
   // Dialog State (History / Revision viewer)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyDoc, setHistoryDoc] = useState<KnowledgeDocDetail | null>(null);
+  const [isSyncingHelp, setIsSyncingHelp] = useState(false);
+
+  const handleSyncHelp = async () => {
+    try {
+      setIsSyncingHelp(true);
+      setError(null);
+      const res = await api.post('/ai/knowledge/sync-help');
+      const data = res.data;
+      setSuccess(
+        `Manuais sincronizados com sucesso: ${data.totalFiles} arquivos analisados (${data.created} criados, ${data.updated} atualizados, ${data.deleted} removidos, ${data.unchanged} inalterados).`,
+      );
+      await fetchDocuments();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Falha ao sincronizar manuais da Central de Ajuda.');
+    } finally {
+      setIsSyncingHelp(false);
+    }
+  };
 
   const fetchDocuments = async () => {
     try {
@@ -204,10 +222,24 @@ export default function AiKnowledgePage() {
             Documentação corporativa indexada com rastreabilidade de revisões para grounding dos assistentes de IA.
           </p>
         </div>
-        <Button onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-white shrink-0">
-          <span className="material-symbols-outlined text-sm mr-2">add</span>
-          Novo Documento
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSyncHelp}
+            disabled={isSyncingHelp}
+            className="shrink-0 text-xs md:text-sm border-slate-200 dark:border-slate-800"
+            title="Sincroniza manuais da Central de Ajuda com o acervo da IA"
+          >
+            <span className={`material-symbols-outlined text-sm mr-2 ${isSyncingHelp ? 'animate-spin' : ''}`}>
+              sync
+            </span>
+            {isSyncingHelp ? 'Sincronizando...' : 'Sincronizar Manuais da Ajuda'}
+          </Button>
+          <Button onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-white shrink-0 text-xs md:text-sm">
+            <span className="material-symbols-outlined text-sm mr-2">add</span>
+            Novo Documento
+          </Button>
+        </div>
       </div>
 
       {/* Alertas */}
