@@ -8,7 +8,6 @@ import { AiMarkdownRenderer } from './ai-markdown-renderer'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
@@ -425,10 +424,10 @@ export function FloatingAiAgentWidget() {
             </div>
           </CardHeader>
 
-          {/* Corpo do Chat / Mensagens */}
+          {/* Corpo do Chat / Mensagens com barra de rolagem padronizada da tela */}
           {!isMinimized && (
             <div className="flex flex-col flex-1 min-h-0 bg-background/50">
-              <ScrollArea className="flex-1 p-3">
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-3 my-auto">
                     <div className="size-14 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden p-1">
@@ -521,7 +520,7 @@ export function FloatingAiAgentWidget() {
                     <div ref={messagesEndRef} />
                   </div>
                 )}
-              </ScrollArea>
+              </div>
 
               {/* Sugestões rápidas acima do input */}
               {messages.length > 0 && (
