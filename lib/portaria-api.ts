@@ -285,3 +285,12 @@ export const portariaApi = {
   deleteBlock: (id: string) => api.delete(`/portaria/blocks/${id}`).then((r) => r.data),
   createOverride: (dto: any) => api.post('/portaria/overrides', dto).then((r) => r.data),
 };
+
+export function extractList<T>(res: any): T[] {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res.items)) return res.items;
+  if (Array.isArray(res.data)) return res.data;
+  return [];
+}
+

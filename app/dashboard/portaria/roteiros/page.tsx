@@ -50,6 +50,7 @@ import {
   PortariaRoute,
   PortariaAccessArea,
   PortariaBranch,
+  extractList,
 } from '@/lib/portaria-api';
 
 export default function PortariaRoteirosPage() {
@@ -88,8 +89,8 @@ export default function PortariaRoteirosPage() {
         portariaApi.getAreas(),
         portariaApi.getContext().catch(() => ({ branches: [] })),
       ]);
-      setRoutes(routesRes.data || routesRes || []);
-      setAreas(areasRes.data || areasRes || []);
+      setRoutes(extractList<PortariaRoute>(routesRes));
+      setAreas(extractList<PortariaAccessArea>(areasRes));
       const bList = contextRes.branches || [];
       setBranches(bList);
       if (bList.length > 0 && !formBranchId) {
@@ -106,18 +107,20 @@ export default function PortariaRoteirosPage() {
     loadData();
   }, []);
 
+  const safeRoutes = useMemo(() => (Array.isArray(routes) ? routes : []), [routes]);
+
   // KPIs
-  const totalRoutes = routes.length;
+  const totalRoutes = safeRoutes.length;
   const inProgressRoutes = useMemo(
-    () => routes.filter((r) => r.status === 'IN_PROGRESS').length,
-    [routes]
+    () => safeRoutes.filter((r) => r.status === 'IN_PROGRESS').length,
+    [safeRoutes]
   );
   const completedRoutes = useMemo(
-    () => routes.filter((r) => r.status === 'COMPLETED').length,
-    [routes]
+    () => safeRoutes.filter((r) => r.status === 'COMPLETED').length,
+    [safeRoutes]
   );
   const criticalAreaRoutes = useMemo(() => {
-    return routes.filter((r) =>
+    return safeRoutes.filter((r) =>
       r.stops?.some((s) => s.requiresEpi || s.requiresEscort || s.requiresSafetyTerm)
     ).length;
   }, [routes]);

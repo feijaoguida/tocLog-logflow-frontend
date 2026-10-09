@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { FilterPopover } from '@/components/ui/filter-popover';
-import { portariaApi, PortariaSession, PortariaGate } from '@/lib/portaria-api';
+import { portariaApi, PortariaSession, PortariaGate, extractList } from '@/lib/portaria-api';
 
 function getDurationString(startedAt: string) {
   const diffMs = Date.now() - new Date(startedAt).getTime();
@@ -87,8 +87,8 @@ export default function PortariaPresentesPage() {
         portariaApi.getSessions({ status: 'ACTIVE' }),
         portariaApi.getGates().catch(() => []),
       ]);
-      setSessions(sessionsRes.data || sessionsRes || []);
-      setGates(gatesRes.data || gatesRes || []);
+      setSessions(extractList<PortariaSession>(sessionsRes));
+      setGates(extractList<PortariaGate>(gatesRes));
     } catch (err) {
       console.error('Erro ao carregar sessões ativas:', err);
     } finally {
@@ -103,20 +103,22 @@ export default function PortariaPresentesPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const safeSessions = useMemo(() => (Array.isArray(sessions) ? sessions : []), [sessions]);
+
   // KPIs
-  const totalPresent = sessions.length;
+  const totalPresent = safeSessions.length;
   const badgesInUse = useMemo(
-    () => sessions.filter((s) => !!s.badgeNumber).length,
-    [sessions]
+    () => safeSessions.filter((s) => !!s.badgeNumber).length,
+    [safeSessions]
   );
   const exceededEightHours = useMemo(
-    () => sessions.filter((s) => isExceededEightHours(s.startedAt)).length,
-    [sessions]
+    () => safeSessions.filter((s) => isExceededEightHours(s.startedAt)).length,
+    [safeSessions]
   );
 
   // Filtros locais
   const filteredSessions = useMemo(() => {
-    return sessions.filter((s) => {
+    return safeSessions.filter((s) => {
       const matchSearch =
         !search ||
         (s.badgeNumber && s.badgeNumber.toLowerCase().includes(search.toLowerCase())) ||

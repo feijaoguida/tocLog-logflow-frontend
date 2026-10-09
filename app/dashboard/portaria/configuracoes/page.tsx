@@ -50,6 +50,7 @@ import {
   PortariaGate,
   PortariaSetting,
   PortariaVisitType,
+  extractList,
 } from '@/lib/portaria-api';
 
 export default function PortariaConfiguracoesPage() {
@@ -118,9 +119,9 @@ export default function PortariaConfiguracoesPage() {
       ]);
 
       setBranches(ctx.branches || []);
-      setVisitTypes(typesRes);
-      setAreas(areasRes);
-      setGates(gatesRes);
+      setVisitTypes(extractList<PortariaVisitType>(typesRes));
+      setAreas(extractList<PortariaAccessArea>(areasRes));
+      setGates(extractList<PortariaGate>(gatesRes));
       setSetting(settingsRes);
 
       if (ctx.branches?.length > 0 && !areaForm.branchId) {

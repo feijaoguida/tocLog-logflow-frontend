@@ -42,6 +42,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/context/auth-context'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { reportError } from '@/lib/error-reporter'
 import { AttachmentDownload, SlaStatus, uploadHelpdeskFile, type Sla } from '../operations'
 
 type TicketDetails = {
@@ -214,6 +215,11 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
       const { data } = await api.get<TicketDetails>(`/helpdesk/tickets/${ticketId}`)
       setTicket(data)
     } catch (error) {
+      reportError(error, {
+        module: 'HELPDESK',
+        screen: 'TicketDetail',
+        action: 'fetchTicket',
+      })
       setLoadError(getApiErrorMessage(error, 'Não foi possível carregar os detalhes do chamado.'))
     } finally {
       setLoading(false)
@@ -247,11 +253,16 @@ function TicketDetailsContent({ ticketId }: { ticketId: string }) {
       try {
         const [queuesRes, reasonsRes] = await Promise.all([
           api.get<QueueOption[]>('/helpdesk/queues'),
-          api.get<ActionReasons>('/helpdesk/settings/action-reasons'),
+          api.get<ActionReasons>('/helpdesk/action-reasons'),
         ])
         setQueueOptions(queuesRes.data)
         setActionReasons(reasonsRes.data)
       } catch (error) {
+        reportError(error, {
+          module: 'HELPDESK',
+          screen: 'TicketDetail',
+          action: 'loadAux',
+        })
         toast.error(
           getApiErrorMessage(error, 'Não foi possível carregar opções de transferência/fechamento.'),
         )

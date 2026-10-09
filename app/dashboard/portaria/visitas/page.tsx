@@ -52,6 +52,7 @@ import {
   PortariaVisit,
   PortariaVisitType,
   PortariaGate,
+  extractList,
 } from '@/lib/portaria-api';
 
 function getInitials(name?: string | null) {
@@ -143,8 +144,8 @@ export default function PortariaVisitasPage() {
 
       setBranches(ctx.branches || []);
       setVisitTypes(ctx.visitTypes || []);
-      setVisits(visitsRes);
-      setGates(gatesRes);
+      setVisits(extractList<PortariaVisit>(visitsRes));
+      setGates(extractList<PortariaGate>(gatesRes));
 
       if (ctx.branches?.length > 0 && !newVisitForm.branchId) {
         setNewVisitForm((prev) => ({
@@ -181,8 +182,10 @@ export default function PortariaVisitasPage() {
   };
 
   // Filtragem
+  const safeVisits = useMemo(() => (Array.isArray(visits) ? visits : []), [visits]);
+
   const filteredVisits = useMemo(() => {
-    return visits.filter((v) => {
+    return safeVisits.filter((v) => {
       const p = v.participants?.[0];
       const matchesSearch =
         !search.trim() ||
@@ -196,16 +199,16 @@ export default function PortariaVisitasPage() {
 
       return matchesSearch && matchesStatus && matchesBranch && matchesAdmission;
     });
-  }, [visits, search, statusFilter, branchFilter, admissionFilter]);
+  }, [safeVisits, search, statusFilter, branchFilter, admissionFilter]);
 
   // Estatísticas operacionais dos KPIs
   const stats = useMemo(() => {
-    const total = visits.length;
-    const waitingAction = visits.filter((v) => v.status === 'ARRIVED').length;
-    const inProgress = visits.filter((v) => v.status === 'IN_PROGRESS').length;
-    const completedToday = visits.filter((v) => v.status === 'COMPLETED').length;
+    const total = safeVisits.length;
+    const waitingAction = safeVisits.filter((v) => v.status === 'ARRIVED').length;
+    const inProgress = safeVisits.filter((v) => v.status === 'IN_PROGRESS').length;
+    const completedToday = safeVisits.filter((v) => v.status === 'COMPLETED').length;
     return { total, waitingAction, inProgress, completedToday };
-  }, [visits]);
+  }, [safeVisits]);
 
   // Paginação
   const totalPages = Math.max(1, Math.ceil(filteredVisits.length / pageSize));

@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { FilterPopover } from '@/components/ui/filter-popover';
-import { portariaApi } from '@/lib/portaria-api';
+import { portariaApi, extractList } from '@/lib/portaria-api';
 
 interface BlockItem {
   id: string;
@@ -83,7 +83,7 @@ export default function PortariaOcorrenciasPage() {
         search: search || undefined,
         targetType: typeFilter === 'ALL' ? undefined : typeFilter,
       });
-      setBlocks(res.data || res || []);
+      setBlocks(extractList<BlockItem>(res));
     } catch (err) {
       console.error('Erro ao carregar bloqueios/ocorrências:', err);
     } finally {
@@ -139,21 +139,23 @@ export default function PortariaOcorrenciasPage() {
     }
   };
 
+  const safeBlocks = useMemo(() => (Array.isArray(blocks) ? blocks : []), [blocks]);
+
   // KPIs
-  const totalBlocks = blocks.length;
-  const activeBlocks = useMemo(() => blocks.filter((b) => b.active).length, [blocks]);
+  const totalBlocks = safeBlocks.length;
+  const activeBlocks = useMemo(() => safeBlocks.filter((b) => b.active).length, [safeBlocks]);
   const documentBlocks = useMemo(
-    () => blocks.filter((b) => b.targetType === 'DOCUMENT').length,
-    [blocks]
+    () => safeBlocks.filter((b) => b.targetType === 'DOCUMENT').length,
+    [safeBlocks]
   );
   const vehicleBlocks = useMemo(
-    () => blocks.filter((b) => b.targetType === 'PLATE').length,
-    [blocks]
+    () => safeBlocks.filter((b) => b.targetType === 'PLATE').length,
+    [safeBlocks]
   );
 
   // Filtros locais
   const filteredBlocks = useMemo(() => {
-    return blocks.filter((b) => {
+    return safeBlocks.filter((b) => {
       const matchSearch =
         !search ||
         (b.documentNumber && b.documentNumber.includes(search)) ||
@@ -163,7 +165,7 @@ export default function PortariaOcorrenciasPage() {
       const matchType = typeFilter === 'ALL' || b.targetType === typeFilter;
       return matchSearch && matchType;
     });
-  }, [blocks, search, typeFilter]);
+  }, [safeBlocks, search, typeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBlocks.length / pageSize));
   const paginatedBlocks = useMemo(() => {

@@ -31,6 +31,7 @@ import {
   portariaApi,
   PortariaVisit,
   PortariaSession,
+  extractList,
 } from '@/lib/portaria-api';
 
 export default function PortariaDashboardPage() {
@@ -45,8 +46,8 @@ export default function PortariaDashboardPage() {
         portariaApi.getVisits({ pageSize: 15 }),
         portariaApi.getSessions({ status: 'ACTIVE' }),
       ]);
-      setVisits(visitsRes.data || visitsRes || []);
-      setActiveSessions(sessionsRes.data || sessionsRes || []);
+      setVisits(extractList<PortariaVisit>(visitsRes));
+      setActiveSessions(extractList<PortariaSession>(sessionsRes));
     } catch (err) {
       console.error('Erro ao carregar dados da portaria:', err);
     } finally {
@@ -58,16 +59,19 @@ export default function PortariaDashboardPage() {
     loadDashboardData();
   }, []);
 
+  const safeVisits = useMemo(() => (Array.isArray(visits) ? visits : []), [visits]);
+  const safeSessions = useMemo(() => (Array.isArray(activeSessions) ? activeSessions : []), [activeSessions]);
+
   // KPIs
-  const totalPresent = activeSessions.length;
-  const visitsToday = visits.length;
+  const totalPresent = safeSessions.length;
+  const visitsToday = safeVisits.length;
   const pendingArrivalOrApproval = useMemo(
-    () => visits.filter((v) => v.status === 'ARRIVED' || v.status === 'SCHEDULED').length,
-    [visits]
+    () => safeVisits.filter((v) => v.status === 'ARRIVED' || v.status === 'SCHEDULED').length,
+    [safeVisits]
   );
   const inProgressVisits = useMemo(
-    () => visits.filter((v) => v.status === 'IN_PROGRESS').length,
-    [visits]
+    () => safeVisits.filter((v) => v.status === 'IN_PROGRESS').length,
+    [safeVisits]
   );
 
   const getStatusBadge = (status: string) => {
@@ -328,14 +332,14 @@ export default function PortariaDashboardPage() {
                     Carregando movimentações...
                   </TableCell>
                 </TableRow>
-              ) : visits.length === 0 ? (
+              ) : safeVisits.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-28 text-center text-xs text-muted-foreground">
                     Nenhuma visita registrada no turno.
                   </TableCell>
                 </TableRow>
               ) : (
-                visits.slice(0, 8).map((visit) => {
+                safeVisits.slice(0, 8).map((visit) => {
                   const mainVisitor = visit.participants?.find((p) => p.isResponsible) || visit.participants?.[0];
                   return (
                     <TableRow key={visit.id} className="hover:bg-muted/30 transition-colors">

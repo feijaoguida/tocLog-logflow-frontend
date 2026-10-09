@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { FilterPopover } from '@/components/ui/filter-popover';
-import { portariaApi, PortariaGroup, PortariaGate } from '@/lib/portaria-api';
+import { portariaApi, PortariaGroup, PortariaGate, extractList } from '@/lib/portaria-api';
 
 export default function PortariaGruposPage() {
   const [groups, setGroups] = useState<PortariaGroup[]>([]);
@@ -88,8 +88,8 @@ export default function PortariaGruposPage() {
         portariaApi.getGroups(),
         portariaApi.getGates().catch(() => []),
       ]);
-      setGroups(groupsRes.data || groupsRes || []);
-      setGates(gatesRes.data || gatesRes || []);
+      setGroups(extractList<PortariaGroup>(groupsRes));
+      setGates(extractList<PortariaGate>(gatesRes));
     } catch (err) {
       console.error('Erro ao carregar dados de grupos:', err);
     } finally {
@@ -101,23 +101,25 @@ export default function PortariaGruposPage() {
     loadData();
   }, []);
 
+  const safeGroups = useMemo(() => (Array.isArray(groups) ? groups : []), [groups]);
+
   // KPIs
-  const totalGroups = groups.length;
+  const totalGroups = safeGroups.length;
   const inProgressGroups = useMemo(
-    () => groups.filter((g) => g.status === 'IN_PROGRESS').length,
-    [groups]
+    () => safeGroups.filter((g) => g.status === 'IN_PROGRESS').length,
+    [safeGroups]
   );
   const totalPresentParticipants = useMemo(() => {
-    return groups.reduce((acc, g) => acc + (g.summary?.present || 0), 0);
-  }, [groups]);
+    return safeGroups.reduce((acc, g) => acc + (g.summary?.present || 0), 0);
+  }, [safeGroups]);
   const completedGroupsToday = useMemo(
-    () => groups.filter((g) => g.status === 'COMPLETED').length,
-    [groups]
+    () => safeGroups.filter((g) => g.status === 'COMPLETED').length,
+    [safeGroups]
   );
 
   // Filtros locais
   const filteredGroups = useMemo(() => {
-    return groups.filter((g) => {
+    return safeGroups.filter((g) => {
       const matchSearch =
         !search ||
         g.name.toLowerCase().includes(search.toLowerCase()) ||

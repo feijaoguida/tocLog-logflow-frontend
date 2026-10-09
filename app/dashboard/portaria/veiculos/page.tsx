@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { FilterPopover } from '@/components/ui/filter-popover';
-import { portariaApi } from '@/lib/portaria-api';
+import { portariaApi, extractList } from '@/lib/portaria-api';
 
 interface VehicleItem {
   id: string;
@@ -92,7 +92,7 @@ export default function PortariaVeiculosPage() {
         isCompanyVehicle: classificationFilter === 'ALL' ? undefined : classificationFilter === 'COMPANY',
         vehicleType: typeFilter === 'ALL' ? undefined : typeFilter,
       });
-      setVehicles(res.data || res || []);
+      setVehicles(extractList<VehicleItem>(res));
     } catch (err) {
       console.error('Erro ao carregar veículos:', err);
     } finally {
@@ -138,21 +138,23 @@ export default function PortariaVeiculosPage() {
     }
   };
 
+  const safeVehicles = useMemo(() => (Array.isArray(vehicles) ? vehicles : []), [vehicles]);
+
   // KPIs
-  const totalVehicles = vehicles.length;
+  const totalVehicles = safeVehicles.length;
   const companyVehicles = useMemo(
-    () => vehicles.filter((v) => v.isCompanyVehicle).length,
-    [vehicles]
+    () => safeVehicles.filter((v) => v.isCompanyVehicle).length,
+    [safeVehicles]
   );
   const thirdPartyVehicles = totalVehicles - companyVehicles;
   const trucksAndCargo = useMemo(
-    () => vehicles.filter((v) => ['TRUCK', 'VAN'].includes(v.vehicleType || '')).length,
-    [vehicles]
+    () => safeVehicles.filter((v) => ['TRUCK', 'VAN'].includes(v.vehicleType || '')).length,
+    [safeVehicles]
   );
 
   // Filtro local adicional se houver busca digitada
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter((v) => {
+    return safeVehicles.filter((v) => {
       const matchSearch =
         !search ||
         v.plate.toLowerCase().includes(search.toLowerCase()) ||
