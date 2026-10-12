@@ -27,6 +27,11 @@ type ProcurementSettingsRecord = {
   hierarchyThreshold: number
   minimumQuotationCount: number
   allowUrgentQuotationWaiver: boolean
+  budgetEnabled: boolean
+  budgetLevel: 'COMPANY' | 'BRANCH' | 'DEPARTMENT'
+  budgetPeriodicity: 'WEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL'
+  allowFreeTextItems: boolean
+  notifyOnQuotationDenied: boolean
   delegatedApprover: {
     id: string
     name: string
@@ -61,6 +66,16 @@ export default function ProcurementSettingsPage() {
   const [hierarchyThreshold, setHierarchyThreshold] = useState('5000')
   const [minimumQuotationCount, setMinimumQuotationCount] = useState('1')
   const [allowUrgentQuotationWaiver, setAllowUrgentQuotationWaiver] = useState(true)
+
+  // Gestão Orçamentária e Políticas de Compras
+  const [budgetEnabled, setBudgetEnabled] = useState(true)
+  const [budgetLevel, setBudgetLevel] = useState<'COMPANY' | 'BRANCH' | 'DEPARTMENT'>('BRANCH')
+  const [budgetPeriodicity, setBudgetPeriodicity] = useState<
+    'WEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL'
+  >('MONTHLY')
+  const [allowFreeTextItems, setAllowFreeTextItems] = useState(false)
+  const [notifyOnQuotationDenied, setNotifyOnQuotationDenied] = useState(true)
+
   const [departmentSaving, setDepartmentSaving] = useState(false)
   const [departmentInheritFromCompany, setDepartmentInheritFromCompany] = useState(true)
   const [departmentApprovalMode, setDepartmentApprovalMode] =
@@ -84,6 +99,11 @@ export default function ProcurementSettingsPage() {
       setHierarchyThreshold(String(settings.hierarchyThreshold))
       setMinimumQuotationCount(String(settings.minimumQuotationCount))
       setAllowUrgentQuotationWaiver(settings.allowUrgentQuotationWaiver)
+      setBudgetEnabled(settings.budgetEnabled ?? true)
+      setBudgetLevel(settings.budgetLevel ?? 'BRANCH')
+      setBudgetPeriodicity(settings.budgetPeriodicity ?? 'MONTHLY')
+      setAllowFreeTextItems(settings.allowFreeTextItems ?? false)
+      setNotifyOnQuotationDenied(settings.notifyOnQuotationDenied ?? true)
       setApprovers(approverOptions)
       setDepartmentSettings(departments)
       if (departments.length > 0) {
@@ -138,6 +158,11 @@ export default function ProcurementSettingsPage() {
         hierarchyThreshold: Number(hierarchyThreshold || 0),
         minimumQuotationCount: Number(minimumQuotationCount || 1),
         allowUrgentQuotationWaiver,
+        budgetEnabled,
+        budgetLevel,
+        budgetPeriodicity,
+        allowFreeTextItems,
+        notifyOnQuotationDenied,
       })
       toast.success('Configurações de compras atualizadas com sucesso.')
     } catch (error) {
@@ -232,6 +257,9 @@ export default function ProcurementSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="quotations" className="text-xs font-medium">
             Política de Cotações
+          </TabsTrigger>
+          <TabsTrigger value="budget" className="text-xs font-medium">
+            Gestão Orçamentária & Catálogo
           </TabsTrigger>
           <TabsTrigger value="departments" className="text-xs font-medium">
             Regras Departamentais
@@ -564,6 +592,129 @@ export default function ProcurementSettingsPage() {
                   {departmentInheritFromCompany
                     ? 'Departamento herdando da empresa'
                     : 'Regras personalizadas ativas'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Aba 4: Gestão Orçamentária & Catálogo */}
+        <TabsContent value="budget" className="space-y-6">
+          <Card className="app-section-card p-6">
+            <CardHeader className="p-0 mb-6">
+              <CardTitle className="text-lg">Gestão Orçamentária por Eventos & Catálogo Mestre</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Configure os parâmetros de governança orçamentária, limites de tolerância e regras de catálogo para novos pedidos.
+              </p>
+            </CardHeader>
+            <CardContent className="p-0 space-y-6">
+              {/* Switch Geral de Orçamento */}
+              <div className="flex items-start justify-between rounded-lg border bg-muted/20 p-4 max-w-2xl">
+                <div className="space-y-1 pr-4">
+                  <p className="text-sm font-semibold text-foreground">
+                    Ativar Controle Orçamentário por Eventos
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Quando ativo, validação orçamentária automática é acionada na criação e envio de pedidos. Pedidos que estourarem o saldo + tolerância serão bloqueados.
+                  </p>
+                </div>
+                <Switch
+                  checked={budgetEnabled}
+                  onCheckedChange={setBudgetEnabled}
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Parâmetros de Nível e Periodicidade */}
+              <div className={budgetEnabled ? 'grid gap-4 md:grid-cols-2 max-w-2xl' : 'pointer-events-none opacity-50 grid gap-4 md:grid-cols-2 max-w-2xl'}>
+                <div className="field-stack">
+                  <Label htmlFor="budget-level" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Nível de Consolidação Orçamentária
+                  </Label>
+                  <Select
+                    value={budgetLevel}
+                    onValueChange={(val) => setBudgetLevel(val as 'COMPANY' | 'BRANCH' | 'DEPARTMENT')}
+                    disabled={loading || !budgetEnabled}
+                  >
+                    <SelectTrigger id="budget-level" className="h-9 text-sm">
+                      <SelectValue placeholder="Selecione o nível de controle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="COMPANY">Empresa Inteira (Global)</SelectItem>
+                      <SelectItem value="BRANCH">Por Filial (Regionalizado)</SelectItem>
+                      <SelectItem value="DEPARTMENT">Por Departamento (Centro de Custo)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Determina se os saldos são consumidos por filial ou departamento.
+                  </p>
+                </div>
+
+                <div className="field-stack">
+                  <Label htmlFor="budget-periodicity" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Periodicidade dos Ciclos
+                  </Label>
+                  <Select
+                    value={budgetPeriodicity}
+                    onValueChange={(val) =>
+                      setBudgetPeriodicity(
+                        val as 'WEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL',
+                      )
+                    }
+                    disabled={loading || !budgetEnabled}
+                  >
+                    <SelectTrigger id="budget-periodicity" className="h-9 text-sm">
+                      <SelectValue placeholder="Selecione a periodicidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WEEKLY">Semanal</SelectItem>
+                      <SelectItem value="MONTHLY">Mensal (Padrão)</SelectItem>
+                      <SelectItem value="BIMONTHLY">Bimestral</SelectItem>
+                      <SelectItem value="QUARTERLY">Trimestral</SelectItem>
+                      <SelectItem value="SEMIANNUAL">Semestral</SelectItem>
+                      <SelectItem value="ANNUAL">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Intervalo para renovação automática do saldo disponível dos eventos.
+                  </p>
+                </div>
+              </div>
+
+              {/* Diretrizes de Catálogo & Notificações */}
+              <div className="space-y-4 pt-2 border-t max-w-2xl">
+                <h3 className="text-sm font-semibold text-foreground">Políticas de Itens e Comunicação</h3>
+
+                <div className="flex items-start justify-between rounded-lg border bg-muted/20 p-4">
+                  <div className="space-y-1 pr-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      Permitir Itens em Texto Livre (Sem Catálogo)
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Se desativado, os solicitantes ficam estritamente restritos aos produtos homologados no Catálogo Mestre.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={allowFreeTextItems}
+                    onCheckedChange={setAllowFreeTextItems}
+                    disabled={loading}
+                  />
+                </div>
+
+              </div>
+
+              {/* Botão Salvar */}
+              <div className="flex items-center gap-3 pt-4 border-t">
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={loading || saving}
+                  className="font-semibold"
+                >
+                  {saving ? 'Salvando...' : 'Salvar configurações orçamentárias'}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  As diretrizes entram em vigor imediatamente para novas requisições.
                 </span>
               </div>
             </CardContent>

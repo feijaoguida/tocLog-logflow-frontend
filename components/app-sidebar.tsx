@@ -224,9 +224,17 @@ export function AppSidebar() {
               { title: "Aprovações", url: "/dashboard/compras/aprovacoes", permission: "procurement.requests.approve" },
               { title: "Cotações", url: "/dashboard/compras/cotacoes", permission: "procurement.quotations.view" },
               { title: "Ordens de Compra", url: "/dashboard/compras/ordens", permission: "procurement.orders.view" },
+              {
+                  title: "Cadastros",
+                  url: "#",
+                  items: [
+                      { title: "Produtos", url: "/dashboard/compras/cadastros/produtos", permission: "procurement.products.view" },
+                      { title: "Fornecedores", url: "/dashboard/compras/cadastros/fornecedores", permission: "procurement.suppliers.view" },
+                      { title: "Categorias", url: "/dashboard/compras/cadastros/categorias", permission: "procurement.products.view" },
+                      { title: "Unidades", url: "/dashboard/compras/cadastros/unidades", permission: "procurement.products.view" },
+                  ],
+              },
               { title: "Configurações", url: "/dashboard/compras/configuracoes", permission: "procurement.settings.manage" },
-              { title: "Produtos", url: "/dashboard/compras/cadastros/produtos", permission: "procurement.products.view" },
-              { title: "Fornecedores", url: "/dashboard/compras/cadastros/fornecedores", permission: "procurement.suppliers.view" },
           ]
       },
       {

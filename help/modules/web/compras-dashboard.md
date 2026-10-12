@@ -27,10 +27,9 @@ Apresenta uma visão operacional do domínio de compras com KPIs do pipeline, re
 | Ordens recentes | Últimas ordens geradas e seu status |
 | Atalhos | Acesso rápido para `Pedidos`, `Cotações` e `Ordens` |
 
-## Prints sugeridos
+## Telas e Imagens
 
-> [!IMPORTANT] Capturas pendentes
-> Adicionar `compras-dashboard.png`.
+![Dashboard de Compras e Pipeline](/help-images/compras-dashboard.png)
 
 ## Dicas de uso
 

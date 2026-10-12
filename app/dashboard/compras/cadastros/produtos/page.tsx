@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
+  History,
+  Calendar,
+  AlertCircle,
   Loader2,
   Package,
   Pencil,
   Plus,
   RotateCw,
-  Ruler,
   Search,
   Tag,
   Trash2,
@@ -35,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -58,12 +59,22 @@ interface Unit {
   symbol: string
 }
 
+interface PriceHistoryItem {
+  id: string
+  position: number
+  price: number
+  orderNumber: string | null
+  purchaseDate: string
+}
+
 interface Product {
   id: string
   name: string
   description: string | null
   category: Category
   unit: Unit
+  priceHistories?: PriceHistoryItem[]
+  suggestedEstimatedPrice?: number | null
 }
 
 export default function ProductsPage() {
@@ -86,10 +97,15 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('')
   const [unitId, setUnitId] = useState('')
 
-  // Delete dialog
+  // Delete dialog produto
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Modal Histórico de Preços
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState(false)
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
@@ -104,9 +120,9 @@ export default function ProductsPage() {
         api.get('/products/units/all'),
       ])
 
-      setProducts(prodRes.data)
-      setCategories(catRes.data)
-      setUnits(unitRes.data)
+      setProducts(prodRes.data || [])
+      setCategories(catRes.data || [])
+      setUnits(unitRes.data || [])
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Erro ao carregar catálogo de produtos.'))
     } finally {
@@ -130,8 +146,8 @@ export default function ProductsPage() {
     setEditingId(p.id)
     setName(p.name)
     setDescription(p.description || '')
-    setCategoryId(p.category.id)
-    setUnitId(p.unit.id)
+    setCategoryId(p.category?.id || '')
+    setUnitId(p.unit?.id || '')
     setIsProductOpen(true)
   }
 
@@ -193,552 +209,539 @@ export default function ProductsPage() {
     }
   }
 
-  const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (searchTerm.trim()) count++
-    if (categoryFilter !== 'ALL') count++
-    return count
-  }, [searchTerm, categoryFilter])
-
-  function handleClearFilters() {
-    setSearchTerm('')
-    setCategoryFilter('ALL')
-    setCurrentPage(1)
+  const openPriceHistory = async (product: Product) => {
+    setSelectedProductForHistory(product)
+    setIsPriceHistoryOpen(true)
+    try {
+      setHistoryLoading(true)
+      const res = await api.get(`/products/${product.id}/price-history`)
+      if (res.data) {
+        setSelectedProductForHistory((prev) =>
+          prev ? { ...prev, priceHistories: res.data } : null,
+        )
+      }
+    } catch {
+      // Mantém os dados locais se falhar
+    } finally {
+      setHistoryLoading(false)
+    }
   }
 
+  // Filtragem
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase()
-        const matchName = p.name.toLowerCase().includes(q)
-        const matchDesc = (p.description || '').toLowerCase().includes(q)
-        const matchCat = p.category?.name.toLowerCase().includes(q)
-        if (!matchName && !matchDesc && !matchCat) return false
-      }
-
-      if (categoryFilter !== 'ALL' && p.category?.id !== categoryFilter) {
-        return false
-      }
-
-      return true
+      const matchesSearch =
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      const matchesCategory =
+        categoryFilter === 'ALL' || (p.category && p.category.id === categoryFilter)
+      return matchesSearch && matchesCategory
     })
   }, [products, searchTerm, categoryFilter])
 
+  // Paginação
   const totalPages = Math.ceil(filteredProducts.length / pageSize) || 1
-
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredProducts.slice(start, start + pageSize)
-  }, [filteredProducts, currentPage, pageSize])
+  }, [filteredProducts, currentPage])
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(1)
-    }
-  }, [totalPages, currentPage])
-
-  const stats = useMemo(() => {
-    return {
-      totalProducts: products.length,
-      totalCategories: categories.length,
-      totalUnits: units.length,
-      withDescription: products.filter((p) => Boolean(p.description)).length,
-    }
-  }, [products, categories, units])
+  // Contadores para os filtros
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    products.forEach((p) => {
+      if (p.category?.id) {
+        counts[p.category.id] = (counts[p.category.id] || 0) + 1
+      }
+    })
+    return counts
+  }, [products])
 
   return (
-    <div className="app-page space-y-6">
-      {/* 1. Cabeçalho Padronizado */}
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Catálogo de Produtos
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie o cadastro mestre de itens, categorias e unidades de medida para compras.
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground">
+              Catálogo de Produtos
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+              {filteredProducts.length} {filteredProducts.length === 1 ? 'produto' : 'produtos'}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cadastro de itens de compras com histórico circular dos 3 últimos preços de compra (Posições 1, 2 e 3).
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={() => {
-              resetForm()
-              setIsProductOpen(true)
-            }}
-            size="sm"
-            className="h-9 gap-1.5 font-semibold"
-          >
-            <Plus className="size-4" />
-            <span>Novo produto</span>
-          </Button>
+        <Button
+          size="sm"
+          className="h-8 gap-1.5 font-semibold"
+          onClick={() => {
+            resetForm()
+            setIsProductOpen(true)
+          }}
+        >
+          <Plus className="size-3.5" />
+          <span>Novo Produto</span>
+        </Button>
+      </div>
 
-          {/* Filtro Flutuante */}
-          <FilterPopover
-            activeCount={activeFilterCount}
-            onClear={handleClearFilters}
-            onApply={() => setCurrentPage(1)}
+      {/* Barra de Filtros e Busca */}
+      <Card className="app-section-card p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou especificação..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="h-9 pl-9 text-xs"
+            />
+          </div>
+
+          <div className="w-56">
+            <Select
+              value={categoryFilter}
+              onValueChange={(val) => {
+                setCategoryFilter(val)
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Todas as categorias" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todas as categorias ({products.length})</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} ({categoryCounts[c.id] || 0})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={fetchData}
+            title="Atualizar lista"
           >
-            <div className="field-stack">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Palavra-chave
-              </span>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <RotateCw className="size-3.5" />
+          </Button>
+        </div>
+      </Card>
+
+      {/* Tabela de Produtos */}
+      <Card className="app-section-card overflow-hidden">
+        {loading ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <Loader2 className="size-6 animate-spin text-primary" />
+          </div>
+        ) : paginatedProducts.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <Package className="mx-auto size-10 text-muted-foreground/60" />
+            <h3 className="text-sm font-semibold text-foreground">Nenhum produto encontrado</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Cadastre produtos para compor as requisições de compras e acompanhar a evolução dos preços.
+            </p>
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                resetForm()
+                setIsProductOpen(true)
+              }}
+            >
+              Cadastrar Primeiro Produto
+            </Button>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Produto / Descrição</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead className="w-[100px]">Unidade</TableHead>
+                <TableHead className="w-[220px]">Último Preço / Histórico</TableHead>
+                <TableHead className="w-[100px] text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedProducts.map((p) => {
+                const historyCount = p.priceHistories?.length || 0
+
+                return (
+                  <TableRow key={p.id} className="hover:bg-muted/40 transition-colors">
+                    {/* Nome e Descrição */}
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <span className="font-semibold text-foreground text-xs block">
+                          {p.name}
+                        </span>
+                        {p.description && (
+                          <span className="text-[11px] text-muted-foreground line-clamp-1">
+                            {p.description}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Categoria */}
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 rounded bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
+                        <Tag className="size-3" />
+                        {p.category?.name || 'Geral'}
+                      </span>
+                    </TableCell>
+
+                    {/* Unidade */}
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-mono font-bold text-primary">
+                        {p.unit?.symbol || 'UN'}
+                      </span>
+                    </TableCell>
+
+                    {/* Último Preço / Histórico Circular */}
+                    <TableCell>
+                      <div className="space-y-1">
+                        {p.suggestedEstimatedPrice != null ? (
+                          <span className="font-semibold text-foreground text-xs font-mono block">
+                            R${' '}
+                            {Number(p.suggestedEstimatedPrice).toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground italic block">
+                            Sem compra registrada
+                          </span>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-[11px] text-primary hover:text-primary-strong gap-1 -ml-1 font-semibold"
+                          onClick={() => openPriceHistory(p)}
+                        >
+                          <History className="size-3 text-primary" />
+                          <span>
+                            {historyCount > 0
+                              ? `3 Preços (${historyCount} reg.)`
+                              : 'Consultar 3 Preços'}
+                          </span>
+                        </Button>
+                      </div>
+                    </TableCell>
+
+                    {/* Ações */}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Editar produto"
+                          onClick={() => handleEdit(p)}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          title="Excluir produto"
+                          onClick={() => {
+                            setDeleteProductId(p.id)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        )}
+
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t p-4 text-xs text-muted-foreground">
+            <span>
+              Mostrando {Math.min((currentPage - 1) * pageSize + 1, filteredProducts.length)} a{' '}
+              {Math.min(currentPage * pageSize, filteredProducts.length)} de{' '}
+              {filteredProducts.length} produtos
+            </span>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <Button
+                  key={pageNum}
+                  variant={pageNum === currentPage ? 'default' : 'outline'}
+                  size="icon-sm"
+                  className={`size-8 font-medium ${pageNum === currentPage ? 'pointer-events-none' : ''}`}
+                  onClick={() => setCurrentPage(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Modal Criar/Editar Produto */}
+      <Dialog open={isProductOpen} onOpenChange={setIsProductOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <form onSubmit={handleSaveProduct}>
+            <DialogHeader>
+              <DialogTitle>
+                {editingId ? 'Editar Produto' : 'Cadastrar Novo Produto'}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4 text-xs">
+              <div className="space-y-1.5">
+                <Label htmlFor="prodName" className="text-xs font-semibold">
+                  Nome do Produto *
+                </Label>
                 <Input
-                  className="pl-9 h-9 text-sm"
-                  placeholder="Nome do produto ou descrição..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      setCurrentPage(1)
-                    }
-                  }}
+                  id="prodName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Cadeira Ergonômica NR17, Toner HP 105A"
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Categoria *</Label>
+                  <Select value={categoryId} onValueChange={setCategoryId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Unidade de Medida *</Label>
+                  <Select value={unitId} onValueChange={setUnitId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {units.map((u) => (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">
+                          {u.name} ({u.symbol})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="prodDesc" className="text-xs font-semibold">
+                  Especificação Técnica / Observação
+                </Label>
+                <Input
+                  id="prodDesc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Detalhes, marca recomendada, voltagem ou dimensões"
+                  className="h-9 text-xs"
                 />
               </div>
             </div>
 
-            <div className="field-stack">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Categoria
-              </span>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Todas as categorias" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todas as categorias</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </FilterPopover>
-
-          {/* Atualização */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5"
-            onClick={() => void fetchData()}
-            disabled={loading}
-          >
-            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Atualizar</span>
-          </Button>
-        </div>
-      </section>
-
-      {/* 2. Cards de Indicadores (KPIs em 4 colunas) */}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* Card 1: Total Produtos */}
-        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
-          <CardHeader className="p-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total de produtos
-            </span>
-          </CardHeader>
-          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-foreground">
-              {stats.totalProducts}
-            </span>
-            <Package className="size-5 text-muted-foreground/60" />
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Categorias */}
-        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
-          <CardHeader className="p-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Categorias ativas
-            </span>
-          </CardHeader>
-          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-foreground">
-              {stats.totalCategories}
-            </span>
-            <Tag className="size-5 text-muted-foreground/60" />
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Unidades */}
-        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
-          <CardHeader className="p-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Unidades de medida
-            </span>
-          </CardHeader>
-          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-foreground">
-              {stats.totalUnits}
-            </span>
-            <Ruler className="size-5 text-muted-foreground/60" />
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Descrições completas */}
-        <Card className="app-section-card p-4 transition-all hover:shadow-xs">
-          <CardHeader className="p-0">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Itens detalhados
-            </span>
-          </CardHeader>
-          <CardContent className="p-0 pt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-              {stats.withDescription}
-            </span>
-            <span className="text-xs text-muted-foreground">com especificação</span>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 3. Navegação por Abas do Catálogo */}
-      <Tabs defaultValue="products" className="space-y-4">
-        <TabsList className="bg-muted/60 p-1">
-          <TabsTrigger value="products" className="text-xs font-medium">
-            Produtos ({products.length})
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="text-xs font-medium">
-            Categorias ({categories.length})
-          </TabsTrigger>
-          <TabsTrigger value="units" className="text-xs font-medium">
-            Unidades de Medida ({units.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Aba 1: Produtos */}
-        <TabsContent value="products">
-          <Card className="app-section-card overflow-hidden">
-            {loading ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                Carregando catálogo de produtos...
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-8 text-center">
-                <Package className="size-12 text-muted-foreground/50" />
-                <div className="space-y-1">
-                  <p className="font-semibold text-foreground">Nenhum produto encontrado</p>
-                  <p className="text-sm text-muted-foreground">
-                    {activeFilterCount > 0
-                      ? 'Nenhum resultado corresponde aos filtros aplicados.'
-                      : 'Cadastre os primeiros produtos para facilitar a seleção nos pedidos de compra.'}
-                  </p>
-                </div>
-                {activeFilterCount > 0 ? (
-                  <Button variant="outline" size="sm" onClick={handleClearFilters} className="mt-2">
-                    Limpar filtros
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => {
-                      resetForm()
-                      setIsProductOpen(true)
-                    }}
-                    size="sm"
-                    className="mt-2"
-                  >
-                    <Plus className="size-4 mr-1.5" />
-                    Novo produto
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[260px] text-xs font-semibold uppercase tracking-wider">
-                        Produto / Descrição
-                      </TableHead>
-                      <TableHead className="w-[180px] text-xs font-semibold uppercase tracking-wider">
-                        Categoria
-                      </TableHead>
-                      <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider">
-                        Unidade
-                      </TableHead>
-                      <TableHead className="w-[120px] text-right text-xs font-semibold uppercase tracking-wider">
-                        Ações
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedProducts.map((p) => (
-                      <TableRow key={p.id} className="transition-colors">
-                        {/* Produto / Descrição */}
-                        <TableCell>
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-foreground text-sm">
-                              {p.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">
-                              {p.description || 'Sem especificações adicionais'}
-                            </p>
-                          </div>
-                        </TableCell>
-
-                        {/* Categoria */}
-                        <TableCell>
-                          <span className="inline-flex items-center rounded-md border border-border/80 bg-muted/30 px-2 py-0.5 text-xs font-medium text-foreground">
-                            {p.category?.name || 'Geral'}
-                          </span>
-                        </TableCell>
-
-                        {/* Unidade */}
-                        <TableCell>
-                          <span className="inline-flex items-center rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-xs font-bold font-mono">
-                            {p.unit?.symbol || '-'}
-                          </span>
-                        </TableCell>
-
-                        {/* Ações */}
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-muted-foreground hover:text-foreground"
-                              title="Editar produto"
-                              onClick={() => handleEdit(p)}
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                              title="Excluir produto"
-                              onClick={() => {
-                                setDeleteProductId(p.id)
-                                setIsDeleteDialogOpen(true)
-                              }}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            {/* Paginação Integrada */}
-            {!loading && filteredProducts.length > 0 && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-t bg-muted/10 text-xs text-muted-foreground">
-                <div>
-                  Exibindo <span className="font-semibold text-foreground">{paginatedProducts.length}</span> de{' '}
-                  <span className="font-semibold text-foreground">{filteredProducts.length}</span> registros
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className="size-8"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <Button
-                      key={pageNum}
-                      variant={pageNum === currentPage ? 'default' : 'outline'}
-                      size="icon-sm"
-                      className={`size-8 font-medium ${pageNum === currentPage ? 'pointer-events-none' : ''}`}
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  ))}
-
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    className="size-8"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
-        {/* Aba 2: Categorias */}
-        <TabsContent value="categories">
-          <Card className="app-section-card p-5 space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-foreground">
-                Categorias de Compras
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Categorias cadastradas para classificar insumos e organizar compras.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {categories.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between rounded-lg border bg-muted/20 px-3.5 py-2.5"
-                >
-                  <div className="flex items-center gap-2">
-                    <Tag className="size-3.5 text-primary" />
-                    <span className="text-sm font-medium text-foreground">{c.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
-
-        {/* Aba 3: Unidades */}
-        <TabsContent value="units">
-          <Card className="app-section-card p-5 space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-foreground">
-                Unidades de Medida
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Padrões métricos e de contagem para requisições e cotações.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {units.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between rounded-lg border bg-muted/20 px-3.5 py-2.5"
-                >
-                  <span className="text-sm font-medium text-foreground">{u.name}</span>
-                  <span className="rounded-full bg-background border px-2 py-0.5 text-xs font-mono font-bold text-muted-foreground">
-                    {u.symbol}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Modal Centralizado de Cadastro/Edição de Produto */}
-      <Dialog open={isProductOpen} onOpenChange={setIsProductOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingId ? 'Editar Produto' : 'Novo Produto'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveProduct} className="space-y-4 pt-2">
-            <div className="field-stack">
-              <Label htmlFor="product-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Nome do Produto *
-              </Label>
-              <Input
-                id="product-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Cadeira Ergonômica NR-17"
-                required
-                className="h-9 text-sm"
-              />
-            </div>
-
-            <div className="field-stack">
-              <Label htmlFor="product-desc" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Descrição / Especificação Técnica
-              </Label>
-              <Input
-                id="product-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: Regulagem de altura, braços 3D, cor preta"
-                className="h-9 text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="field-stack">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Categoria *
-                </Label>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="field-stack">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Unidade *
-                </Label>
-                <Select value={unitId} onValueChange={setUnitId}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {units.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.symbol} - {u.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 pt-2 border-t">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsProductOpen(false)}
-                disabled={formLoading}
               >
                 Cancelar
               </Button>
               <Button type="submit" size="sm" disabled={formLoading}>
-                {formLoading ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  'Salvar produto'
-                )}
+                {formLoading ? <Loader2 className="size-3.5 animate-spin" /> : 'Salvar Produto'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* ConfirmDialog de Exclusão */}
+      {/* Modal Histórico dos 3 Preços */}
+      <Dialog open={isPriceHistoryOpen} onOpenChange={setIsPriceHistoryOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <History className="size-4 text-primary" />
+              <span>Histórico de Compras · 3 Preços</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedProductForHistory && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm text-foreground">
+                    {selectedProductForHistory.name}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                    {selectedProductForHistory.unit?.symbol || 'UN'}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground block">
+                  Categoria: {selectedProductForHistory.category?.name || 'Geral'}
+                </span>
+              </div>
+
+              {/* Slots Posicionais P1, P2, P3 */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Buffer Circular (Ordem FIFO)
+                  </span>
+                  {historyLoading && <Loader2 className="size-3 animate-spin text-primary" />}
+                </div>
+
+                {[1, 2, 3].map((pos) => {
+                  const entry = selectedProductForHistory.priceHistories?.find(
+                    (p) => p.position === pos,
+                  )
+                  const slotLabel =
+                    pos === 1
+                      ? 'P1 - Última Compra (Preço Sugerido)'
+                      : pos === 2
+                      ? 'P2 - Penúltima Compra'
+                      : 'P3 - Antepenúltima Compra'
+                  const badgeColor =
+                    pos === 1
+                      ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+                      : pos === 2
+                      ? 'bg-blue-500/15 text-blue-700 border-blue-500/30'
+                      : 'bg-muted text-muted-foreground border-border'
+
+                  return (
+                    <div
+                      key={pos}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-2xs"
+                    >
+                      <div className="space-y-1">
+                        <span
+                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold border ${badgeColor}`}
+                        >
+                          {slotLabel}
+                        </span>
+                        {entry ? (
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground pt-0.5">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="size-3" />
+                              {new Date(entry.purchaseDate).toLocaleDateString('pt-BR')}
+                            </span>
+                            {entry.orderNumber && (
+                              <span className="font-mono font-medium text-foreground">
+                                OC #{entry.orderNumber}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            Slot vago (nenhuma compra anterior registrada)
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        {entry ? (
+                          <span className="font-mono text-sm font-bold text-foreground">
+                            R${' '}
+                            {Number(entry.price).toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/60">--</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="rounded border border-border/60 bg-muted/10 p-2.5 text-[11px] text-muted-foreground flex items-start gap-2">
+                <AlertCircle className="size-3.5 text-primary mt-0.5 shrink-0" />
+                <span>
+                  A cada nova Ordem de Compra confirmada pelo comprador, o sistema rotaciona os valores automaticamente: o preço atual se torna P1 e o P3 mais antigo é descartado.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPriceHistoryOpen(false)}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de Exclusão */}
       <ConfirmDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         title="Excluir Produto"
-        description="Tem certeza que deseja excluir este produto do catálogo? Caso haja requisições vinculadas, a integridade histórica será preservada."
-        confirmText="Confirmar exclusão"
-        variant="destructive"
-        loading={deleteLoading}
+        description="Tem certeza que deseja excluir este produto do catálogo? O histórico de compras também será removido."
         onConfirm={handleDeleteProduct}
+        loading={deleteLoading}
+        confirmText="Excluir Produto"
+        variant="destructive"
       />
     </div>
   )

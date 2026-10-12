@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Button } from "@/components/ui/button"
-import { CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ImageUpload } from "@/components/image-upload"
 import { Input } from "@/components/ui/input"
@@ -123,6 +122,8 @@ export interface EmployeeData {
   cpf: string
   role: string
   roleId?: string
+  jobPositionId?: string
+  jobPosition?: { id: string; name: string } | null
   status: string
   branchId: string
   departmentId?: string
@@ -192,6 +193,8 @@ function buildInitialData(initialData?: EmployeeData): EmployeeData {
     email: "",
     cpf: "",
     role: "",
+    roleId: "",
+    jobPositionId: "",
     status: "ACTIVE",
     branchId: "",
     departmentId: "",
@@ -292,6 +295,7 @@ export function EmployeeForm({
   const [departments, setDepartments] = useState<LookupItem[]>([])
   const [roles, setRoles] = useState<LookupItem[]>([])
   const [branches, setBranches] = useState<LookupItem[]>([])
+  const [jobPositions, setJobPositions] = useState<LookupItem[]>([])
   const [managers, setManagers] = useState<ManagerItem[]>([])
   const [managerSearch, setManagerSearch] = useState("")
   const [isSearchingManager, setIsSearchingManager] = useState(false)
@@ -314,14 +318,16 @@ export function EmployeeForm({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [deptRes, roleRes, branchRes] = await Promise.all([
+        const [deptRes, roleRes, branchRes, posRes] = await Promise.allSettled([
           api.get("/departments"),
           api.get("/roles"),
           api.get("/branches"),
+          api.get("/job-positions"),
         ])
-        setDepartments(deptRes.data)
-        setRoles(roleRes.data)
-        setBranches(branchRes.data)
+        if (deptRes.status === "fulfilled") setDepartments(deptRes.value.data)
+        if (roleRes.status === "fulfilled") setRoles(roleRes.value.data)
+        if (branchRes.status === "fulfilled") setBranches(branchRes.value.data)
+        if (posRes.status === "fulfilled") setJobPositions(posRes.value.data)
 
         if (initialData?.directManagerId) {
           const managerRes = await api.get(`/employees/${initialData.directManagerId}`)
@@ -335,7 +341,7 @@ export function EmployeeForm({
           try {
             const secRes = await api.get(`/employees/${initialData.id}/roles`)
             if (secRes.data?.secondaryRoles && Array.isArray(secRes.data.secondaryRoles)) {
-              setSecondaryRoleIds(secRes.data.secondaryRoles.map((s: any) => s.roleId))
+              setSecondaryRoleIds(secRes.data.secondaryRoles.map((s: { roleId: string }) => s.roleId))
             }
           } catch (e) {
             console.error("Secondary roles fetch error", e)
@@ -577,6 +583,11 @@ export function EmployeeForm({
       const sanitizedFormData = { ...formData }
       delete sanitizedFormData.id
       delete sanitizedFormData.phone
+      delete sanitizedFormData.userId
+      delete sanitizedFormData.jobPosition
+      if (isEditMode) {
+        delete sanitizedFormData.password
+      }
       const payload: Record<string, unknown> = {
         ...sanitizedFormData,
         cpf: formData.cpf.replace(/\D/g, ""),
@@ -1028,7 +1039,30 @@ export function EmployeeForm({
           </div>
 
           <div className="field-stack">
-            <Label htmlFor="role">Cargo / Função</Label>
+            <Label htmlFor="jobPositionId">Cargo Organizacional</Label>
+            <Select
+              value={formData.jobPositionId || "none"}
+              onValueChange={(val) => handleChange("jobPositionId", val === "none" ? "" : val)}
+            >
+              <SelectTrigger id="jobPositionId" className="w-full">
+                <SelectValue placeholder="Selecione o cargo organizacional" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não informado / Sem cargo</SelectItem>
+                {jobPositions.map((pos) => (
+                  <SelectItem key={pos.id} value={pos.id}>
+                    {pos.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Estrutura organizacional do plano de cargos. Diferente do perfil de acesso no sistema.
+            </p>
+          </div>
+
+          <div className="field-stack">
+            <Label htmlFor="role">Função / Título Livre</Label>
             <Input
               id="role"
               value={formData.role}

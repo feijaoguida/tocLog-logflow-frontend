@@ -4,21 +4,26 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
+  AlertTriangle,
   ArrowLeft,
   Ban,
+  Check,
   CheckCircle2,
   DollarSign,
   FileSpreadsheet,
+  FileText,
   Loader2,
   Plus,
   RotateCw,
   ShoppingCart,
+  ThumbsDown,
   TrendingDown,
   Trophy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -43,6 +49,7 @@ interface RequestItem {
   id: string
   quantity: number
   description: string
+  estimatedPrice?: number | null
   product?: { name: string }
   unit: { symbol: string }
 }
@@ -52,6 +59,8 @@ interface QuotationItem {
   price: number
   deliveryTime?: string
   paymentConditions?: string
+  status?: string
+  denialReason?: string | null
   requestItem: RequestItem
 }
 
@@ -60,6 +69,7 @@ interface Quotation {
   supplier: { id: string; name: string }
   status: string
   totalValue: number
+  denialReason?: string | null
   items: QuotationItem[]
 }
 
@@ -124,6 +134,21 @@ export default function QuotationDetailPage() {
     variant?: 'default' | 'destructive'
     action?: () => Promise<void>
   }>({ open: false, title: '' })
+
+  // Modal de Negativa de Cotação
+  const [isDenyModalOpen, setIsDenyModalOpen] = useState(false)
+  const [selectedQuoteForDeny, setSelectedQuoteForDeny] = useState<Quotation | null>(null)
+  const [denyType, setDenyType] = useState<'TOTAL' | 'PARTIAL'>('TOTAL')
+  const [selectedItemIdsToDeny, setSelectedItemIdsToDeny] = useState<string[]>([])
+  const [denyReason, setDenyReason] = useState('')
+  const [returnItemToRequester, setReturnItemToRequester] = useState(true)
+  const [denyLoading, setDenyLoading] = useState(false)
+
+  // Modal de Gerar Ordem de Compra com Lançamento
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [selectedQuoteForOrder, setSelectedQuoteForOrder] = useState<Quotation | null>(null)
+  const [entryNumber, setEntryNumber] = useState('')
+  const [orderLoading, setOrderLoading] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -226,22 +251,82 @@ export default function QuotationDetailPage() {
     })
   }
 
-  const handleGenerateOrder = (quoteId: string) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Gerar Ordem de Compra',
-      description: 'Deseja emitir a Ordem de Compra oficial para esta cotação agora?',
-      confirmText: 'Gerar Ordem',
-      action: async () => {
-        try {
-          await api.post(`/purchase-orders/generate/${quoteId}`)
-          toast.success('Ordem de Compra emitida com sucesso.')
-          router.push('/dashboard/compras/ordens')
-        } catch (error) {
-          toast.error(getApiErrorMessage(error, 'Erro ao gerar ordem de compra.'))
-        }
-      },
-    })
+  const openDenyModal = (quote: Quotation) => {
+    setSelectedQuoteForDeny(quote)
+    setDenyType('TOTAL')
+    setSelectedItemIdsToDeny([])
+    setDenyReason('')
+    setReturnItemToRequester(true)
+    setIsDenyModalOpen(true)
+  }
+
+  const handleConfirmDeny = async () => {
+    if (!selectedQuoteForDeny) return
+    if (!denyReason.trim()) {
+      toast.error('Informe a justificativa da recusa.')
+      return
+    }
+
+    if (denyType === 'PARTIAL' && selectedItemIdsToDeny.length === 0) {
+      toast.error('Selecione pelo menos um item para negar.')
+      return
+    }
+
+    setDenyLoading(true)
+    try {
+      if (denyType === 'TOTAL') {
+        await api.post(`/quotations/${selectedQuoteForDeny.id}/deny`, {
+          reason: denyReason.trim(),
+          returnItemToRequester,
+        })
+        toast.success('Cotação negada com sucesso e solicitante notificado por e-mail.')
+      } else {
+        await Promise.all(
+          selectedItemIdsToDeny.map((itemId) =>
+            api.post(`/quotations/${selectedQuoteForDeny.id}/items/${itemId}/deny`, {
+              reason: denyReason.trim(),
+              action: returnItemToRequester
+                ? 'RETURN_TO_REQUESTER'
+                : 'CONTINUE_WITH_REMAINING',
+              returnItemToRequester,
+            }),
+          ),
+        )
+        toast.success(
+          `${selectedItemIdsToDeny.length} ${selectedItemIdsToDeny.length === 1 ? 'item negado' : 'itens negados'} com sucesso.`,
+        )
+      }
+
+      setIsDenyModalOpen(false)
+      await fetchData()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Não foi possível processar a negativa da cotação.'))
+    } finally {
+      setDenyLoading(false)
+    }
+  }
+
+  const openGenerateOrderModal = (quote: Quotation) => {
+    setSelectedQuoteForOrder(quote)
+    setEntryNumber('')
+    setIsOrderModalOpen(true)
+  }
+
+  const handleConfirmGenerateOrder = async () => {
+    if (!selectedQuoteForOrder) return
+    setOrderLoading(true)
+    try {
+      await api.post(`/purchase-orders/generate/${selectedQuoteForOrder.id}`, {
+        entryNumber: entryNumber.trim() || undefined,
+      })
+      toast.success('Ordem de Compra oficial emitida com sucesso.')
+      setIsOrderModalOpen(false)
+      router.push('/dashboard/compras/ordens')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao gerar ordem de compra.'))
+    } finally {
+      setOrderLoading(false)
+    }
   }
 
   const handleCancelQuotation = (quoteId: string) => {
@@ -444,7 +529,7 @@ export default function QuotationDetailPage() {
               <Button
                 size="sm"
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                onClick={() => handleGenerateOrder(winner.id)}
+                onClick={() => openGenerateOrderModal(winner)}
               >
                 <ShoppingCart className="size-4" />
                 <span>Gerar Ordem de Compra</span>
@@ -497,24 +582,67 @@ export default function QuotationDetailPage() {
                 </div>
               </div>
 
-              {/* Itens e Valores da Cotação */}
+              {/* Itens e Valores da Cotação com Destaques Orçamentários */}
               <div className="space-y-2 text-xs">
-                {quote.items.map((qi) => (
-                  <div
-                    key={qi.id}
-                    className="flex items-center justify-between py-1 border-b border-border/40 text-muted-foreground"
-                  >
-                    <span className="truncate pr-2">
-                      {qi.requestItem.quantity}x{' '}
-                      {qi.requestItem.product?.name || qi.requestItem.description}
-                    </span>
-                    <span className="font-medium text-foreground whitespace-nowrap">
-                      {Number(qi.price) > 0
-                        ? `R$ ${Number(qi.price).toFixed(2)}/un`
-                        : 'Não precificado'}
-                    </span>
-                  </div>
-                ))}
+                {quote.items.map((qi) => {
+                  const estimated = Number(qi.requestItem.estimatedPrice || 0)
+                  const price = Number(qi.price || 0)
+                  const isOverBudget = estimated > 0 && price > estimated
+                  const isDenied = qi.status === 'DENIED' || quote.status === 'CANCELLED'
+
+                  return (
+                    <div
+                      key={qi.id}
+                      className={`flex flex-col gap-1 py-2 border-b border-border/40 text-xs ${
+                        isDenied ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`truncate pr-2 font-medium ${isDenied ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                          {qi.requestItem.quantity}x{' '}
+                          {qi.requestItem.product?.name || qi.requestItem.description}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`font-semibold whitespace-nowrap font-mono ${
+                              isOverBudget && !isDenied
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-foreground'
+                            }`}
+                          >
+                            {price > 0
+                              ? `R$ ${price.toFixed(2)}/un`
+                              : 'Não precificado'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Destaque de Orçamento e Status de Negativa */}
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                        {estimated > 0 ? (
+                          <span>Estimado prévio: R$ {estimated.toFixed(2)}</span>
+                        ) : (
+                          <span>Sem prévia</span>
+                        )}
+
+                        {isDenied ? (
+                          <span className="inline-flex items-center rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                            Negado {qi.denialReason ? `(${qi.denialReason})` : ''}
+                          </span>
+                        ) : isOverBudget ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            <AlertTriangle className="size-3" />
+                            Acima do orçado (+R$ {(price - estimated).toFixed(2)})
+                          </span>
+                        ) : price > 0 ? (
+                          <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                            ✓ Dentro do orçado
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Ações da Cotação */}
@@ -544,6 +672,17 @@ export default function QuotationDetailPage() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-8 px-2 text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1"
+                      onClick={() => openDenyModal(quote)}
+                      title="Negar cotação total ou por itens específicos"
+                    >
+                      <ThumbsDown className="size-3.5" />
+                      <span>Negar</span>
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-8 px-2 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                       onClick={() => handleCancelQuotation(quote.id)}
                     >
@@ -557,7 +696,7 @@ export default function QuotationDetailPage() {
                   <Button
                     size="sm"
                     className="h-8 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleGenerateOrder(quote.id)}
+                    onClick={() => openGenerateOrderModal(quote)}
                   >
                     <ShoppingCart className="size-3.5" />
                     <span>Emitir Ordem</span>
@@ -673,6 +812,202 @@ export default function QuotationDetailPage() {
             <Button size="sm" onClick={handleSaveValues} disabled={savingQuote}>
               {savingQuote && <Loader2 className="mr-2 size-4 animate-spin" />}
               <span>Salvar Proposta</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Negar Cotação (Total ou Parcial) */}
+      <Dialog open={isDenyModalOpen} onOpenChange={setIsDenyModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+              <Ban className="size-4" />
+              <span>Negar Proposta: {selectedQuoteForDeny?.supplier.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="field-stack">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Tipo de Negativa
+              </Label>
+              <Select
+                value={denyType}
+                onValueChange={(val) => setDenyType(val as 'TOTAL' | 'PARTIAL')}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecione o tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TOTAL">Negar Cotação Completa</SelectItem>
+                  <SelectItem value="PARTIAL">Negar Itens Específicos (Parcial)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Seleção de itens se for parcial */}
+            {denyType === 'PARTIAL' && selectedQuoteForDeny && (
+              <div className="space-y-2 rounded-lg border bg-muted/20 p-3 max-h-[180px] overflow-y-auto">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                  Selecione os itens a serem rejeitados:
+                </span>
+                {selectedQuoteForDeny.items.map((it) => {
+                  const isChecked = selectedItemIdsToDeny.includes(it.id)
+                  return (
+                    <label
+                      key={it.id}
+                      className="flex items-center gap-2.5 p-1.5 rounded hover:bg-muted/40 cursor-pointer text-xs"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedItemIdsToDeny((prev) => [...prev, it.id])
+                          } else {
+                            setSelectedItemIdsToDeny((prev) => prev.filter((id) => id !== it.id))
+                          }
+                        }}
+                      />
+                      <span className="font-medium text-foreground truncate">
+                        {it.requestItem.quantity}x {it.requestItem.product?.name || it.requestItem.description}
+                      </span>
+                      <span className="font-mono text-muted-foreground ml-auto">
+                        R$ {Number(it.price || 0).toFixed(2)}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="field-stack">
+              <Label htmlFor="deny-reason" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Motivo da Recusa / Justificativa *
+              </Label>
+              <Textarea
+                id="deny-reason"
+                value={denyReason}
+                onChange={(e) => setDenyReason(e.target.value)}
+                placeholder="Explique o motivo técnico ou comercial da recusa (será registrado na auditoria e enviado por e-mail)..."
+                className="min-h-[85px] text-sm"
+              />
+            </div>
+
+            <div className="flex items-start gap-2 pt-1">
+              <Checkbox
+                id="return-requester"
+                checked={returnItemToRequester}
+                onCheckedChange={(c) => setReturnItemToRequester(Boolean(c))}
+                className="mt-0.5"
+              />
+              <label
+                htmlFor="return-requester"
+                className="text-xs text-muted-foreground cursor-pointer leading-relaxed"
+              >
+                Devolver item ao solicitante (cancelar no pedido original caso não haja continuidade).
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDenyModalOpen(false)}
+              disabled={denyLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleConfirmDeny}
+              disabled={denyLoading}
+              className="font-semibold"
+            >
+              {denyLoading ? (
+                <>
+                  <Loader2 className="mr-2 size-3.5 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Confirmar Negativa'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Gerar Ordem de Compra com Número de Lançamento */}
+      <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="size-4 text-emerald-600" />
+              <span>Emitir Ordem de Compra</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedQuoteForOrder && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Fornecedor Vencedor:</span>
+                  <strong className="text-foreground">{selectedQuoteForOrder.supplier.name}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor Total da Proposta:</span>
+                  <strong className="text-emerald-600 font-mono text-sm">
+                    {Number(selectedQuoteForOrder.totalValue || 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="field-stack">
+                <Label htmlFor="order-entry-number" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Número de Lançamento Contábil / ERP (Opcional)
+                </Label>
+                <Input
+                  id="order-entry-number"
+                  value={entryNumber}
+                  onChange={(e) => setEntryNumber(e.target.value)}
+                  placeholder="Ex: LANÇ-2026-0042 ou NF-5520"
+                  className="h-9 text-sm font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Identificador contábil gravado na Ordem de Compra para conciliação financeira e compras futuras.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsOrderModalOpen(false)}
+              disabled={orderLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              onClick={handleConfirmGenerateOrder}
+              disabled={orderLoading}
+            >
+              {orderLoading ? (
+                <>
+                  <Loader2 className="mr-2 size-3.5 animate-spin" />
+                  Emitindo...
+                </>
+              ) : (
+                'Confirmar e Emitir Ordem'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

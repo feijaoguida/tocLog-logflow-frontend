@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, Printer, RotateCw } from 'lucide-react'
+import { ArrowLeft, Ban, ExternalLink, Loader2, Phone, Printer, RotateCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { PurchaseRequestTimeline } from '@/components/dashboard/widgets/PurchaseRequestTimeline'
@@ -44,6 +44,12 @@ type PurchaseRequestDetail = {
     quantity: number | string
     observation?: string | null
     description?: string | null
+    estimatedPrice?: number | string | null
+    supplierLink?: string | null
+    contactPhone?: string | null
+    contactWhatsapp?: string | null
+    status?: string | null
+    denialReason?: string | null
     product?: { name?: string | null } | null
     unit?: { symbol?: string | null } | null
   }>
@@ -308,19 +314,59 @@ export default function RequestDetailsPage() {
               {request.items.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-lg border bg-muted/20 p-3.5 flex flex-wrap items-start justify-between gap-3"
+                  className={`rounded-lg border p-3.5 space-y-2 ${
+                    item.status === 'CANCELLED'
+                      ? 'border-red-200 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/20'
+                      : 'bg-muted/20'
+                  }`}
                 >
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-foreground text-sm">
-                      {item.product?.name || item.description || 'Item sem descrição'}
-                    </p>
-                    {item.observation && (
-                      <p className="text-xs text-muted-foreground">{item.observation}</p>
-                    )}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-foreground text-sm">
+                          {item.product?.name || item.description || 'Item sem descrição'}
+                        </p>
+                        {item.status === 'CANCELLED' && (
+                          <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200 px-2 py-0.5 text-xs font-semibold">
+                            Cancelado / Recusado
+                          </span>
+                        )}
+                      </div>
+                      {item.observation && (
+                        <p className="text-xs text-muted-foreground">{item.observation}</p>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-background border px-2.5 py-0.5 text-xs font-bold text-foreground">
+                      {Number(item.quantity)} {item.unit?.symbol || 'un'}
+                    </span>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-background border px-2.5 py-0.5 text-xs font-bold text-foreground">
-                    {Number(item.quantity)} {item.unit?.symbol || 'un'}
-                  </span>
+
+                  {item.status === 'CANCELLED' && item.denialReason && (
+                    <div className="rounded border border-red-200 bg-red-50/70 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+                      <strong>Motivo da recusa na cotação:</strong> {item.denialReason}
+                    </div>
+                  )}
+
+                  {(item.supplierLink || item.contactPhone || item.contactWhatsapp) && (
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-muted-foreground border-t border-border/40">
+                      {item.supplierLink && (
+                        <a
+                          href={item.supplierLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                        >
+                          🔗 Ver no e-commerce
+                        </a>
+                      )}
+                      {item.contactPhone && (
+                        <span>📞 {item.contactPhone}</span>
+                      )}
+                      {item.contactWhatsapp && (
+                        <span>💬 Whats: {item.contactWhatsapp}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

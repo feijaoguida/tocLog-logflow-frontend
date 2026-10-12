@@ -1,46 +1,46 @@
 # Ordens de Compra
 
+Centraliza o acompanhamento e a gestão de entrega das Ordens de Compra (OC) geradas a partir das cotações aprovadas, integrando controle financeiro contábil, atualização de preços de catálogo e baixa orçamentária.
+
 ## O que esta funcionalidade faz
 
-Lista ordens de compra geradas a partir das cotações vencedoras e permite acompanhar envio, recebimento parcial, recebimento total, encerramento e cancelamento com rastreabilidade.
+- **Acompanhamento do Ciclo da OC**: Controle de estados (`Pendente`, `Aprovada`, `Em Entrega`, `Recebimento Parcial`, `Recebida`, `Cancelada`).
+- **Número de Lançamento Contábil**: Exibição em badge (`Lanç: #...`) e barra de pesquisa textual rápida por número de lançamento do ERP/Contabilidade.
+- **Buffer Circular dos 3 Preços**: Ao aprovar/emitir a Ordem de Compra, o sistema rotaciona os preços do produto automaticamente:
+  - O valor da compra atual torna-se a **Posição 1** (preço de referência para futuros pedidos).
+  - A antiga Posição 1 vira Posição 2, e a Posição 2 vira Posição 3.
+  - A Posição 3 mais antiga é arquivada.
+- **Débito e Estorno Orçamentário**:
+  - A emissão da OC debita o valor no evento orçamentário da categoria.
+  - O cancelamento da OC realiza o estorno transacional automático do valor ao saldo do ciclo vigente.
 
-## Quando usar
+## Passo a Passo de Uso
 
-- Para consultar ordens emitidas.
-- Para acompanhar avancos do pedido apos a cotacao.
-- Para atualizar o estado da ordem conforme a operacao.
+1. Acesse `/dashboard/compras/ordens`.
+2. Utilize os filtros de busca por fornecedor, número da ordem ou **Número de Lançamento Contábil**.
+3. Acompanhe a entrega com o fornecedor.
+4. Conforme o material ou serviço for entregue, clique nas ações da ordem para:
+   - Registrar recebimento parcial.
+   - Confirmar recebimento total (finalizando a ordem).
+   - Cancelar ordem (caso necessário, informando justificativa obrigatória e liberando o estorno do orçamento).
 
-## Passo a passo de uso
+## Campos e Elementos da Tela
 
-1. Abra ` /dashboard/compras/ordens `.
-2. Revise os KPIs e a fila de ordens.
-3. Localize a ordem desejada e ajuste o status para `Enviar`, `Registrar parcial`, `Receber total`, `Encerrar` ou `Cancelar` quando permitido.
+| Elemento | Explicação |
+|---|---|
+| **Número da Ordem** | Identificador sequencial interno da OC |
+| **Lançamento Contábil** | Identificador de lançamento financeiro/contábil informado na aprovação |
+| **Fornecedor** | Razão social e dados do fornecedor vencedor da cotação |
+| **Valores Financeiros** | Valor total contratado e valor já recebido/entregue |
+| **Ações de Status** | Botões com validação por permissão RBAC (`ORDERS_APPROVE`, `ORDERS_RECEIVE`, `ORDERS_CANCEL`) |
 
-## Campos e elementos da tela
+## Boas Práticas
 
-| Elemento | Explicacao |
-| --- | --- |
-| Lista de ordens | Registros emitidos a partir das cotacoes |
-| Prioridade / data desejada | Contexto herdado da requisicao para triagem operacional |
-| Financeiro | Total da ordem e valor ja recebido |
-| Status | Situação atual da ordem |
-| Estado vazio | Informa quando nenhuma ordem foi gerada |
-| Acoes operacionais | Botoes de envio, recebimento parcial, recebimento total, encerramento e cancelamento conforme a etapa |
+- Mantenha o número de lançamento contábil preenchido para facilitar conciliações com o time financeiro e fiscal.
+- Cancele ordens apenas com justificativa plausível para auditoria e conferência do saldo orçamentário estornado.
 
-## Prints sugeridos
+---
 
-> [!IMPORTANT] Capturas pendentes
-> Adicionar `compras-ordens.png`.
+## Telas e Imagens
 
-## Dicas de uso
-
-- Revise a origem da ordem antes de atualizar o status.
-- Em ordens urgentes, confira a data desejada antes de registrar entrega parcial ou total.
-- Use esta tela para acompanhamento, nao para reabrir a decisao comercial.
-- Confirme o envio, o recebimento parcial e o encerramento apenas quando a operacao real acontecer.
-
-## Boas praticas
-
-- Manter o status sincronizado com a operacao real.
-- Cruzar a ordem com a cotacao original quando houver duvida.
-- Evitar cancelar ordens com recebimento registrado ou encerrar sem conferir a trilha do processo.
+![Ordens de Compra e Lançamento Contábil](/help-images/compras-ordens.png)

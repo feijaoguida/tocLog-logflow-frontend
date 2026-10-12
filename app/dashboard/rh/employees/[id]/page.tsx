@@ -8,21 +8,14 @@ import {
   Award,
   BadgeCheck,
   Briefcase,
-  Building2,
-  Calendar,
-  CheckCircle2,
   ChevronRight,
   GraduationCap,
   History,
   Info,
-  Laptop,
   Loader2,
   Mail,
   MapPin,
   Pencil,
-  Phone,
-  Smartphone,
-  UserCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -83,6 +76,7 @@ type EmployeeRecord = {
   experiences?: string | ExperienceRecord[]
   branch?: { name?: string }
   role?: { name?: string }
+  jobPosition?: { id?: string; name?: string; description?: string } | null
   user?: { name?: string; email?: string }
 }
 
@@ -142,7 +136,8 @@ export default function EmployeeProfilePage() {
   const courses = parseJsonArray<CourseRecord>(employee.courses)
   const experiences = parseJsonArray<ExperienceRecord>(employee.experiences)
 
-  const displayRole = employee.role?.name || employee.legacyRole || 'Cargo não definido'
+  const displayJobPosition = employee.jobPosition?.name || 'Não informado'
+  const displayRole = employee.role?.name || 'Sem perfil de acesso'
   const location = [employee.city, employee.state].filter(Boolean).join(', ') || employee.branch?.name
 
   return (
@@ -217,7 +212,10 @@ export default function EmployeeProfilePage() {
                 <h2 className="text-2xl font-bold text-foreground tracking-tight">
                   {employee.user?.name}
                 </h2>
-                <p className="text-sm font-semibold text-primary">{displayRole}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-primary">{displayJobPosition}</span>
+                  <span className="text-xs text-muted-foreground">• Perfil: {displayRole}</span>
+                </div>
 
                 <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1 flex-wrap">
                   <div className="flex items-center gap-1.5">
@@ -554,7 +552,10 @@ export default function EmployeeProfilePage() {
                               )
                               details = `${oSal} ➔ ${nSal}`
                             } else {
-                              if (event.actionType === 'ROLE') title = 'Mudança de Cargo'
+                              if (event.actionType === 'ROLE')
+                                title = 'Mudança de Perfil de Acesso'
+                              else if (event.actionType === 'JOB_POSITION')
+                                title = 'Mudança de Cargo Organizacional'
                               else if (event.actionType === 'DEPT')
                                 title = 'Transferência de Departamento'
                               else if (event.actionType === 'BRANCH')

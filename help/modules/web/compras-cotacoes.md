@@ -1,53 +1,50 @@
-# Cotações
+# Cotações de Compra
+
+Gerencia a cotação de propostas entre múltiplos fornecedores, análise comparativa de preços com alerta de sobrepreço, negativa total/parcial de itens e transformação em Ordem de Compra com rastreamento contábil.
 
 ## O que esta funcionalidade faz
 
-Organiza a fila de requisições aprovadas para compras, permite abrir fornecedores, comparar propostas e transformar a cotacao vencedora em ordem de compra.
+- **Fila de Cotações**: Lista requisições aprovadas prontas para pesquisa de mercado.
+- **Comparativo Multi-Fornecedor**: Registro de propostas de múltiplos parceiros com preços unitários, prazos, fretes e condições de pagamento.
+- **Alerta de Sobrepreço Orçamentário**: Destaque visual em vermelho com badge `⚠️ Acima do orçado (+X%)` quando o preço cotado pelo fornecedor for superior à estimativa aprovada no pedido.
+- **Negativa Total ou Parcial com Devolução**: Recusa de propostas inadequadas ou itens específicos, com registro obrigatório de justificativa e devolução do item ao solicitante.
+- **Notificações por E-mail**: Disparo automático de e-mail ao solicitante e envolvidos informando sobre cotações negadas e motivos da recusa.
+- **Definição de Vencedora & Lançamento Contábil**: Escolha da proposta vencedora e emissão da Ordem de Compra solicitando o campo opcional **Número de Lançamento Contábil**.
 
-## Quando usar
+## Passo a Passo Operacional
 
-- Ao receber propostas de fornecedores.
-- Para comparar alternativas antes da compra.
-- Para transformar a cotacao vencedora em ordem.
+### 1. Inserir Propostas de Fornecedores
+1. Acesse `/dashboard/compras/cotacoes`.
+2. Selecione a requisição na fila e abra os detalhes.
+3. Clique em **Adicionar Fornecedor** e informe:
+   - Fornecedor cadastrado
+   - Preço unitário por item
+   - Prazo de entrega (dias)
+   - Valor do frete e condição de pagamento
+4. Observe os destaques: itens que ultrapassarem o valor estimado original serão sinalizados com badge de alerta para atenção do comprador.
 
-## Passo a passo de uso
+### 2. Negativa Total ou Parcial da Cotação
+Caso o fornecedor não atenda às exigências ou os valores estejam inviáveis:
+1. Clique no botão **Negar Cotação / Devolver Itens**.
+2. No modal interativo:
+   - Escolha entre **Negar toda a cotação** ou **Negar itens específicos** (selecionando os itens da lista).
+   - Preencha obrigatoriamente o **Motivo da recusa**.
+   - Marque a opção **Devolver itens rejeitados de volta ao solicitante**.
+3. Confirme a ação: os itens devolvidos recebem status `Cancelado` no pedido com o motivo da recusa gravado e um e-mail é disparado ao solicitante.
 
-1. Acesse ` /dashboard/compras/cotacoes `.
-2. Escolha uma requisição da fila operacional e abra o processo.
-3. Adicione o fornecedor, preencha preços, prazo, frete e pagamento.
-4. Compare as propostas, selecione a vencedora e gere a ordem quando aplicável.
+### 3. Seleção de Vencedora e Geração de Ordem
+1. Após comparar as opções (respeitando o mínimo de cotações parametrizado), clique em **Selecionar como Vencedora**.
+2. No modal de confirmação, informe o **Número de Lançamento Contábil** (se aplicável ao ERP/Contabilidade).
+3. O sistema gera a Ordem de Compra vinculada e bloqueia a cotação contra edições posteriores (trava anti-fraude).
 
-## Campos e elementos da tela
+## Dicas e Boas Práticas
 
-| Campo | Explicacao |
-| --- | --- |
-| Fornecedor | Origem da proposta |
-| Preco unitario | Valor por item cotado |
-| Prazo de entrega | Tempo previsto para atendimento |
-| Condicao de pagamento | Regra financeira associada |
-| Fila operacional | Requisicoes aguardando abertura ou ja em cotacao |
-| Cotacao vencedora | Proposta escolhida para gerar a ordem |
+- Sempre verifique o alerta de sobrepreço antes de bater o martelo da compra.
+- Ao negar uma cotação, forneça um motivo claro para orientar o solicitante ou gestor do centro de custo.
+- Utilize o número de lançamento contábil para cruzar as compras do sistema com o extrato financeiro ou lançamentos do ERP.
 
-## Prints sugeridos
+---
 
-> [!IMPORTANT] Capturas pendentes
-> Adicionar `compras-cotacoes-listagem.png`.
-> Adicionar `compras-cotacoes-detalhe.png`.
+## Telas e Imagens
 
-## Dicas de uso
-
-- Compare custo, prazo e pagamento em conjunto.
-- Revise itens antes de gerar a ordem final.
-- Use a fila de cotações para priorizar o que ainda está aprovado sem fornecedor aberto.
-
-## Erros ou duvidas comuns
-
-- `Nao consigo gerar ordem`: validar se a cotacao esta completa.
-- `Valores divergentes`: confirmar se o item editado foi salvo corretamente.
-- `Nao encontro a requisição`: confirmar se o pedido já foi aprovado e liberado para compras.
-
-## Boas praticas
-
-- Manter historico das propostas relevantes.
-- Justificar internamente a escolha do fornecedor quando necessario.
-- Evitar definir vencedora antes de revisar o total, o frete e as condicoes de pagamento.
+![Fila Operacional de Cotações](/help-images/compras-cotacoes-listagem.png)

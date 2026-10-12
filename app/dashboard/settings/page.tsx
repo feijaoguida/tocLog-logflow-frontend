@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, MonitorCog, MoonStar, Palette, SunMedium, Sparkles, Cpu, Bot, Key, Shield, Database, FileText } from "lucide-react"
+import { Loader2, MonitorCog, MoonStar, Palette, SunMedium, Sparkles, Cpu, Bot, Key, Shield, Database, FileText, ShoppingCart } from "lucide-react"
 
 import { useSettings } from "@/context/settings-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,9 +81,14 @@ export default function SettingsPage() {
     const [loadingRetention, setLoadingRetention] = useState(false)
     const [savingRetention, setSavingRetention] = useState(false)
 
+    const [notifyOnQuotationDenied, setNotifyOnQuotationDenied] = useState<boolean>(true)
+    const [loadingProcurement, setLoadingProcurement] = useState(false)
+    const [savingProcurement, setSavingProcurement] = useState(false)
+
     useEffect(() => {
         fetchCompanyProfile()
         fetchRetentionDays()
+        fetchProcurementSettings()
     }, [])
 
     useEffect(() => {
@@ -148,6 +153,34 @@ export default function SettingsPage() {
         }
     }
 
+    const fetchProcurementSettings = async () => {
+        setLoadingProcurement(true)
+        try {
+            const res = await api.get('/procurement-settings')
+            if (typeof res.data?.notifyOnQuotationDenied === 'boolean') {
+                setNotifyOnQuotationDenied(res.data.notifyOnQuotationDenied)
+            }
+        } catch {
+            // fallback suave
+        } finally {
+            setLoadingProcurement(false)
+        }
+    }
+
+    const handleSaveProcurement = async () => {
+        setSavingProcurement(true)
+        try {
+            await api.patch('/procurement-settings', {
+                notifyOnQuotationDenied,
+            })
+            toast.success("Configurações de compras atualizadas com sucesso!")
+        } catch {
+            toast.error("Erro ao salvar configurações de compras.")
+        } finally {
+            setSavingProcurement(false)
+        }
+    }
+
     const handleSaveCompany = async () => {
         if (!companyId) return
         setCompanyLoading(true)
@@ -187,12 +220,13 @@ export default function SettingsPage() {
             />
 
             <Tabs defaultValue="theme" className="w-full space-y-6">
-                <TabsList className="grid w-full max-w-[950px] grid-cols-6">
+                <TabsList className="grid w-full max-w-[1100px] grid-cols-7">
                     <TabsTrigger value="theme">Tema</TabsTrigger>
                     <TabsTrigger value="interface">Interface</TabsTrigger>
                     <TabsTrigger value="company">Empresa</TabsTrigger>
                     <TabsTrigger value="email">E-mail e Alertas</TabsTrigger>
                     <TabsTrigger value="ai">Inteligência Artificial</TabsTrigger>
+                    <TabsTrigger value="compras">Compras</TabsTrigger>
                     <TabsTrigger value="system">Sistema</TabsTrigger>
                 </TabsList>
 
@@ -493,6 +527,61 @@ export default function SettingsPage() {
                                         </Link>
                                     </Button>
                                 </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="compras" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <ShoppingCart className="size-4 text-primary" />
+                                <CardTitle>Diretrizes e Notificações de Compras</CardTitle>
+                            </div>
+                            <CardDescription>
+                                Configurações gerais do sistema para o módulo de aquisições, cotações e notificações a solicitantes.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="rounded-lg border border-border p-4 bg-surface-subtle space-y-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="notify-quotation-denied" className="text-sm font-semibold text-foreground cursor-pointer">
+                                            Notificar Solicitante em Caso de Negativa de Cotação
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                                            Envia e-mail automático ao solicitante quando uma cotação for negada total ou parcialmente pelo comprador. Mantém os requisitantes cientes do encerramento ou reprovação imediata da cotação.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        id="notify-quotation-denied"
+                                        checked={notifyOnQuotationDenied}
+                                        onCheckedChange={setNotifyOnQuotationDenied}
+                                        disabled={loadingProcurement || savingProcurement}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-2">
+                                <div className="text-xs text-muted-foreground">
+                                    Para gerenciar alçadas de aprovação, orçamentos e permissões departamentais, acesse as{' '}
+                                    <Link
+                                        href="/dashboard/compras/configuracoes"
+                                        className="font-medium text-primary underline underline-offset-4 hover:opacity-80"
+                                    >
+                                        Configurações de Governança de Compras
+                                    </Link>.
+                                </div>
+
+                                <Button
+                                    onClick={handleSaveProcurement}
+                                    disabled={loadingProcurement || savingProcurement}
+                                    size="sm"
+                                >
+                                    {savingProcurement && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                    Salvar Configurações de Compras
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

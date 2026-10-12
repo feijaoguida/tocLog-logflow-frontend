@@ -1,60 +1,56 @@
-# Pedidos
+# Pedidos de Compra
+
+Permite abrir, acompanhar, gerenciar o fluxo de aprovação e imprimir solicitações de compras com controle orçamentário em tempo real e auto-aprovação hierárquica.
 
 ## O que esta funcionalidade faz
 
-Permite criar, consultar, editar rascunhos, detalhar pedidos de compra e gerar um documento de impressao/PDF com os dados auditaveis do processo.
+- **Wizard em 3 Etapas**: Processo guiado de criação dividido em Dados Gerais, Itens com Verificação Orçamentária e Relatório de Conferência.
+- **Validação Orçamentária Reativa**: Bloqueia inclusão de itens que excedam a dotação do ciclo (+X% de tolerância).
+- **Preço Estimado Sugerido**: Preenchimento automático do valor unitário de referência com base na Posição 1 do histórico de compras do produto.
+- **Auto-Aprovação para Gestores**: Pedidos criados por gestores de departamento ou diretores são aprovados instantaneamente sem fila de espera.
+- **Rastreabilidade de Recusa**: Exibição destacada de itens rejeitados na etapa de cotação com o motivo da recusa.
+- **Espelho e Impressão**: Geração de documento formal formatado para impressão ou exportação em PDF.
 
-## Quando usar
+## Fluxo do Wizard de Criação (3 Etapas)
 
-- Para abrir uma nova necessidade de compra.
-- Para acompanhar pedidos ja enviados.
-- Para revisar o pedido antes da aprovacao, da cotacao ou da impressao final.
+### Etapa 1: Dados Gerais e Contexto
+1. **Departamento Solicitante**: Selecione a área responsável pela compra.
+   - *Nota de Auto-Aprovação*: Se o solicitante for o gestor titular do departamento ou perfil diretor, um aviso em verde confirmará que o pedido será aprovado imediatamente após o envio.
+2. **Justificativa**: Explicação detalhada da necessidade operacional.
+3. **Prioridade**: Baixa, Normal, Alta ou Urgente.
+4. **Data Desejada**: Previsão limite para atendimento da necessidade.
+5. **Observações**: Instruções complementares de entrega ou particularidades.
 
-## Passo a passo de uso
+### Etapa 2: Itens, Preço Sugerido e Trava Orçamentária
+1. **Produto do Catálogo**: Selecione o produto cadastrado (ou descrição livre se autorizado).
+2. **Preço Estimado Sugerido**: O sistema carrega automaticamente o valor da **Posição 1** (último preço praticado em ordens anteriores). O solicitante pode ajustar se necessário.
+3. **Painel de Saldo Orçamentário**: Apresenta em tempo real o saldo disponível do evento orçamentário da categoria e a tolerância permitida.
+4. **Trava Bloqueante**: Caso o item supere o limite `Saldo Disponível × (1 + Tolerância%)`, um alerta em vermelho bloqueia o avanço até o ajuste do valor ou quantidade.
+5. **Links e Contatos**: Campos para informar link de e-commerce, telefone da loja ou WhatsApp para agilizar a cotação pelo comprador.
 
-1. Acesse ` /dashboard/compras/pedidos `.
-2. Clique em `Novo pedido` para abrir a tela dedicada de criacao ou entre em um pedido existente.
-3. Informe justificativa, prioridade, data desejada, observacao e os itens da solicitacao.
-4. Salve o rascunho, envie para aprovacao e acompanhe o fluxo pela listagem ou pela tela de detalhes.
-5. Na tela de detalhes, use `Imprimir` para abrir a versao pronta para impressao ou salvamento em PDF.
+### Etapa 3: Relatório de Conferência (Espelho do Pedido)
+1. Resumo formal de todos os dados do pedido e status da validação orçamentária.
+2. Conferência dos itens, quantidades, valores estimados e total consolidado.
+3. Clique em **Enviar Pedido** para submeter ao fluxo.
 
-## Campos e elementos da tela
+## Tela de Detalhes do Pedido
 
-| Campo | Explicacao |
-| --- | --- |
-| Justificativa | Motivo principal da compra |
-| Prioridade | Nivel operacional da solicitacao para triagem e aprovacao |
-| Data desejada | Data alvo esperada pelo solicitante para atendimento da compra |
-| Observacao | Instrucoes adicionais |
-| Produto / descricao | Item solicitado e complemento |
-| Quantidade / unidade | Volume e medida do pedido |
-| Resumo operacional | Departamento, valor estimado, itens e aprovador |
-| Trilha de eventos | Timeline auditavel do pedido |
-| Imprimir | Abre um documento com solicitante, aprovador, cotacoes e ordem vinculada |
+- **Status Operacional**: `Rascunho`, `Aguardando Aprovação`, `Aprovado`, `Em Cotação`, `Ordem Gerada`, `Finalizado` ou `Cancelado`.
+- **Itens Recusados na Cotação**: Se o comprador rejeitar um item durante a cotação e devolvê-lo ao solicitante, o item é sinalizado em vermelho como `Cancelado / Recusado`, com a exibição do box com o **motivo da recusa na cotação**.
+- **Ações Rápidas de Links**: Links de e-commerce e botões de contato informados na solicitação ficam clicáveis na listagem de itens.
+- **Trilha de Auditoria (Timeline)**: Linha do tempo completa registrando quem criou, aprovou, cotou ou negou cada etapa.
+- **Impressão**: Botão `Imprimir` para gerar espelho com carimbos auditáveis.
 
-## Prints sugeridos
+## Dicas e Boas Práticas
 
-> [!IMPORTANT] Capturas pendentes
-> Adicionar `compras-pedidos-listagem.png`.
-> Adicionar `compras-pedidos-formulario.png`.
-> Adicionar `compras-pedidos-detalhe.png`.
-> Adicionar `compras-pedidos-impressao.png`.
+- Sempre consulte o preço sugerido (Posição 1) para ter uma base realista do custo de mercado.
+- Inclua links de produtos na internet ou contato direto de fornecedores conhecidos para acelerar o processo de cotação.
+- Caso o orçamento esteja bloqueado, converse com a liderança para realocação de saldo orçamentário entre eventos da categoria.
 
-## Dicas de uso
+---
 
-- Detalhe bem os itens quando o produto nao estiver fechado no catalogo.
-- Use `Prioridade` e `Data desejada` para dar contexto real de prazo ao aprovador e ao comprador.
-- Revise unidade e quantidade antes de enviar.
-- Use a tela de detalhes para validar aprovador, trilha e cotações antes de imprimir.
+## Telas e Imagens
 
-## Erros ou duvidas comuns
+![Listagem de Pedidos de Compra](/help-images/compras-pedidos-listagem.png)
 
-- `Nao achei o produto`: verificar catalogo ou usar descricao complementar.
-- `Nao consigo gerar ordem`: confirmar se a etapa de cotacao foi concluida e se existe cotacao vencedora.
-- `A impressao nao abriu`: liberar pop-up/nova aba no navegador e tentar novamente.
-
-## Boas praticas
-
-- Criar um pedido por necessidade clara.
-- Evitar observacoes vagas em compras sensiveis.
-- Imprimir ou salvar em PDF apenas depois de revisar aprovador, cotacoes e status atual do pedido.
+![Wizard de Criação de Novo Pedido em 3 Etapas](/help-images/compras-pedidos-formulario.png)

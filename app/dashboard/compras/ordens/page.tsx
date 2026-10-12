@@ -57,6 +57,7 @@ type PurchaseOrderAction =
 type PurchaseOrder = {
   id: string
   number?: number | null
+  entryNumber?: string | null
   totalValue: number | string
   receivedAmount?: number | string | null
   status: string
@@ -202,7 +203,8 @@ export default function PurchaseOrdersPage() {
         const matchNumber = (order.number ? String(order.number) : '').includes(q)
         const matchSupplier = (order.supplier?.name || '').toLowerCase().includes(q)
         const matchRequest = (order.quotation?.request?.code ? String(order.quotation.request.code) : '').includes(q)
-        if (!matchNumber && !matchSupplier && !matchRequest) {
+        const matchEntry = (order.entryNumber || '').toLowerCase().includes(q)
+        if (!matchNumber && !matchSupplier && !matchRequest && !matchEntry) {
           return false
         }
       }
@@ -563,6 +565,11 @@ export default function PurchaseOrdersPage() {
                           <p className="font-semibold text-foreground text-sm">
                             OC #{order.number || order.id.slice(0, 8)}
                           </p>
+                          {order.entryNumber && (
+                            <span className="font-mono text-[10px] text-muted-foreground block">
+                              Lanç: {order.entryNumber}
+                            </span>
+                          )}
                           <span
                             className={`inline-flex items-center rounded-full border px-2 py-0.2 text-[10px] font-bold tracking-wider ${getPriorityBadgeStyle(
                               priority,

@@ -21,9 +21,13 @@ Concentra ajustes do ambiente autenticado, com foco atual em preferencias visuai
 
 | Elemento | Explicacao |
 | --- | --- |
-| Modo visual | Alterna entre claro, escuro e sistema |
-| Paleta visual | Escolhe a assinatura cromatica oficial |
-| Selects de configuracao | Ajustes adicionais do dashboard, quando disponiveis |
+| Tema & Modo visual | Alterna entre claro, escuro e sistema com paleta cromatica |
+| Interface & Shell | Modo sanfona e densidade de listagens |
+| Empresa | Dados cadastrais e documento da empresa logada |
+| E-mail e Alertas | Configuracao de servidor SMTP e regras de disparo |
+| Inteligencia Artificial | Chaves de provedores LLM e metricas de consumo |
+| Compras | Notificacoes do solicitante em caso de negativa de cotacao |
+| Sistema | Retencao e expurgo programado de logs de erro |
 
 ## Prints sugeridos
 

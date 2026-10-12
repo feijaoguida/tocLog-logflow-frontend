@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   CalendarClock,
   Eye,
@@ -63,6 +62,10 @@ interface Employee {
     id: string
     name: string
   } | null
+  jobPosition?: {
+    id: string
+    name: string
+  } | null
   department?: {
     name: string
   } | null
@@ -110,7 +113,6 @@ function getEmployeeStatusLabel(status: string) {
 }
 
 export default function EmployeesPage() {
-  const router = useRouter()
   const { hasPermission } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
@@ -433,12 +435,15 @@ export default function EmployeesPage() {
 
                       <TableCell>
                         <div className="space-y-0.5">
-                          <span className="font-medium text-sm text-foreground block">
-                            {emp.role?.name || emp.legacyRole || 'Sem cargo definido'}
+                          <span className="font-semibold text-sm text-foreground block">
+                            {emp.jobPosition?.name || 'Não informado'}
                           </span>
                           <span className="text-xs text-muted-foreground block">
                             {emp.department?.name || 'Sem departamento'}{' '}
                             {emp.branch?.name ? `• ${emp.branch.name}` : ''}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground/80 block">
+                            Perfil: {emp.role?.name || 'Sem perfil'}
                           </span>
                         </div>
                       </TableCell>

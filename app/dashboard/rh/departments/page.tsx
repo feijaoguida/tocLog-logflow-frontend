@@ -11,7 +11,6 @@ import {
   Search,
   Trash2,
   UserX,
-  Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -62,6 +61,11 @@ interface Department {
   name: string
   description: string | null
   active: boolean
+  parentId?: string | null
+  parent?: {
+    id: string
+    name: string
+  } | null
   headManager: {
     id: string
     user: {
@@ -605,6 +609,11 @@ export default function DepartmentsPage() {
 
                       <TableCell className="font-medium text-foreground">
                         <div className="font-semibold text-sm">{dept.name}</div>
+                        {dept.parent?.name && (
+                          <span className="text-[11px] text-primary/80 font-medium block">
+                            Subordinado a: {dept.parent.name}
+                          </span>
+                        )}
                         {dept.description && (
                           <p className="text-xs text-muted-foreground line-clamp-1">
                             {dept.description}
@@ -630,8 +639,8 @@ export default function DepartmentsPage() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-xs italic text-muted-foreground">
-                            Sem gestor definido
+                          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                            Sem gestor definido (Pendente)
                           </span>
                         )}
                       </TableCell>

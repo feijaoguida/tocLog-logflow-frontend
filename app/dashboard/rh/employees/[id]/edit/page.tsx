@@ -38,12 +38,12 @@ export default function EditEmployeePage() {
         // Transform Backend Model to Frontend Form Model
         const mappedData: EmployeeData = {
           id: data.id,
-          userId,
           name: data.user?.name || '',
           email: data.user?.email || '',
           cpf: formatCPF(data.cpf || ''),
           role: data.legacyRole || data.role?.name || '',
           roleId: data.roleId || '',
+          jobPositionId: data.jobPositionId || '',
           status: data.status,
           branchId: data.branchId || '',
           departmentId: data.departmentId || '',
