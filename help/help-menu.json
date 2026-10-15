@@ -283,7 +283,7 @@
           "title": "Cotações",
           "slug": "web/compras/cotacoes",
           "file": "modules/web/compras-cotacoes.md",
-          "summary": "Comparação de fornecedores e geração de ordem de compra.",
+          "summary": "Matriz comparativa multi-fornecedor, premiação por item, fracionamento de quantidades e emissão de ordens.",
           "route": "/dashboard/compras/cotacoes",
           "platform": "web",
           "status": "ready"
@@ -292,7 +292,7 @@
           "title": "Ordens de Compra",
           "slug": "web/compras/ordens",
           "file": "modules/web/compras-ordens.md",
-          "summary": "Consulta e atualização do status das ordens emitidas.",
+          "summary": "Acompanhamento de múltiplas ordens emitidas (1:N), lançamento contábil, recebimento e histórico de preços.",
           "route": "/dashboard/compras/ordens",
           "platform": "web",
           "status": "ready"

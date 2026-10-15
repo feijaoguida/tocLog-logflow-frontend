@@ -13,8 +13,12 @@ import {
   FileSpreadsheet,
   FileText,
   Loader2,
+  Mail,
+  Package,
   Plus,
+  Printer,
   RotateCw,
+  Search,
   ShoppingCart,
   ThumbsDown,
   TrendingDown,
@@ -42,16 +46,26 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api'
 import { getApiErrorMessage } from '@/lib/api-error'
+import {
+  QuotationComparisonMatrix,
+  ComparisonMatrixData,
+  ItemAllocation,
+} from '@/components/procurement/quotation-comparison-matrix'
+import { QuotationScenarioPanel } from '@/components/procurement/quotation-scenario-panel'
+import { BatchOrderEmissionModal } from '@/components/procurement/batch-order-emission-modal'
+import { QuotationPrintSheet } from '@/components/procurement/quotation-print-sheet'
+
 
 interface RequestItem {
   id: string
   quantity: number
   description: string
   estimatedPrice?: number | null
-  product?: { name: string }
-  unit: { symbol: string }
+  product?: { name: string; code?: string; unit?: string }
+  unit?: { symbol: string }
 }
 
 interface QuotationItem {
@@ -66,9 +80,12 @@ interface QuotationItem {
 
 interface Quotation {
   id: string
-  supplier: { id: string; name: string }
+  supplier: { id: string; name: string; cnpj?: string; email?: string | null; phone?: string | null }
   status: string
   totalValue: number
+  freightCost?: number | null
+  paymentTerms?: string | null
+  validityDate?: string | null
   denialReason?: string | null
   items: QuotationItem[]
 }
@@ -118,12 +135,32 @@ export default function QuotationDetailPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState('')
   const [createLoading, setCreateLoading] = useState(false)
 
+  // Controle de Abas
+  const [activeTab, setActiveTab] = useState<'matrix' | 'cards'>('matrix')
+
   // Edit Values State
   const [editingQuote, setEditingQuote] = useState<Quotation | null>(null)
+  const [editingFreight, setEditingFreight] = useState<number | string>(0)
+  const [editingPaymentTerms, setEditingPaymentTerms] = useState<string>('')
+  const [editingValidityDate, setEditingValidityDate] = useState<string>('')
   const [editItems, setEditItems] = useState<
-    { id: string; price: number; deliveryTime: string; paymentConditions: string }[]
+    {
+      id: string
+      price: number
+      deliveryTime: string
+      paymentConditions: string
+      isUnavailable: boolean
+    }[]
   >([])
   const [savingQuote, setSavingQuote] = useState(false)
+
+  // RFQ Print Sheet Modal
+  const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false)
+  const [selectedQuoteForPrint, setSelectedQuoteForPrint] = useState<Quotation | null>(null)
+
+  // Filtro e expansão de itens para Propostas Individuais (30+ itens)
+  const [filterItemText, setFilterItemText] = useState('')
+  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({})
 
   // Confirm dialog
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -150,23 +187,129 @@ export default function QuotationDetailPage() {
   const [entryNumber, setEntryNumber] = useState('')
   const [orderLoading, setOrderLoading] = useState(false)
 
+  // PROC-2026-11: Matriz Comparativa, Alocações e Emissão em Lote
+  const [matrix, setMatrix] = useState<ComparisonMatrixData | null>(null)
+  const [allocations, setAllocations] = useState<ItemAllocation[]>([])
+  const [savingAllocations, setSavingAllocations] = useState(false)
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false)
+
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [reqRes, quotesRes, supRes] = await Promise.all([
+      const [reqRes, quotesRes, supRes, matrixRes] = await Promise.all([
         api.get(`/purchase-requests/${requestId}`),
         api.get(`/quotations/request/${requestId}`),
         api.get('/suppliers'),
+        api
+          .get(`/quotations/request/${requestId}/matrix`)
+          .catch(() => ({ data: null })),
       ])
       setRequest(reqRes.data)
       setQuotations(quotesRes.data)
       setSuppliers(supRes.data)
+
+      if (matrixRes?.data) {
+        setMatrix(matrixRes.data)
+        const initialAllocations: ItemAllocation[] = []
+        for (const item of matrixRes.data.items || []) {
+          const itemSuppliers = item.suppliers || item.offers || []
+          for (const sup of itemSuppliers) {
+            if (sup.isWinner) {
+              initialAllocations.push({
+                quotationItemId: sup.quotationItemId,
+                requestItemId: item.requestItemId,
+                supplierId: sup.supplierId,
+                awardedQuantity: sup.awardedQuantity || item.availableBalance,
+                isWinner: true,
+                notes: sup.allocationNotes || undefined,
+              })
+            }
+          }
+        }
+        setAllocations(initialAllocations)
+      }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Erro ao carregar dados da cotação.'))
     } finally {
       setLoading(false)
     }
   }
+
+  const handleSaveAllocations = async () => {
+    setSavingAllocations(true)
+    try {
+      const validAllocations = allocations
+        .filter((a) => a.isWinner && Number(a.awardedQuantity) > 0)
+        .map((a) => ({
+          requestItemId: a.requestItemId,
+          quotationItemId: a.quotationItemId,
+          quantity: Number(a.awardedQuantity),
+          allocationNotes: a.notes,
+        }))
+
+      if (validAllocations.length === 0) {
+        toast.error('Selecione pelo menos um fornecedor vencedor com quantidade para salvar.')
+        setSavingAllocations(false)
+        return
+      }
+
+      await api.post(`/quotations/request/${requestId}/allocations`, {
+        allocations: validAllocations,
+      })
+      toast.success('Alocações de fornecedores salvas com sucesso!')
+      await fetchData()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao salvar alocações.'))
+    } finally {
+      setSavingAllocations(false)
+    }
+  }
+
+  const batchSupplierOrders = useMemo(() => {
+    if (!matrix) return []
+    return matrix.suppliers
+      .map((sup) => {
+        const supAllocs = allocations.filter(
+          (a) => a.supplierId === sup.supplierId && a.isWinner && a.awardedQuantity > 0,
+        )
+        if (supAllocs.length === 0) return null
+
+        let itemsSubtotal = 0
+        for (const a of supAllocs) {
+          const itemObj = matrix.items.find((it) => it.requestItemId === a.requestItemId)
+          const itemSuppliers = itemObj?.suppliers || itemObj?.offers || []
+          const quoteObj = itemSuppliers.find(
+            (s) => s.quotationItemId === a.quotationItemId,
+          )
+          const price = quoteObj
+            ? (quoteObj.effectiveUnitPrice ??
+               quoteObj.netUnitPrice ??
+               Math.max(0, quoteObj.price - (quoteObj.discount || 0)))
+            : 0
+          itemsSubtotal += a.awardedQuantity * price
+        }
+
+        const freight = sup.freightCost || 0
+        return {
+          supplierId: sup.supplierId,
+          supplierName: sup.supplierName,
+          itemsCount: supAllocs.length,
+          itemsSubtotal,
+          freightCost: freight,
+          orderTotal: itemsSubtotal + freight,
+        }
+      })
+      .filter(Boolean) as Array<{
+        supplierId: string
+        supplierName: string
+        itemsCount: number
+        itemsSubtotal: number
+        freightCost: number
+        orderTotal: number
+      }>
+  }, [matrix, allocations])
+
+
 
   useEffect(() => {
     if (requestId) void fetchData()
@@ -193,15 +336,30 @@ export default function QuotationDetailPage() {
 
   const openEditModal = (quote: Quotation) => {
     setEditingQuote(quote)
+    setEditingFreight(Number(quote.freightCost || 0))
+    setEditingPaymentTerms(quote.paymentTerms || '')
+    setEditingValidityDate(quote.validityDate ? quote.validityDate.split('T')[0] : '')
     setEditItems(
       quote.items.map((i) => ({
         id: i.id,
-        price: i.price,
+        price: Number(i.price || 0),
         deliveryTime: i.deliveryTime || '',
         paymentConditions: i.paymentConditions || '',
+        isUnavailable: i.status === 'DENIED',
       })),
     )
     setIsEditOpen(true)
+  }
+
+  const toggleEditItemUnavailable = (index: number) => {
+    const newItems = [...editItems]
+    const cur = !!newItems[index].isUnavailable
+    newItems[index] = {
+      ...newItems[index],
+      isUnavailable: !cur,
+      price: !cur ? 0 : newItems[index].price,
+    }
+    setEditItems(newItems)
   }
 
   const handleSaveValues = async () => {
@@ -209,20 +367,45 @@ export default function QuotationDetailPage() {
     setSavingQuote(true)
     try {
       await api.patch(`/quotations/${editingQuote.id}`, {
+        freightCost: Number(editingFreight || 0),
+        paymentTerms: editingPaymentTerms || undefined,
+        validityDate: editingValidityDate ? new Date(editingValidityDate).toISOString() : undefined,
         items: editItems.map((i) => ({
           id: i.id,
-          price: Number(i.price),
+          price: i.isUnavailable ? 0 : Number(i.price),
           deliveryTime: i.deliveryTime,
           paymentConditions: i.paymentConditions,
+          status: i.isUnavailable ? 'DENIED' : 'PENDING',
+          denialReason: i.isUnavailable ? 'Não atende / Indisponível' : undefined,
         })),
       })
-      toast.success('Valores e condições salvos.')
+      toast.success('Valores e condições salvos com sucesso!')
       setIsEditOpen(false)
       await fetchData()
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Erro ao salvar valores.'))
     } finally {
       setSavingQuote(false)
+    }
+  }
+
+  const openPrintSheet = (quoteOrId: Quotation | string) => {
+    const quote =
+      typeof quoteOrId === 'string'
+        ? quotations.find((q) => q.id === quoteOrId)
+        : quoteOrId
+    if (quote) {
+      setSelectedQuoteForPrint(quote)
+      setIsPrintSheetOpen(true)
+    }
+  }
+
+  const handleSendRfqEmail = async (quotationId: string) => {
+    try {
+      const res = await api.post(`/quotations/${quotationId}/send-rfq`)
+      toast.success(res.data?.message || 'Ficha enviada por e-mail com sucesso!')
+    } catch (error: any) {
+      toast.error(getApiErrorMessage(error, 'Erro ao enviar e-mail ao fornecedor.'))
     }
   }
 
@@ -539,180 +722,318 @@ export default function QuotationDetailPage() {
         </Card>
       )}
 
-      {/* Grid de Propostas dos Fornecedores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {quotations.map((quote) => {
-          const isWinner = quote.status === 'WON'
-          const isCancelled = quote.status === 'CANCELLED'
+      {/* Abas Operacionais: Matriz Comparativa (PROC-2026-11) vs Propostas Individuais */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => setActiveTab(val as 'matrix' | 'cards')}
+        className="w-full space-y-4"
+      >
+        <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="matrix" className="gap-1.5 font-semibold text-xs">
+            <FileSpreadsheet className="size-4" />
+            <span>Matriz Comparativa & Alocação</span>
+          </TabsTrigger>
+          <TabsTrigger value="cards" className="gap-1.5 font-semibold text-xs">
+            <FileText className="size-4" />
+            <span>Propostas Individuais ({quotations.length})</span>
+          </TabsTrigger>
+        </TabsList>
 
-          return (
-            <Card
-              key={quote.id}
-              className={`app-section-card p-5 transition-all ${
-                isWinner
-                  ? 'border-emerald-500 shadow-xs'
-                  : isCancelled
-                    ? 'opacity-60 border-dashed'
-                    : ''
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3 border-b pb-3 mb-3">
-                <div className="space-y-1">
-                  <p className="font-semibold text-foreground text-base">
-                    {quote.supplier.name}
-                  </p>
+        <TabsContent value="matrix" className="space-y-4">
+          {matrix && matrix.items.length > 0 ? (
+            <>
+              <QuotationComparisonMatrix
+                matrix={matrix}
+                allocations={allocations}
+                onAllocationsChange={setAllocations}
+                disabled={request.status === 'ORDERED'}
+                onEditPrices={(qId) => {
+                  const q = quotations.find((it) => it.id === qId)
+                  if (q) openEditModal(q)
+                }}
+                onPrintSheet={(qId) => openPrintSheet(qId)}
+                onSendEmail={(qId) => handleSendRfqEmail(qId)}
+              />
+              <QuotationScenarioPanel
+                matrix={matrix}
+                allocations={allocations}
+                onSaveAllocations={handleSaveAllocations}
+                onOpenBatchModal={() => setIsBatchModalOpen(true)}
+                saving={savingAllocations}
+                disabled={request.status === 'ORDERED'}
+              />
+            </>
+          ) : (
+            <div className="p-12 text-center text-sm text-muted-foreground rounded-lg border border-dashed bg-muted/10">
+              Nenhuma proposta recebida para estruturar a matriz. Adicione fornecedores e insira preços para comparar.
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cards" className="space-y-4">
+          {/* Barra de Filtro e Busca para 30+ Itens */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/20 p-3 rounded-lg border">
+            <div className="relative flex-1 min-w-[240px] max-w-md">
+              <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Filtrar por nome do produto ou descrição..."
+                value={filterItemText}
+                onChange={(e) => setFilterItemText(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{quotations.length} fornecedores participantes</span>
+              <span>•</span>
+              <span>{request.items.length} itens demandados</span>
+            </div>
+          </div>
+
+          {/* Grid de Propostas dos Fornecedores */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {quotations.map((quote) => {
+              const isWinner = quote.status === 'WON'
+              const isCancelled = quote.status === 'CANCELLED'
+
+              const displayedItems = quote.items.filter((qi) => {
+                if (!filterItemText.trim()) return true
+                const query = filterItemText.toLowerCase()
+                const name = (qi.requestItem.product?.name || qi.requestItem.description || '').toLowerCase()
+                return name.includes(query)
+              })
+
+              return (
+                <Card
+                  key={quote.id}
+                  className={`app-section-card p-5 transition-all flex flex-col justify-between ${
+                    isWinner
+                      ? 'border-emerald-500 shadow-xs'
+                      : isCancelled
+                        ? 'opacity-60 border-dashed'
+                        : ''
+                  }`}
+                >
                   <div>
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getQuotationBadgeStyle(
-                        quote.status,
-                      )}`}
-                    >
-                      {QUOTATION_STATUS_LABELS[quote.status] || quote.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xl font-bold tracking-tight text-foreground">
-                    {Number(quote.totalValue || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Itens e Valores da Cotação com Destaques Orçamentários */}
-              <div className="space-y-2 text-xs">
-                {quote.items.map((qi) => {
-                  const estimated = Number(qi.requestItem.estimatedPrice || 0)
-                  const price = Number(qi.price || 0)
-                  const isOverBudget = estimated > 0 && price > estimated
-                  const isDenied = qi.status === 'DENIED' || quote.status === 'CANCELLED'
-
-                  return (
-                    <div
-                      key={qi.id}
-                      className={`flex flex-col gap-1 py-2 border-b border-border/40 text-xs ${
-                        isDenied ? 'opacity-60' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`truncate pr-2 font-medium ${isDenied ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                          {qi.requestItem.quantity}x{' '}
-                          {qi.requestItem.product?.name || qi.requestItem.description}
-                        </span>
-                        <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-start justify-between gap-3 border-b pb-3 mb-3">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-foreground text-base">
+                          {quote.supplier.name}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`font-semibold whitespace-nowrap font-mono ${
-                              isOverBudget && !isDenied
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-foreground'
-                            }`}
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getQuotationBadgeStyle(
+                              quote.status,
+                            )}`}
                           >
-                            {price > 0
-                              ? `R$ ${price.toFixed(2)}/un`
-                              : 'Não precificado'}
+                            {QUOTATION_STATUS_LABELS[quote.status] || quote.status}
                           </span>
+                          {Number(quote.freightCost || 0) > 0 ? (
+                            <span className="text-[11px] text-muted-foreground">
+                              Frete: R$ {Number(quote.freightCost).toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              Frete Grátis
+                            </span>
+                          )}
+                          {quote.paymentTerms && (
+                            <span className="text-[11px] text-muted-foreground">
+                              • {quote.paymentTerms}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Destaque de Orçamento e Status de Negativa */}
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
-                        {estimated > 0 ? (
-                          <span>Estimado prévio: R$ {estimated.toFixed(2)}</span>
-                        ) : (
-                          <span>Sem prévia</span>
-                        )}
-
-                        {isDenied ? (
-                          <span className="inline-flex items-center rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-400 border border-rose-500/20">
-                            Negado {qi.denialReason ? `(${qi.denialReason})` : ''}
-                          </span>
-                        ) : isOverBudget ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                            <AlertTriangle className="size-3" />
-                            Acima do orçado (+R$ {(price - estimated).toFixed(2)})
-                          </span>
-                        ) : price > 0 ? (
-                          <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                            ✓ Dentro do orçado
-                          </span>
-                        ) : null}
+                      <div className="text-right">
+                        <span className="text-xl font-bold tracking-tight text-foreground font-mono">
+                          {Number(quote.totalValue || 0).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
 
-              {/* Ações da Cotação */}
-              <div className="flex items-center justify-between pt-4 mt-2 border-t gap-2 flex-wrap">
-                {quote.status === 'PENDING' && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 px-2.5 text-xs font-semibold gap-1"
-                      onClick={() => openEditModal(quote)}
-                    >
-                      <DollarSign className="size-3.5" />
-                      <span>Preços</span>
-                    </Button>
+                    {/* Itens e Valores da Cotação com Tabela Compacta Rolável para 30+ itens */}
+                    <div className="border rounded-lg overflow-hidden my-3 bg-card">
+                      <div className="bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground flex justify-between">
+                        <span>
+                          Itens Cotados ({displayedItems.length} de {quote.items.length})
+                        </span>
+                        <span>Preço Unitário</span>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto divide-y divide-border/40 text-xs">
+                        {displayedItems.map((qi) => {
+                          const estimated = Number(qi.requestItem.estimatedPrice || 0)
+                          const price = Number(qi.price || 0)
+                          const isOverBudget = estimated > 0 && price > estimated
+                          const isDenied = qi.status === 'DENIED' || quote.status === 'CANCELLED'
 
-                    <Button
-                      size="sm"
-                      className="h-8 px-2.5 text-xs font-semibold gap-1"
-                      onClick={() => handleWin(quote.id)}
-                      disabled={Number(quote.totalValue) === 0}
-                    >
-                      <Trophy className="size-3.5" />
-                      <span>Homologar</span>
-                    </Button>
+                          return (
+                            <div
+                              key={qi.id}
+                              className={`flex flex-col gap-1 p-2.5 hover:bg-muted/10 transition-colors ${
+                                isDenied ? 'opacity-60 bg-muted/15' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span
+                                  className={`truncate pr-2 font-medium ${
+                                    isDenied
+                                      ? 'line-through text-muted-foreground'
+                                      : 'text-foreground'
+                                  }`}
+                                >
+                                  {qi.requestItem.quantity}x{' '}
+                                  {qi.requestItem.product?.name || qi.requestItem.description}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span
+                                    className={`font-semibold whitespace-nowrap font-mono ${
+                                      isOverBudget && !isDenied
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-foreground'
+                                    }`}
+                                  >
+                                    {price > 0
+                                      ? `R$ ${price.toFixed(2)}/un`
+                                      : 'Não precificado'}
+                                  </span>
+                                </div>
+                              </div>
 
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 px-2 text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1"
-                      onClick={() => openDenyModal(quote)}
-                      title="Negar cotação total ou por itens específicos"
-                    >
-                      <ThumbsDown className="size-3.5" />
-                      <span>Negar</span>
-                    </Button>
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                                {estimated > 0 ? (
+                                  <span>Ref: R$ {estimated.toFixed(2)}</span>
+                                ) : (
+                                  <span>Sem ref.</span>
+                                )}
 
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 px-2 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                      onClick={() => handleCancelQuotation(quote.id)}
-                    >
-                      <Ban className="size-3.5 mr-1" />
-                      <span>Cancelar</span>
-                    </Button>
+                                {isDenied ? (
+                                  <span className="inline-flex items-center rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                                    Não Atende {qi.denialReason ? `(${qi.denialReason})` : ''}
+                                  </span>
+                                ) : isOverBudget ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    <AlertTriangle className="size-3" />
+                                    +R$ {(price - estimated).toFixed(2)}
+                                  </span>
+                                ) : price > 0 ? (
+                                  <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                    ✓ Dentro do orçado
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {displayedItems.length === 0 && (
+                          <div className="p-4 text-center text-xs text-muted-foreground">
+                            Nenhum item corresponde ao filtro informado.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                {isWinner && request.status !== 'ORDERED' && (
-                  <Button
-                    size="sm"
-                    className="h-8 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => openGenerateOrderModal(quote)}
-                  >
-                    <ShoppingCart className="size-3.5" />
-                    <span>Emitir Ordem</span>
-                  </Button>
-                )}
+                  {/* Ações da Cotação com Botões de Ficha e E-mail */}
+                  <div className="flex items-center justify-between pt-3 mt-2 border-t gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2.5 text-xs font-semibold gap-1"
+                        onClick={() => openEditModal(quote)}
+                      >
+                        <DollarSign className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Preços</span>
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 text-xs font-medium gap-1"
+                        onClick={() => openPrintSheet(quote)}
+                        title="Imprimir Ficha de Cotação em PDF/Papel"
+                      >
+                        <Printer className="size-3.5" />
+                        <span className="hidden sm:inline">Ficha</span>
+                      </Button>
+
+                      {quote.supplier.email && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2 text-xs font-medium gap-1"
+                          onClick={() => handleSendRfqEmail(quote.id)}
+                          title={`Enviar por e-mail para ${quote.supplier.email}`}
+                        >
+                          <Mail className="size-3.5" />
+                        </Button>
+                      )}
+
+                      {quote.status === 'PENDING' && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-8 px-2.5 text-xs font-semibold gap-1"
+                            onClick={() => handleWin(quote.id)}
+                            disabled={Number(quote.totalValue) === 0}
+                          >
+                            <Trophy className="size-3.5" />
+                            <span>Homologar</span>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1"
+                            onClick={() => openDenyModal(quote)}
+                            title="Negar cotação"
+                          >
+                            <ThumbsDown className="size-3.5" />
+                            <span>Negar</span>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            onClick={() => handleCancelQuotation(quote.id)}
+                          >
+                            <Ban className="size-3.5 mr-1" />
+                            <span>Cancelar</span>
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    {isWinner && request.status !== 'ORDERED' && (
+                      <Button
+                        size="sm"
+                        className="h-8 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => openGenerateOrderModal(quote)}
+                      >
+                        <ShoppingCart className="size-3.5" />
+                        <span>Emitir Ordem</span>
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
+
+            {quotations.length === 0 && (
+              <div className="col-span-full p-12 text-center text-sm text-muted-foreground rounded-lg border border-dashed bg-muted/10">
+                Nenhuma cotação com fornecedor foi iniciada para esta solicitação. Clique em &quot;Adicionar fornecedor&quot; acima para começar.
               </div>
-            </Card>
-          )
-        })}
-
-        {quotations.length === 0 && (
-          <div className="col-span-full p-12 text-center text-sm text-muted-foreground rounded-lg border border-dashed bg-muted/10">
-            Nenhuma cotação com fornecedor foi iniciada para esta solicitação. Clique em &quot;Adicionar fornecedor&quot; acima para começar.
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
+
 
       {/* Modal Adicionar Fornecedor */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -749,63 +1070,235 @@ export default function QuotationDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Inserir Valores e Condições */}
+      {/* Modal Inserir Valores e Condições (Modernizado PROC-2026-12) */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              Preços e Condições: {editingQuote?.supplier.name}
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-6">
+          <DialogHeader className="pb-3 border-b">
+            <DialogTitle className="flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <DollarSign className="size-4 text-emerald-600" />
+                <span>Preços e Condições: {editingQuote?.supplier.name}</span>
+              </span>
+              <span className="text-xs font-mono text-muted-foreground font-normal">
+                {editingQuote?.supplier.cnpj || editingQuote?.supplier.email}
+              </span>
             </DialogTitle>
           </DialogHeader>
-          <div className="py-3 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            {editItems.map((item, idx) => {
-              const originalItem = editingQuote?.items.find((i) => i.id === item.id)
-              const prodName =
-                originalItem?.requestItem.product?.name ||
-                originalItem?.requestItem.description
-              const qty = originalItem?.requestItem.quantity
 
-              return (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end border-b pb-3"
-                >
-                  <div className="md:col-span-5">
-                    <Label className="text-xs font-semibold text-foreground">
-                      {qty}x {prodName}
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Preço Unit. (R$)"
-                      value={item.price}
-                      onChange={(e) => updateEditItem(idx, 'price', e.target.value)}
-                      className="h-9 text-sm mt-1"
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <Label className="text-xs text-muted-foreground">Prazo de entrega</Label>
-                    <Input
-                      placeholder="Ex: 5 dias"
-                      value={item.deliveryTime}
-                      onChange={(e) => updateEditItem(idx, 'deliveryTime', e.target.value)}
-                      className="h-9 text-sm mt-1"
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <Label className="text-xs text-muted-foreground">Condição de pagamento</Label>
-                    <Input
-                      placeholder="Ex: 30 dias boleto"
-                      value={item.paymentConditions}
-                      onChange={(e) => updateEditItem(idx, 'paymentConditions', e.target.value)}
-                      className="h-9 text-sm mt-1"
-                    />
-                  </div>
+          <div className="flex-1 overflow-y-auto py-3 space-y-4 pr-1">
+            {/* Parâmetros Comerciais da Proposta */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-muted/20 border rounded-lg">
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Valor do Frete (R$)
+                </Label>
+                <div className="relative mt-1">
+                  <span className="absolute left-2.5 top-2 text-xs text-muted-foreground font-mono">R$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    value={editingFreight}
+                    onChange={(e) => setEditingFreight(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="h-8 pl-8 text-xs font-mono"
+                  />
                 </div>
-              )
-            })}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Deixe 0 se o frete for FOB/gratuito
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Condição de Pagamento Geral
+                </Label>
+                <Input
+                  placeholder="Ex: 30 dias boleto / À vista"
+                  value={editingPaymentTerms}
+                  onChange={(e) => setEditingPaymentTerms(e.target.value)}
+                  className="h-8 text-xs mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Validade da Proposta
+                </Label>
+                <Input
+                  type="date"
+                  value={editingValidityDate}
+                  onChange={(e) => setEditingValidityDate(e.target.value)}
+                  className="h-8 text-xs mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Lista de Itens da Cotação */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Itens da Cotação ({editItems.length})
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Marque &quot;Não Atende&quot; para itens que o fornecedor não comercializa
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {editItems.map((item, idx) => {
+                  const originalItem = editingQuote?.items.find((i) => i.id === item.id)
+                  const prodName =
+                    originalItem?.requestItem.product?.name ||
+                    originalItem?.requestItem.description
+                  const qty = originalItem?.requestItem.quantity || 1
+                  const unit =
+                    originalItem?.requestItem.unit?.symbol ||
+                    originalItem?.requestItem.product?.unit ||
+                    'UN'
+                  const itemSubtotal = item.isUnavailable ? 0 : (Number(item.price) || 0) * qty
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        item.isUnavailable
+                          ? 'bg-rose-50/40 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/50'
+                          : 'bg-card hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                        <div className="flex-1 min-w-[200px]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-foreground">
+                              {qty} {unit}
+                            </span>
+                            <span className="text-xs font-medium text-foreground">
+                              {prodName}
+                            </span>
+                          </div>
+                          {originalItem?.requestItem.product?.code && (
+                            <span className="text-[10px] font-mono text-muted-foreground">
+                              Cód: {originalItem.requestItem.product.code}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={item.isUnavailable ? 'destructive' : 'outline'}
+                            className="h-7 text-[11px] px-2 gap-1"
+                            onClick={() => toggleEditItemUnavailable(idx)}
+                          >
+                            <Ban className="size-3" />
+                            <span>{item.isUnavailable ? 'Indisponível (Não Atende)' : 'Disponível'}</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      {!item.isUnavailable ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end pt-1">
+                          <div className="sm:col-span-4">
+                            <Label className="text-[11px] text-muted-foreground">Preço Unitário (R$)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0,00"
+                              value={item.price}
+                              onChange={(e) => updateEditItem(idx, 'price', e.target.value)}
+                              className="h-8 text-xs font-mono mt-0.5"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
+                            <Label className="text-[11px] text-muted-foreground">Prazo de Entrega</Label>
+                            <Input
+                              placeholder="Ex: 5 dias úteis"
+                              value={item.deliveryTime}
+                              onChange={(e) => updateEditItem(idx, 'deliveryTime', e.target.value)}
+                              className="h-8 text-xs mt-0.5"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
+                            <Label className="text-[11px] text-muted-foreground">Condição Específica</Label>
+                            <Input
+                              placeholder="Opcional"
+                              value={item.paymentConditions}
+                              onChange={(e) => updateEditItem(idx, 'paymentConditions', e.target.value)}
+                              className="h-8 text-xs mt-0.5"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 text-right">
+                            <span className="text-[10px] text-muted-foreground uppercase block">Subtotal</span>
+                            <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                              {itemSubtotal.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-1 text-xs text-rose-700 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                          <Ban className="size-3.5" />
+                          <span>Fornecedor não comercializa este item ou não possui estoque no momento.</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Resumo da Proposta */}
+            <div className="p-3 bg-muted/30 border rounded-lg flex items-center justify-between flex-wrap gap-3">
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div>
+                  Itens cotados:{' '}
+                  <strong className="text-foreground">
+                    {editItems.filter((i) => !i.isUnavailable).length} de {editItems.length}
+                  </strong>
+                </div>
+                {Number(editingFreight) > 0 && (
+                  <div>
+                    Frete adicionado:{' '}
+                    <strong className="text-foreground font-mono">
+                      {Number(editingFreight).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </strong>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                  Valor Total Estimado da Proposta
+                </span>
+                <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  {(
+                    editItems.reduce((acc, it) => {
+                      if (it.isUnavailable) return acc
+                      const orig = editingQuote?.items.find((i) => i.id === it.id)
+                      const qty = orig?.requestItem.quantity || 1
+                      return acc + (Number(it.price) || 0) * qty
+                    }, 0) + (Number(editingFreight) || 0)
+                  ).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </span>
+              </div>
+            </div>
           </div>
-          <DialogFooter className="gap-2 pt-2 border-t">
+
+          <DialogFooter className="gap-2 pt-3 border-t">
             <Button variant="outline" size="sm" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
@@ -1028,6 +1521,24 @@ export default function QuotationDetailPage() {
           setConfirmDialog((s) => ({ ...s, open: false }))
         }}
       />
+
+      {/* Modal de Emissão em Lote de Ordens de Compra (PROC-2026-11) */}
+      <BatchOrderEmissionModal
+        open={isBatchModalOpen}
+        onOpenChange={setIsBatchModalOpen}
+        requestId={requestId}
+        supplierOrders={batchSupplierOrders}
+        onSuccess={fetchData}
+      />
+
+      {/* Ficha de Cotação Externa (RFQ) para Impressão e PDF (PROC-2026-12) */}
+      <QuotationPrintSheet
+        open={isPrintSheetOpen}
+        onOpenChange={setIsPrintSheetOpen}
+        quotation={selectedQuoteForPrint}
+        request={request}
+      />
     </div>
   )
 }
+
