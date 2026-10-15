@@ -179,6 +179,37 @@ export function DesignSystemView() {
                 </div>
 
                 <div>
+                  <span className="text-xs font-semibold text-foreground">Superfícies Dark Theme (Grafite Azulado)</span>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                    {[
+                      { name: "Fundo Geral", hex: "#10161C", text: "#F2F5F7", token: "--background" },
+                      { name: "Sidebar", hex: "#192128", text: "#F2F5F7", token: "--sidebar" },
+                      { name: "Header (Barra)", hex: "#141B22", text: "#F2F5F7", token: "--surface" },
+                      { name: "Cards / Tabelas", hex: "#1B232B", text: "#F2F5F7", token: "--card" },
+                      { name: "Modais / Popover", hex: "#171F27", text: "#F2F5F7", token: "--popover" },
+                      { name: "Inputs Formulário", hex: "#202A33", text: "#F2F5F7", token: "--input-bg" },
+                      { name: "Borda Principal", hex: "#34414B", text: "#F2F5F7", token: "--border-strong" },
+                      { name: "Borda Secundária", hex: "#2B3640", text: "#F2F5F7", token: "--border" },
+                      { name: "Texto Principal", hex: "#F2F5F7", text: "#10161C", token: "--foreground" },
+                      { name: "Texto Secundário", hex: "#A7B2BF", text: "#10161C", token: "--muted-foreground" },
+                      { name: "Verde Destaque", hex: "#18C76B", text: "#0D3D28", token: "--primary" },
+                      { name: "Menu Ativo Fundo", hex: "#0D3D28", text: "#18C76B", token: "--sidebar-accent" },
+                    ].map((item) => (
+                      <div
+                        key={item.name}
+                        className="flex flex-col justify-between rounded p-2 text-xs border border-border min-h-[58px]"
+                        style={{ backgroundColor: item.hex, color: item.text }}
+                      >
+                        <span className="font-semibold text-[11px] leading-tight">{item.name}</span>
+                        <div className="flex items-center justify-between text-[10px] opacity-90 mt-1 font-mono">
+                          <span>{item.hex}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <span className="text-xs font-semibold text-foreground">Cores Semânticas</span>
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="rounded border border-success/30 bg-success-subtle p-2.5 text-xs">
@@ -487,27 +518,62 @@ export function DesignSystemView() {
                     <tr>
                       <td className="p-2.5 text-primary">--primary</td>
                       <td className="p-2.5">bg-primary, text-primary</td>
-                      <td className="p-2.5 font-sans">Cor principal configurável da assinatura</td>
+                      <td className="p-2.5 font-sans">Cor principal configurável da assinatura (#16a34a / #18C76B)</td>
                     </tr>
                     <tr>
                       <td className="p-2.5">--background</td>
                       <td className="p-2.5">bg-background</td>
-                      <td className="p-2.5 font-sans">Superfície base da aplicação (#ffffff / #09090b)</td>
+                      <td className="p-2.5 font-sans">Superfície base da aplicação (#ffffff / #10161C)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--sidebar</td>
+                      <td className="p-2.5">bg-sidebar, text-sidebar-foreground</td>
+                      <td className="p-2.5 font-sans">Menu lateral de navegação (#ffffff / #192128)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--surface</td>
+                      <td className="p-2.5">bg-surface</td>
+                      <td className="p-2.5 font-sans">Barra superior e cabeçalhos (#ffffff / #141B22)</td>
                     </tr>
                     <tr>
                       <td className="p-2.5">--card</td>
                       <td className="p-2.5">bg-card, text-card-foreground</td>
-                      <td className="p-2.5 font-sans">Superfície de cards e painéis (#ffffff / #111216)</td>
+                      <td className="p-2.5 font-sans">Superfície de cards e tabelas (#ffffff / #1B232B)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--popover</td>
+                      <td className="p-2.5">bg-popover, text-popover-foreground</td>
+                      <td className="p-2.5 font-sans">Modais, dropdowns e popovers (#ffffff / #171F27)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--input-bg</td>
+                      <td className="p-2.5">bg-input-bg</td>
+                      <td className="p-2.5 font-sans">Fundo de campos de formulário (#ffffff / #202A33)</td>
                     </tr>
                     <tr>
                       <td className="p-2.5">--border</td>
                       <td className="p-2.5">border-border</td>
-                      <td className="p-2.5 font-sans">Bordas neutras de 1px (#e4e4e7 / #27272a)</td>
+                      <td className="p-2.5 font-sans">Bordas secundárias (#e4e4e7 / #2B3640)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--border-strong</td>
+                      <td className="p-2.5">border-border-strong</td>
+                      <td className="p-2.5 font-sans">Bordas principais e modais (#d4d4d8 / #34414B)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--foreground</td>
+                      <td className="p-2.5">text-foreground</td>
+                      <td className="p-2.5 font-sans">Texto principal suave (#18181b / #F2F5F7)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">--muted-foreground</td>
+                      <td className="p-2.5">text-muted-foreground</td>
+                      <td className="p-2.5 font-sans">Texto secundário (#71717a / #A7B2BF)</td>
                     </tr>
                     <tr>
                       <td className="p-2.5 text-success">--success</td>
                       <td className="p-2.5">bg-success, text-success</td>
-                      <td className="p-2.5 font-sans">Status positivo fixo (#16a34a)</td>
+                      <td className="p-2.5 font-sans">Status positivo fixo (#16a34a / #18C76B)</td>
                     </tr>
                     <tr>
                       <td className="p-2.5 text-destructive">--destructive</td>

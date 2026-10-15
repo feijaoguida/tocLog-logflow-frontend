@@ -27,7 +27,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-13 shrink-0 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur-xs transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 md:px-6">
+        <header className="sticky top-0 z-10 flex h-13 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/95 px-4 backdrop-blur-xs transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 md:px-6">
           <div className="flex items-center gap-2.5">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 h-4" />
@@ -54,7 +54,7 @@ export default function DashboardLayout({
               <input
                 type="search"
                 placeholder="Buscar no sistema..."
-                className="h-8.5 w-full rounded-md border border-input bg-surface-subtle pl-8 pr-11 text-xs placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary/20"
+                className="h-8.5 w-full rounded-md border border-border bg-input-bg pl-8 pr-11 text-xs placeholder:text-placeholder outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary/20"
                 readOnly
               />
               <kbd className="pointer-events-none absolute right-2 inline-flex h-4.5 select-none items-center gap-0.5 rounded border border-border bg-card px-1 font-mono text-[10px] font-medium text-muted-foreground">

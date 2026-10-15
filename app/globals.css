@@ -35,6 +35,8 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
+  --color-input-bg: var(--input-bg);
+  --color-placeholder: var(--placeholder);
   --color-ring: var(--ring);
 
   --color-destructive: var(--destructive);
@@ -122,6 +124,8 @@
   --border: #e4e4e7;
   --border-strong: #d4d4d8;
   --input: #e4e4e7;
+  --input-bg: #ffffff;
+  --placeholder: #71717a;
 
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
 
@@ -173,62 +177,64 @@
 }
 
 .dark {
-  /* Global Dark Mode - Zinc Neutral Scale */
-  --background: #09090b;
-  --foreground: #fafafa;
+  /* Global Dark Mode - Grafite Azulado TocLog */
+  --background: #10161C;
+  --foreground: #F2F5F7;
 
-  --surface: #0f1014;
-  --surface-subtle: #111216;
-  --surface-muted: #18181b;
+  --surface: #141B22; /* Barra superior / topbar */
+  --surface-subtle: #171F27; /* Superfície de modais e popovers */
+  --surface-muted: #1B232B; /* Cards e tabelas */
 
-  --card: #111216;
-  --card-foreground: #fafafa;
+  --card: #1B232B;
+  --card-foreground: #F2F5F7;
 
-  --popover: #111216;
-  --popover-foreground: #fafafa;
+  --popover: #171F27;
+  --popover-foreground: #F2F5F7;
 
-  --secondary: #18181b;
-  --secondary-foreground: #fafafa;
+  --secondary: #1B232B;
+  --secondary-foreground: #F2F5F7;
 
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
+  --muted: #1B232B;
+  --muted-foreground: #A7B2BF;
 
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --input: #27272a;
+  --border: #2B3640; /* Bordas secundárias */
+  --border-strong: #34414B; /* Bordas principais */
+  --input: #34414B; /* Bordas de inputs */
+  --input-bg: #202A33; /* Fundo de formulários */
+  --placeholder: #94A3B0; /* Placeholder */
 
-  --success-subtle: #052e16;
+  --success-subtle: #0D3D28;
   --warning-subtle: #451a03;
   --destructive-subtle: #450a0a;
   --info-subtle: #172554;
 
-  /* Default Primary Signature: Ruby Dark */
-  --primary: #e11d48;
-  --primary-hover: #be123c;
-  --primary-active: #9f1239;
-  --primary-subtle: #2b0a12;
-  --primary-muted: #4c0519;
+  /* Default Primary Signature: Verde TocLog / Forest */
+  --primary: #18C76B;
+  --primary-hover: #15b05e;
+  --primary-active: #0f8a48;
+  --primary-subtle: #0D3D28;
+  --primary-muted: #14532d;
   --primary-foreground: #ffffff;
 
-  --accent: #e11d48;
+  --accent: #18C76B;
   --accent-foreground: #ffffff;
   --ring: var(--primary);
 
   /* Sidebar Tokens - Dark */
-  --sidebar: #0f1014;
-  --sidebar-foreground: #fafafa;
+  --sidebar: #192128;
+  --sidebar-foreground: #F2F5F7;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--primary-subtle);
-  --sidebar-accent-foreground: var(--primary);
-  --sidebar-border: #27272a;
+  --sidebar-accent: #0D3D28;
+  --sidebar-accent-foreground: #18C76B;
+  --sidebar-border: #2B3640;
   --sidebar-ring: var(--primary);
 
   /* Charts */
   --chart-1: var(--primary);
-  --chart-2: #fafafa;
+  --chart-2: #F2F5F7;
   --chart-3: #3b82f6;
-  --chart-4: #16a34a;
+  --chart-4: #18C76B;
   --chart-5: #f59e0b;
 }
 
@@ -322,18 +328,18 @@
 
 .dark[data-theme-color="forest"],
 .dark[data-palette="forest"] {
-  --primary: #22c55e;
-  --primary-hover: #16a34a;
-  --primary-active: #15803d;
-  --primary-subtle: #052e16;
+  --primary: #18C76B;
+  --primary-hover: #15b05e;
+  --primary-active: #0f8a48;
+  --primary-subtle: #0D3D28;
   --primary-muted: #14532d;
   --primary-foreground: #ffffff;
-  --accent: #22c55e;
+  --accent: #18C76B;
   --accent-foreground: #ffffff;
-  --ring: #22c55e;
-  --sidebar-primary: #22c55e;
-  --sidebar-accent: #052e16;
-  --sidebar-accent-foreground: #22c55e;
+  --ring: #18C76B;
+  --sidebar-primary: #18C76B;
+  --sidebar-accent: #0D3D28;
+  --sidebar-accent-foreground: #18C76B;
 }
 
 /* 4. Ember */
