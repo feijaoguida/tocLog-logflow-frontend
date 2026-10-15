@@ -243,7 +243,7 @@ export function AiChatInterface({
           setStatus('ERROR')
           setStatusMessage('')
           setActiveRunId(null)
-          setErrorMessage(run.error || 'A execução da consulta foi encerrada com erro.')
+          setErrorMessage(run.errorSanitized || run.error || 'A execução da consulta foi encerrada com erro.')
           return
         }
 

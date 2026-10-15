@@ -177,7 +177,7 @@ export function FloatingAiAgentWidget() {
           stopPolling()
           setStatus('IDLE')
           setStatusMessage('')
-          toast.error(run.error || 'A consulta foi encerrada com erro.')
+          toast.error(run.errorSanitized || run.error || 'A consulta foi encerrada com erro.')
           return
         }
 
