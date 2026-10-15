@@ -107,7 +107,8 @@ export default function PortariaOcorrenciasPage() {
     try {
       setSubmitting(true);
       await portariaApi.createBlock({
-        targetType: formTargetType,
+        targetType: formTargetType === 'PLATE' ? 'VEHICLE' : formTargetType,
+        targetValue: formIdentifier.trim(),
         documentNumber: formTargetType === 'DOCUMENT' ? formIdentifier.trim() : undefined,
         plate: formTargetType === 'PLATE' ? formIdentifier.trim().toUpperCase() : undefined,
         reason: formReason.trim(),

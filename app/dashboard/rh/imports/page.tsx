@@ -15,6 +15,10 @@ import {
   Building2,
   Clock,
   Play,
+  FileText,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 import { useAuth } from '@/context/auth-context'
@@ -430,14 +434,19 @@ function ImportWorkspace({
   onCommit: () => Promise<void>
   onSelectBatch: (batchId: string) => Promise<void>
 }) {
+  const [showGuide, setShowGuide] = useState(false)
+
   const templateLinks =
     activeTab === 'departments'
       ? [
-          { href: '/rh-imports/departments-sample.xlsx', label: 'Planilha Exemplo: Departamentos (.xlsx)' },
+          { href: '/rh-imports/departments-sample.xlsx', label: 'Planilha Departamentos (.xlsx)' },
+          { href: '/rh-imports/departments-sample.csv', label: 'Arquivo Departamentos (.csv)' },
         ]
       : [
-          { href: '/rh-imports/employees-only-sample.xlsx', label: 'Planilha Exemplo: Somente Funcionários (.xlsx)' },
-          { href: '/rh-imports/employees-with-department-sample.xlsx', label: 'Planilha Exemplo: Funcionários com Departamentos (.xlsx)' },
+          { href: '/rh-imports/employees-only-sample.xlsx', label: 'Planilha Completa: Somente Funcionários (.xlsx)' },
+          { href: '/rh-imports/employees-only-sample.csv', label: 'Arquivo CSV: Somente Funcionários (.csv)' },
+          { href: '/rh-imports/employees-with-department-sample.xlsx', label: 'Planilha Completa: Funcionários com Departamentos (.xlsx)' },
+          { href: '/rh-imports/employees-with-department-sample.csv', label: 'Arquivo CSV: Funcionários com Departamentos (.csv)' },
         ]
 
   const getStatusBadge = (status: ImportBatchListItem['status']) => {
@@ -616,24 +625,294 @@ function ImportWorkspace({
 
       {/* Sample Templates Card */}
       <Card className="border-border/60 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-            Modelos de Planilha para Download
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Baixe o modelo pré-formatado com as colunas esperadas para preenchimento.
-          </CardDescription>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+              Modelos de Planilha para Download
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Baixe o modelo pré-formatado com todas as colunas esperadas (obrigatórias e opcionais).
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowGuide(!showGuide)}
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            {showGuide ? 'Ocultar Guia de Colunas' : 'Ver Guia de Colunas'}
+            {showGuide ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </Button>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          {templateLinks.map((link) => (
-            <Button key={link.href} asChild variant="outline" size="sm" className="h-8 gap-1.5">
-              <a href={link.href} download>
-                <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                {link.label}
-              </a>
-            </Button>
-          ))}
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2.5">
+            {templateLinks.map((link) => (
+              <Button key={link.href} asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <a href={link.href} download>
+                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                  {link.label}
+                </a>
+              </Button>
+            ))}
+          </div>
+
+          {showGuide ? (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-4 text-xs">
+              <div className="flex items-center gap-2 text-foreground font-semibold">
+                <FileText className="h-4 w-4 text-primary" />
+                Guia de Colunas para Importação de {activeTab === 'departments' ? 'Departamentos' : 'Funcionários'}
+              </div>
+
+              {activeTab === 'departments' ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-44">Coluna na Planilha</TableHead>
+                        <TableHead className="w-28">Obrigatoriedade</TableHead>
+                        <TableHead>Descrição e Regras</TableHead>
+                        <TableHead className="w-48">Exemplo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">departmentName / departamento</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Nome do departamento a ser criado ou atualizado</TableCell>
+                        <TableCell className="text-muted-foreground">Recursos Humanos</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">branchName / filial</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Nome ou código da filial vinculada</TableCell>
+                        <TableCell className="text-muted-foreground">Matriz - São Paulo</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">headManagerEmail / emailGestor</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>E-mail do gestor do departamento</TableCell>
+                        <TableCell className="text-muted-foreground">gestor@toclog.com.br</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">headManagerCpf / cpfGestor</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>CPF do gestor (caso o e-mail não seja informado)</TableCell>
+                        <TableCell className="text-muted-foreground">12345678911</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">departmentDescription / descricao</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Descrição e atribuições do setor</TableCell>
+                        <TableCell className="text-muted-foreground">Gestão de pessoas e cultura</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">departmentActive / ativo</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>true ou false (padrão: true)</TableCell>
+                        <TableCell className="text-muted-foreground">true</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="overflow-x-auto space-y-3">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-48">Coluna na Planilha</TableHead>
+                        <TableHead className="w-28">Obrigatoriedade</TableHead>
+                        <TableHead>Campo na Ficha / Descrição</TableHead>
+                        <TableHead className="w-48">Exemplo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Obrigatórios */}
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">nome / name</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Nome completo do funcionário</TableCell>
+                        <TableCell className="text-muted-foreground">João da Silva</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">email</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>E-mail corporativo exclusivo (usado para acesso)</TableCell>
+                        <TableCell className="text-muted-foreground">joao.silva@toclog.com.br</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">cpf</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>CPF do funcionário (com ou sem formatação)</TableCell>
+                        <TableCell className="text-muted-foreground">123.456.789-11</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">perfil / role</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Perfil de permissão no sistema (ex: USER, RH_MANAGER)</TableCell>
+                        <TableCell className="text-muted-foreground">USER</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">filial / branchName</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Nome ou código da filial cadastrada</TableCell>
+                        <TableCell className="text-muted-foreground">Matriz - São Paulo</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/30">
+                        <TableCell className="font-mono font-semibold text-foreground">departamento / departmentName</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Obrigatório</Badge></TableCell>
+                        <TableCell>Nome do departamento do colaborador</TableCell>
+                        <TableCell className="text-muted-foreground">Recursos Humanos</TableCell>
+                      </TableRow>
+
+                      {/* Opcionais Funcionais */}
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">cargo / jobPosition</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Cargo oficial de RH (vincula à tabela de Cargos)</TableCell>
+                        <TableCell className="text-muted-foreground">Analista de RH Pleno</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">matricula / registration</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Matrícula interna do funcionário</TableCell>
+                        <TableCell className="text-muted-foreground">RH-001</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">situacao / status</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>ACTIVE (Ativo), INACTIVE (Inativo), AWAY (Afastado) - padrão: ACTIVE</TableCell>
+                        <TableCell className="text-muted-foreground">ACTIVE</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">dataAdmissao / admissionDate</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Data de admissão (formato AAAA-MM-DD ou DD/MM/AAAA)</TableCell>
+                        <TableCell className="text-muted-foreground">10/01/2026</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">dataDemissao / dismissalDate</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Data de demissão (se aplicável)</TableCell>
+                        <TableCell className="text-muted-foreground">15/06/2026</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">dataNascimento / birthDate</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Data de nascimento (AAAA-MM-DD ou DD/MM/AAAA)</TableCell>
+                        <TableCell className="text-muted-foreground">18/04/1992</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">salarioAtual / currentSalary</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Salário atual numérico ou decimal</TableCell>
+                        <TableCell className="text-muted-foreground">4500.00</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">emailGestorDireto / directManagerEmail</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>E-mail do gestor direto imediato</TableCell>
+                        <TableCell className="text-muted-foreground">gestor@toclog.com.br</TableCell>
+                      </TableRow>
+
+                      {/* Opcionais Documentos e Pessoais */}
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">sexo / gender</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>MASCULINO, FEMININO ou OUTRO</TableCell>
+                        <TableCell className="text-muted-foreground">MASCULINO</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">rg</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Registro Geral (RG)</TableCell>
+                        <TableCell className="text-muted-foreground">12.345.678-9</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">ctps</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Número da Carteira de Trabalho</TableCell>
+                        <TableCell className="text-muted-foreground">1234567/001-SP</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">cnh</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Número da CNH</TableCell>
+                        <TableCell className="text-muted-foreground">12345678900</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">escolaridade / educationLevel</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Nível de escolaridade</TableCell>
+                        <TableCell className="text-muted-foreground">Superior Completo</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">nomeDaMae / motherName</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Nome da mãe</TableCell>
+                        <TableCell className="text-muted-foreground">Maria Aparecida da Silva</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">nomeDoPai / fatherName</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Nome do pai</TableCell>
+                        <TableCell className="text-muted-foreground">José da Silva</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">endereco / address</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Logradouro residencial, número e bairro</TableCell>
+                        <TableCell className="text-muted-foreground">Av. Paulista, 1000</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">cidade / city</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Município de residência</TableCell>
+                        <TableCell className="text-muted-foreground">São Paulo</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">uf / state</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Sigla do Estado (2 letras)</TableCell>
+                        <TableCell className="text-muted-foreground">SP</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">nomeDoConjuge / spouseName</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Nome do cônjuge</TableCell>
+                        <TableCell className="text-muted-foreground">Carla Silva</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium">telefoneConjuge / spousePhone</TableCell>
+                        <TableCell><Badge variant="outline" className="border-border text-muted-foreground">Opcional</Badge></TableCell>
+                        <TableCell>Telefone do cônjuge com DDD</TableCell>
+                        <TableCell className="text-muted-foreground">(11) 98765-4321</TableCell>
+                      </TableRow>
+
+                      {/* Modo Com Departamento */}
+                      <TableRow className="border-t-2">
+                        <TableCell className="font-mono font-medium text-primary">descricaoDepartamento</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Condicional</Badge></TableCell>
+                        <TableCell>Obrigatório apenas se o departamento for novo no sistema</TableCell>
+                        <TableCell className="text-muted-foreground">Gestão de suprimentos</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono font-medium text-primary">emailGestorDepartamento</TableCell>
+                        <TableCell><Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40">Condicional</Badge></TableCell>
+                        <TableCell>Obrigatório apenas se o departamento for novo no sistema</TableCell>
+                        <TableCell className="text-muted-foreground">gestor@toclog.com.br</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                  <p className="text-[11px] text-muted-foreground">
+                    * Senhas provisórias de novos funcionários são geradas com segurança pelo sistema e exibidas na tela ao término do lote.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -17,7 +17,10 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   ShieldCheck,
+  UserPlus,
+  Loader2,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -76,6 +79,10 @@ export default function PortariaGruposPage() {
   // Lote Check-in / Check-out
   const [selectedGateId, setSelectedGateId] = useState('');
   const [batchBadges, setBatchBadges] = useState<{ [participantId: string]: string }>({});
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [addingMember, setAddingMember] = useState(false);
+  const [loadingGroupDetails, setLoadingGroupDetails] = useState(false);
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -167,29 +174,122 @@ export default function PortariaGruposPage() {
     }
   };
 
-  const handleOpenBatchModal = (group: PortariaGroup, type: 'CHECK_IN' | 'CHECK_OUT') => {
+  const handleOpenBatchModal = async (group: PortariaGroup, type: 'CHECK_IN' | 'CHECK_OUT') => {
     setBatchActionGroup(group);
     setBatchType(type);
     setSelectedGateId(gates[0]?.id || '');
-    // Pré-preenche badges vazios
-    const initialBadges: { [id: string]: string } = {};
-    group.participants?.forEach((p) => {
-      initialBadges[p.id] = '';
-    });
-    setBatchBadges(initialBadges);
+    setNewMemberName('');
+
+    const setupParticipants = (participants: any[]) => {
+      const initialBadges: { [id: string]: string } = {};
+      const eligibleIds: string[] = [];
+      participants?.forEach((p) => {
+        initialBadges[p.id] = '';
+        if (type === 'CHECK_IN') {
+          if (p.status !== 'CHECKED_IN' && p.status !== 'CHECKED_OUT' && p.status !== 'CANCELLED') {
+            eligibleIds.push(p.id);
+          }
+        } else {
+          if (p.status === 'CHECKED_IN' || p.status === 'IN_PROGRESS') {
+            eligibleIds.push(p.id);
+          }
+        }
+      });
+      setBatchBadges(initialBadges);
+      setSelectedParticipantIds(eligibleIds);
+    };
+
+    if (group.participants && group.participants.length > 0) {
+      setupParticipants(group.participants);
+    }
+
+    try {
+      setLoadingGroupDetails(true);
+      const res = await portariaApi.getGroup(group.id);
+      const fullGroup = res?.group || res;
+      if (fullGroup) {
+        setBatchActionGroup(fullGroup);
+        if (fullGroup.participants) {
+          setupParticipants(fullGroup.participants);
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao buscar detalhes completos do grupo:', err);
+    } finally {
+      setLoadingGroupDetails(false);
+    }
+  };
+
+  const handleAddParticipantToGroup = async () => {
+    if (!batchActionGroup || !newMemberName.trim()) return;
+
+    try {
+      setAddingMember(true);
+      await portariaApi.addParticipants(batchActionGroup.id, {
+        participants: [
+          {
+            name: newMemberName.trim(),
+            role: 'VISITOR',
+          },
+        ],
+      });
+
+      setNewMemberName('');
+      const res = await portariaApi.getGroup(batchActionGroup.id);
+      const fullGroup = res?.group || res;
+      if (fullGroup) {
+        setBatchActionGroup(fullGroup);
+        const eligibleIds = fullGroup.participants
+          ?.filter((p: any) => p.status !== 'CHECKED_IN' && p.status !== 'CHECKED_OUT' && p.status !== 'CANCELLED')
+          .map((p: any) => p.id) || [];
+        setSelectedParticipantIds(eligibleIds);
+      }
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao adicionar participante ao grupo');
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    if (!batchActionGroup?.participants) return;
+    const eligible = batchActionGroup.participants.filter((p) =>
+      batchType === 'CHECK_IN'
+        ? p.status !== 'CHECKED_IN' && p.status !== 'CHECKED_OUT' && p.status !== 'CANCELLED'
+        : p.status === 'CHECKED_IN' || p.status === 'IN_PROGRESS'
+    );
+    if (selectedParticipantIds.length === eligible.length) {
+      setSelectedParticipantIds([]);
+    } else {
+      setSelectedParticipantIds(eligible.map((p) => p.id));
+    }
+  };
+
+  const handleToggleParticipant = (participantId: string) => {
+    setSelectedParticipantIds((prev) =>
+      prev.includes(participantId)
+        ? prev.filter((id) => id !== participantId)
+        : [...prev, participantId]
+    );
   };
 
   const handleExecuteBatch = async () => {
     if (!batchActionGroup) return;
 
+    if (selectedParticipantIds.length === 0) {
+      alert('Selecione ao menos um membro para a operação.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       if (batchType === 'CHECK_IN') {
-        const items = batchActionGroup.participants
-          .filter((p) => p.status === 'APPROVED' || p.status === 'ARRIVED')
+        const items = (batchActionGroup.participants || [])
+          .filter((p) => selectedParticipantIds.includes(p.id))
           .map((p) => ({
             participantId: p.id,
-            badgeNumber: batchBadges[p.id] || undefined,
+            badgeNumber: batchBadges[p.id]?.trim() || undefined,
           }));
 
         if (items.length === 0) {
@@ -198,22 +298,16 @@ export default function PortariaGruposPage() {
         }
 
         await portariaApi.batchCheckIn(batchActionGroup.id, {
+          entryGateId: selectedGateId || undefined,
           gateId: selectedGateId || undefined,
+          participantIds: items.map((i) => i.participantId),
           items,
         });
       } else {
-        const participantIds = batchActionGroup.participants
-          .filter((p) => p.status === 'IN_PROGRESS')
-          .map((p) => p.id);
-
-        if (participantIds.length === 0) {
-          alert('Nenhum participante com sessão ativa para saída.');
-          return;
-        }
-
         await portariaApi.batchCheckOut(batchActionGroup.id, {
+          exitGateId: selectedGateId || undefined,
           gateId: selectedGateId || undefined,
-          participantIds,
+          participantIds: selectedParticipantIds,
         });
       }
 
@@ -715,43 +809,128 @@ export default function PortariaGruposPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Membros Selecionados para Operação</Label>
-              <div className="max-h-60 overflow-y-auto rounded-md border border-border/60 p-2 space-y-2">
-                {batchActionGroup?.participants?.map((p) => {
-                  return (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between gap-2 p-1.5 rounded-sm hover:bg-muted/40 text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{p.name}</span>
-                        {p.isResponsible && (
-                          <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
-                            Líder
-                          </span>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">({p.status})</span>
-                      </div>
-
-                      {batchType === 'CHECK_IN' && (
-                        <div className="w-32">
-                          <Input
-                            placeholder="Nº Crachá"
-                            value={batchBadges[p.id] || ''}
-                            onChange={(e) =>
-                              setBatchBadges((prev) => ({
-                                ...prev,
-                                [p.id]: e.target.value,
-                              }))
-                            }
-                            className="h-7 text-xs font-mono"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">
+                  Membros Selecionados para Operação{' '}
+                  <span className="text-muted-foreground font-normal">
+                    ({selectedParticipantIds.length} de {batchActionGroup?.participants?.length || 0})
+                  </span>
+                </Label>
+                {batchActionGroup?.participants && batchActionGroup.participants.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-2 text-primary hover:text-primary/80"
+                    onClick={handleToggleSelectAll}
+                  >
+                    {selectedParticipantIds.length === (batchActionGroup?.participants?.length || 0)
+                      ? 'Desmarcar Todos'
+                      : 'Selecionar Todos'}
+                  </Button>
+                )}
               </div>
+
+              {loadingGroupDetails ? (
+                <div className="flex items-center justify-center p-6 border rounded-md border-border/60 text-xs text-muted-foreground gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  Carregando membros do grupo...
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto rounded-md border border-border/60 p-2 space-y-2">
+                  {batchActionGroup?.participants && batchActionGroup.participants.length > 0 ? (
+                    batchActionGroup.participants.map((p) => {
+                      const isEligible =
+                        batchType === 'CHECK_IN'
+                          ? p.status !== 'CHECKED_IN' && p.status !== 'CHECKED_OUT' && p.status !== 'CANCELLED'
+                          : p.status === 'CHECKED_IN' || p.status === 'IN_PROGRESS';
+                      const isSelected = selectedParticipantIds.includes(p.id);
+
+                      return (
+                        <div
+                          key={p.id}
+                          className={`flex items-center justify-between gap-2 p-1.5 rounded-sm text-xs transition-colors ${
+                            isSelected ? 'bg-primary/5 border border-primary/20' : 'hover:bg-muted/40'
+                          } ${!isEligible ? 'opacity-60 bg-muted/20' : ''}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={!isEligible}
+                              onCheckedChange={() => handleToggleParticipant(p.id)}
+                            />
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-foreground">{p.name}</span>
+                                {p.isResponsible && (
+                                  <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                                    Líder
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">Status: {p.status}</span>
+                            </div>
+                          </div>
+
+                          {batchType === 'CHECK_IN' && isEligible && (
+                            <div className="w-32">
+                              <Input
+                                placeholder="Nº Crachá"
+                                value={batchBadges[p.id] || ''}
+                                onChange={(e) =>
+                                  setBatchBadges((prev) => ({
+                                    ...prev,
+                                    [p.id]: e.target.value,
+                                  }))
+                                }
+                                className="h-7 text-xs font-mono"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      Nenhum membro cadastrado neste grupo ainda. Adicione membros abaixo para realizar a entrada.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Opção para Cadastrar Novo Membro no Grupo */}
+              {batchType === 'CHECK_IN' && (
+                <div className="pt-2">
+                  <Label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    Cadastrar novo membro no grupo:
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Nome completo do novo membro..."
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddParticipantToGroup();
+                        }
+                      }}
+                      className="h-8 text-xs flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                      onClick={handleAddParticipantToGroup}
+                      disabled={addingMember || !newMemberName.trim()}
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      {addingMember ? 'Adicionando...' : 'Cadastrar'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-4">

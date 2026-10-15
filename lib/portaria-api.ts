@@ -252,6 +252,8 @@ export const portariaApi = {
   getGroups: (params?: any) => api.get('/portaria/groups', { params }).then((r) => r.data),
   getGroup: (id: string) => api.get(`/portaria/groups/${id}`).then((r) => r.data),
   createGroup: (dto: any) => api.post('/portaria/groups', dto).then((r) => r.data),
+  addParticipants: (id: string, dto: any) =>
+    api.post(`/portaria/groups/${id}/participants`, dto).then((r) => r.data),
   batchCheckIn: (id: string, dto: any) =>
     api.post(`/portaria/groups/${id}/batch-check-in`, dto).then((r) => r.data),
   batchCheckOut: (id: string, dto: any) =>

@@ -259,6 +259,7 @@ export default function PortariaVisitasPage() {
     try {
       await portariaApi.authorizeVisit(selectedVisit.id, {
         decision: authDecision,
+        authorized: authDecision === 'APPROVED',
         method: authMethod,
         notes: authNotes.trim() || undefined,
       });

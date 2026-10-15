@@ -1,20 +1,25 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   FileText,
   MoreHorizontal,
   Package2,
   PackageCheck,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
   ShieldAlert,
+  Trash2,
   Truck,
+  Unlink,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -212,16 +217,26 @@ export default function RoutesPage() {
   // Modals & Selected items
   const [selectedRoute, setSelectedRoute] = useState<RouteDetail | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editRouteModalOpen, setEditRouteModalOpen] = useState(false)
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [attachModalOpen, setAttachModalOpen] = useState(false)
   const [dispatchModalOpen, setDispatchModalOpen] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [quickEditModalOpen, setQuickEditModalOpen] = useState(false)
 
   // Form states: Nova Rota
   const [newCode, setNewCode] = useState('')
   const [newOrigin, setNewOrigin] = useState('')
   const [newDestination, setNewDestination] = useState('')
   const [savingRoute, setSavingRoute] = useState(false)
+
+  // Form states: Editar Rota
+  const [editingRoute, setEditingRoute] = useState<RouteRecord | null>(null)
+  const [editRouteCode, setEditRouteCode] = useState('')
+  const [editRouteOrigin, setEditRouteOrigin] = useState('')
+  const [editRouteDestination, setEditRouteDestination] = useState('')
+  const [editRouteNotes, setEditRouteNotes] = useState('')
+  const [savingEditRoute, setSavingEditRoute] = useState(false)
 
   // Form states: Alocação
   const [allocVehicleType, setAllocVehicleType] = useState<'INTERNAL_VEHICLE' | 'EXTERNAL_VEHICLE'>('INTERNAL_VEHICLE')
@@ -230,10 +245,26 @@ export default function RoutesPage() {
   const [allocDriverId, setAllocDriverId] = useState('')
   const [allocNotes, setAllocNotes] = useState('')
   const [assigning, setAssigning] = useState(false)
+  const [removingAssignment, setRemovingAssignment] = useState(false)
 
   // Form states: Vincular Carga
   const [shipmentIdToAttach, setShipmentIdToAttach] = useState('')
   const [attaching, setAttaching] = useState(false)
+
+  // Form states: Correção Rápida de Carga (Facilitador de Divergência)
+  const [quickEditShipment, setQuickEditShipment] = useState<ShipmentRecord | null>(null)
+  const [savingQuickEdit, setSavingQuickEdit] = useState(false)
+  const [quickEditForm, setQuickEditForm] = useState({
+    clientName: '',
+    recipientName: '',
+    recipientDocument: '',
+    fiscalDocumentType: 'NFE',
+    fiscalDocumentNumber: '',
+    fiscalDocumentKey: '',
+    fiscalDocumentIssuedAt: '',
+    status: 'READY_TO_ROUTE',
+    notes: '',
+  })
 
   // Form states: Despacho
   const [allowDivergentCargoOverride, setAllowDivergentCargoOverride] = useState(false)
@@ -340,6 +371,121 @@ export default function RoutesPage() {
       toast.error(getApiErrorMessage(error, 'Erro ao criar rota.'))
     } finally {
       setSavingRoute(false)
+    }
+  }
+
+  // Handle Editar Rota (quando em Planejamento)
+  function handleOpenEditRoute(route: RouteRecord) {
+    setEditingRoute(route)
+    setEditRouteCode(route.code)
+    setEditRouteOrigin(route.originLabel || '')
+    setEditRouteDestination(route.destinationLabel || '')
+    setEditRouteNotes(route.notes || '')
+    setEditRouteModalOpen(true)
+  }
+
+  async function handleSaveEditRoute() {
+    if (!editingRoute) return
+    if (!editRouteCode.trim()) {
+      toast.error('Informe o código da rota.')
+      return
+    }
+
+    setSavingEditRoute(true)
+    try {
+      await api.patch(`/shipments/routes/${editingRoute.id}`, {
+        code: editRouteCode.trim(),
+        originLabel: editRouteOrigin.trim() || undefined,
+        destinationLabel: editRouteDestination.trim() || undefined,
+        notes: editRouteNotes.trim() || undefined,
+      })
+      toast.success('Rota atualizada com sucesso!')
+      setEditRouteModalOpen(false)
+      await loadInitialData(false)
+      if (selectedRoute?.id === editingRoute.id) {
+        await fetchRouteDetail(editingRoute.id)
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao atualizar dados da rota.'))
+    } finally {
+      setSavingEditRoute(false)
+    }
+  }
+
+  // Handle Remover Alocação da Rota
+  async function handleRemoveAssignment(routeId: string) {
+    setRemovingAssignment(true)
+    try {
+      await api.delete(`/shipments/routes/${routeId}/assignments`)
+      toast.success('Alocação de recursos excluída com sucesso!')
+      setAssignModalOpen(false)
+      await loadInitialData(false)
+      if (selectedRoute?.id === routeId) {
+        await fetchRouteDetail(routeId)
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao remover alocação da rota.'))
+    } finally {
+      setRemovingAssignment(false)
+    }
+  }
+
+  // Handle Desvincular Carga da Rota
+  async function handleDetachShipment(routeId: string, shipmentId: string) {
+    try {
+      await api.delete(`/shipments/routes/${routeId}/shipments/${shipmentId}`)
+      toast.success('Carga desvinculada da rota com sucesso!')
+      await loadInitialData(false)
+      if (selectedRoute?.id === routeId) {
+        await fetchRouteDetail(routeId)
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao desvincular carga da rota.'))
+    }
+  }
+
+  // Handle Correção Rápida de Carga (Facilitador de Divergência inline)
+  function handleOpenQuickEditShipment(shipment: ShipmentRecord) {
+    setQuickEditShipment(shipment)
+    setQuickEditForm({
+      clientName: shipment.clientName || '',
+      recipientName: shipment.recipientName || '',
+      recipientDocument: shipment.recipientDocument || '',
+      fiscalDocumentType: shipment.fiscalDocumentType || 'NFE',
+      fiscalDocumentNumber: shipment.fiscalDocumentNumber || '',
+      fiscalDocumentKey: shipment.fiscalDocumentKey || '',
+      fiscalDocumentIssuedAt: '',
+      status: shipment.status === 'DIVERGENT' ? 'READY_TO_ROUTE' : shipment.status,
+      notes: '',
+    })
+    setQuickEditModalOpen(true)
+  }
+
+  async function handleSaveQuickEditShipment() {
+    if (!quickEditShipment) return
+    setSavingQuickEdit(true)
+    try {
+      await api.patch(`/shipments/${quickEditShipment.id}`, {
+        clientName: quickEditForm.clientName.trim() || undefined,
+        recipientName: quickEditForm.recipientName.trim() || undefined,
+        recipientDocument: quickEditForm.recipientDocument.trim() || undefined,
+        fiscalDocumentType: quickEditForm.fiscalDocumentType.trim() || undefined,
+        fiscalDocumentNumber: quickEditForm.fiscalDocumentNumber.trim() || undefined,
+        fiscalDocumentKey: quickEditForm.fiscalDocumentKey.trim() || undefined,
+        fiscalDocumentIssuedAt: quickEditForm.fiscalDocumentIssuedAt || undefined,
+        status: quickEditForm.status || undefined,
+        notes: quickEditForm.notes.trim() || undefined,
+      })
+      toast.success(`Carga ${quickEditShipment.code} regularizada com sucesso!`)
+      setQuickEditModalOpen(false)
+      await loadInitialData(false)
+      if (selectedRoute) {
+        await fetchRouteDetail(selectedRoute.id)
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao regularizar carga.'))
+    } finally {
+      setSavingQuickEdit(false)
     }
   }
 
@@ -798,18 +944,34 @@ export default function RoutesPage() {
                                     <MoreHorizontal className="size-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuContent align="end" className="w-52">
                                   <DropdownMenuItem onClick={() => handleOpenDetail(route)}>
                                     <FileText className="size-4 mr-2" />
                                     <span>Ver detalhes</span>
                                   </DropdownMenuItem>
 
+                                  {!isDispatched && canCreateRoutes && (
+                                    <DropdownMenuItem onClick={() => handleOpenEditRoute(route)}>
+                                      <Pencil className="size-4 mr-2 text-primary" />
+                                      <span>Editar rota</span>
+                                    </DropdownMenuItem>
+                                  )}
+
                                   {!isDispatched && canAssignRoutes && (
                                     <>
                                       <DropdownMenuItem onClick={() => handleOpenAssign(route)}>
                                         <Truck className="size-4 mr-2" />
-                                        <span>Alocar recursos</span>
+                                        <span>{lastAssign ? 'Alterar alocação' : 'Alocar recursos'}</span>
                                       </DropdownMenuItem>
+                                      {lastAssign && (
+                                        <DropdownMenuItem
+                                          onClick={() => handleRemoveAssignment(route.id)}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="size-4 mr-2" />
+                                          <span>Remover alocação</span>
+                                        </DropdownMenuItem>
+                                      )}
                                       <DropdownMenuItem onClick={() => handleOpenAttach(route)}>
                                         <Package2 className="size-4 mr-2" />
                                         <span>Vincular cargas</span>
@@ -919,6 +1081,61 @@ export default function RoutesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* --- MODAL 1.1: EDITAR ROTA (U6) --- */}
+      <Dialog open={editRouteModalOpen} onOpenChange={setEditRouteModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Rota — {editingRoute?.code}</DialogTitle>
+            <DialogDescription>
+              Ajuste as informações da rota enquanto estiver em planejamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Código da Rota *</Label>
+              <Input
+                placeholder="Ex: ROTA-SPO-001"
+                value={editRouteCode}
+                onChange={(e) => setEditRouteCode(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Ponto de Origem</Label>
+              <Input
+                placeholder="Ex: CD Central - São Paulo/SP"
+                value={editRouteOrigin}
+                onChange={(e) => setEditRouteOrigin(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Ponto de Destino</Label>
+              <Input
+                placeholder="Ex: Goiânia/GO"
+                value={editRouteDestination}
+                onChange={(e) => setEditRouteDestination(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Observações</Label>
+              <Textarea
+                placeholder="Orientações ou notas da rota..."
+                value={editRouteNotes}
+                onChange={(e) => setEditRouteNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRouteModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEditRoute} disabled={savingEditRoute}>
+              {savingEditRoute ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* --- MODAL 2: ALOCAR RECURSOS (U6) --- */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
         <DialogContent className="max-w-lg">
@@ -1004,13 +1221,28 @@ export default function RoutesPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveAssignment} disabled={assigning}>
-              {assigning ? 'Gravando...' : 'Salvar Alocação'}
-            </Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
+            {selectedRoute?.assignments && selectedRoute.assignments.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                type="button"
+                onClick={() => selectedRoute && handleRemoveAssignment(selectedRoute.id)}
+                disabled={removingAssignment}
+                className="gap-1.5"
+              >
+                <Trash2 className="size-4" />
+                <span>{removingAssignment ? 'Removendo...' : 'Remover Alocação'}</span>
+              </Button>
+            )}
+            <div className="flex items-center justify-end gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setAssignModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveAssignment} disabled={assigning}>
+                {assigning ? 'Gravando...' : 'Salvar Alocação'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1111,35 +1343,121 @@ export default function RoutesPage() {
                 </div>
               )}
 
-              {/* Alerta de Cargas Divergentes / Avariadas */}
+              {/* Alerta de Cargas Divergentes / Avariadas com Facilitador de Correção */}
               {dispatchChecks.divergentShipments.length > 0 && (
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3.5 text-orange-900">
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3.5 text-orange-900 space-y-2">
                   <div className="flex items-center gap-2 font-semibold text-sm">
                     <AlertTriangle className="size-4 text-orange-600 shrink-0" />
-                    <span>Cargas com Divergência ou Avaria</span>
+                    <span>Cargas com Divergência ou Avaria ({dispatchChecks.divergentShipments.length})</span>
                   </div>
-                  <p className="text-xs text-orange-800 mt-1">
-                    {dispatchChecks.divergentShipments.length} carga(s) foram marcadas com avaria ou divergência física na conferência: {dispatchChecks.divergentShipments.map((s) => s.code).join(', ')}.
+                  <p className="text-xs text-orange-800">
+                    Estas cargas possuem divergência física ou avaria registrada. Você pode regularizá-las diretamente aqui ou desvinculá-las da rota para liberar as demais:
                   </p>
+                  <div className="space-y-1.5 pt-1">
+                    {dispatchChecks.divergentShipments.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between p-2 bg-white/70 dark:bg-card/70 border rounded-md text-xs">
+                        <div>
+                          <span className="font-semibold">{s.code}</span>
+                          <span className="text-muted-foreground ml-2">Dest: {s.recipientName || 'N/I'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenQuickEditShipment(s)}
+                            className="h-6 px-2 text-[11px] gap-1 border-orange-300 text-orange-700 hover:bg-orange-100"
+                          >
+                            <Pencil className="size-3" />
+                            <span>Corrigir</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => selectedRoute && handleDetachShipment(selectedRoute.id, s.id)}
+                            className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10 gap-1"
+                            title="Desvincular carga desta rota"
+                          >
+                            <Unlink className="size-3" />
+                            <span>Desvincular</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Pendências não liberáveis por override */}
+              {/* Pendências não liberáveis por override com Facilitadores */}
               {(dispatchChecks.pendingConference.length > 0 || dispatchChecks.missingFiscal.length > 0) && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-red-900 text-xs">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3.5 text-red-900 text-xs space-y-2">
                   <div className="flex items-center gap-2 font-semibold text-sm">
                     <ShieldAlert className="size-4 text-red-600 shrink-0" />
                     <span>Pendências Fiscais / Conferência Obrigatórias</span>
                   </div>
+
                   {dispatchChecks.missingFiscal.length > 0 && (
-                    <p className="mt-1">
-                      Cargas sem dados fiscais: {dispatchChecks.missingFiscal.map((s) => s.code).join(', ')}.
-                    </p>
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-red-800">
+                        Cargas com dados fiscais incompletos (NF-e/Chave ausente):
+                      </p>
+                      {dispatchChecks.missingFiscal.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between p-2 bg-white/70 dark:bg-card/70 border rounded-md">
+                          <span className="font-semibold">{s.code}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenQuickEditShipment(s)}
+                              className="h-6 px-2 text-[11px] gap-1 border-red-300 text-red-700 hover:bg-red-100"
+                            >
+                              <FileText className="size-3" />
+                              <span>Preencher NF</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => selectedRoute && handleDetachShipment(selectedRoute.id, s.id)}
+                              className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10 gap-1"
+                            >
+                              <Unlink className="size-3" />
+                              <span>Desvincular</span>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
+
                   {dispatchChecks.pendingConference.length > 0 && (
-                    <p className="mt-1">
-                      Cargas com volumes pendentes de conferência: {dispatchChecks.pendingConference.map((s) => s.code).join(', ')}.
-                    </p>
+                    <div className="space-y-1.5 pt-1">
+                      <p className="font-medium text-red-800">
+                        Cargas com volumes pendentes de conferência:
+                      </p>
+                      {dispatchChecks.pendingConference.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between p-2 bg-white/70 dark:bg-card/70 border rounded-md">
+                          <span className="font-semibold">{s.code}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Link
+                              href={`/dashboard/shipments?search=${s.code}`}
+                              target="_blank"
+                              className="text-primary hover:underline flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 border rounded bg-background"
+                            >
+                              <span>Conferir Volumes</span>
+                              <ExternalLink className="size-3" />
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => selectedRoute && handleDetachShipment(selectedRoute.id, s.id)}
+                              className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10 gap-1"
+                            >
+                              <Unlink className="size-3" />
+                              <span>Desvincular</span>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
@@ -1296,15 +1614,46 @@ export default function RoutesPage() {
                 <h4 className="font-semibold text-sm mb-2 text-foreground">Cargas na Rota</h4>
                 {selectedRoute.shipments && selectedRoute.shipments.length > 0 ? (
                   <div className="space-y-1.5">
-                    {selectedRoute.shipments.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between p-2.5 border rounded-lg bg-card">
-                        <div>
-                          <span className="font-semibold text-foreground">{s.code}</span>
-                          <span className="text-muted-foreground ml-2">Dest: {s.recipientName || 'N/I'}</span>
+                    {selectedRoute.shipments.map((s) => {
+                      const isDispatched = ['DISPATCHED', 'IN_PROGRESS', 'COMPLETED'].includes(selectedRoute.status)
+                      return (
+                        <div key={s.id} className="flex items-center justify-between p-2.5 border rounded-lg bg-card">
+                          <div>
+                            <span className="font-semibold text-foreground">{s.code}</span>
+                            <span className="text-muted-foreground ml-2">Dest: {s.recipientName || 'N/I'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={s.status === 'DIVERGENT' || s.status === 'DAMAGED' ? 'destructive' : 'outline'}>
+                              {s.status}
+                            </Badge>
+                            {!isDispatched && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenQuickEditShipment(s)}
+                                  className="h-6 px-2 text-[11px] gap-1"
+                                  title="Editar dados fiscais / corrigir carga"
+                                >
+                                  <Pencil className="size-3 text-muted-foreground" />
+                                  <span>Editar</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDetachShipment(selectedRoute.id, s.id)}
+                                  className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10 gap-1"
+                                  title="Desvincular carga desta rota"
+                                >
+                                  <Unlink className="size-3" />
+                                  <span>Desvincular</span>
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="outline">{s.status}</Badge>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <p className="text-muted-foreground italic">Nenhuma carga nesta rota.</p>
@@ -1316,6 +1665,149 @@ export default function RoutesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailModalOpen(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- MODAL 6: CORREÇÃO RÁPIDA DE CARGA (FACILITADOR INLINE) --- */}
+      <Dialog open={quickEditModalOpen} onOpenChange={setQuickEditModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Correção da Carga — {quickEditShipment?.code}</DialogTitle>
+            <DialogDescription>
+              Corrija dados cadastrais, notas fiscais ou regularize a divergência sem sair da tela de rotas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs max-h-[65vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Cliente / Remetente</Label>
+                <Input
+                  placeholder="Nome do cliente"
+                  value={quickEditForm.clientName}
+                  onChange={(e) => setQuickEditForm({ ...quickEditForm, clientName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Status da Carga</Label>
+                <Select
+                  value={quickEditForm.status}
+                  onValueChange={(val) => setQuickEditForm({ ...quickEditForm, status: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="READY_TO_ROUTE">Pronta para Rota (Liberada)</SelectItem>
+                    <SelectItem value="CONFERRED">Conferida</SelectItem>
+                    <SelectItem value="RECEIVED">Recebida</SelectItem>
+                    <SelectItem value="DIVERGENT">Com Divergência</SelectItem>
+                    <SelectItem value="DAMAGED">Com Avaria</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Nome do Destinatário</Label>
+                <Input
+                  placeholder="Nome completo ou Razão Social"
+                  value={quickEditForm.recipientName}
+                  onChange={(e) => setQuickEditForm({ ...quickEditForm, recipientName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">CPF / CNPJ do Destinatário</Label>
+                <Input
+                  placeholder="000.000.000-00"
+                  value={quickEditForm.recipientDocument}
+                  onChange={(e) => setQuickEditForm({ ...quickEditForm, recipientDocument: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipo Fiscal</Label>
+                <Select
+                  value={quickEditForm.fiscalDocumentType}
+                  onValueChange={(val) => setQuickEditForm({ ...quickEditForm, fiscalDocumentType: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NFE">NF-e</SelectItem>
+                    <SelectItem value="CTE">CT-e</SelectItem>
+                    <SelectItem value="DECLARACAO">Declaração</SelectItem>
+                    <SelectItem value="OUTROS">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Número do Documento</Label>
+                <Input
+                  placeholder="Ex: 12345"
+                  value={quickEditForm.fiscalDocumentNumber}
+                  onChange={(e) => setQuickEditForm({ ...quickEditForm, fiscalDocumentNumber: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Data Emissão</Label>
+                <Input
+                  type="date"
+                  value={quickEditForm.fiscalDocumentIssuedAt}
+                  onChange={(e) => setQuickEditForm({ ...quickEditForm, fiscalDocumentIssuedAt: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Chave de Acesso Fiscal (44 dígitos)</Label>
+              <Input
+                placeholder="Ex: 35231000000000000000550010000000011000000010"
+                value={quickEditForm.fiscalDocumentKey}
+                onChange={(e) => setQuickEditForm({ ...quickEditForm, fiscalDocumentKey: e.target.value })}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Observações da Regularização</Label>
+              <Textarea
+                placeholder="Justificativa ou nota de correção..."
+                value={quickEditForm.notes}
+                onChange={(e) => setQuickEditForm({ ...quickEditForm, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t text-muted-foreground">
+              <span>Precisa gerenciar volumes completos?</span>
+              <Link
+                href={`/dashboard/shipments?search=${quickEditShipment?.code || ''}`}
+                className="text-primary hover:underline flex items-center gap-1 font-medium"
+                target="_blank"
+              >
+                <span>Abrir no Módulo Cargas</span>
+                <ExternalLink className="size-3" />
+              </Link>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickEditModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveQuickEditShipment} disabled={savingQuickEdit}>
+              {savingQuickEdit ? 'Regularizando...' : 'Salvar e Regularizar'}
             </Button>
           </DialogFooter>
         </DialogContent>

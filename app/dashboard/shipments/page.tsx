@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   PackageCheck,
   PackageOpen,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -136,6 +137,37 @@ function getShipmentBadgeVariant(status: string): 'default' | 'secondary' | 'out
   }
 }
 
+function getShipmentStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    DRAFT: 'Rascunho',
+    RECEIVED: 'Recebida',
+    CONFERRED: 'Conferida',
+    READY_TO_ROUTE: 'Pronta p/ Rota',
+    ALLOCATED: 'Alocada em Rota',
+    LOADED: 'Carregada',
+    DISPATCHED: 'Despachada',
+    IN_TRANSIT: 'Em Trânsito',
+    PARTIALLY_DELIVERED: 'Parc. Entregue',
+    DELIVERED: 'Entregue',
+    RETURNED: 'Devolvida',
+    DIVERGENT: 'Com Divergência',
+    DAMAGED: 'Com Avaria',
+    CANCELLED: 'Cancelada',
+  }
+  return map[status] || status
+}
+
+function getVolumeStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    PENDING: 'Pendente',
+    CONFERRED: 'Conferido',
+    DIVERGENT: 'Com Divergência',
+    DAMAGED: 'Com Avaria',
+    CANCELLED: 'Cancelado',
+  }
+  return map[status] || status
+}
+
 export default function ShipmentsPage() {
   const { hasPermission } = useAuth()
   const canViewCargo = hasPermission('shipments.cargo.view')
@@ -159,6 +191,7 @@ export default function ShipmentsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [conferenceModalOpen, setConferenceModalOpen] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   // Form states: Nova Carga
   const [savingShipment, setSavingShipment] = useState(false)
@@ -173,6 +206,23 @@ export default function ShipmentsPage() {
   const [fiscalDocumentKey, setFiscalDocumentKey] = useState('')
   const [fiscalDocumentIssuedAt, setFiscalDocumentIssuedAt] = useState('')
   const [notes, setNotes] = useState('')
+
+  // Form states: Edição de Carga (Divergências / Atualizações)
+  const [editingShipment, setEditingShipment] = useState<ShipmentRecord | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editForm, setEditForm] = useState({
+    clientName: '',
+    recipientName: '',
+    recipientDocument: '',
+    fiscalDocumentType: 'NFE',
+    fiscalDocumentNumber: '',
+    fiscalDocumentKey: '',
+    fiscalDocumentIssuedAt: '',
+    status: 'READY_TO_ROUTE',
+    notes: '',
+    totalWeight: '',
+    totalVolume: '',
+  })
 
   // Form states: Volumes & Conferência
   const [volumeForm, setVolumeForm] = useState(EMPTY_VOLUME_FORM)
@@ -376,6 +426,63 @@ export default function ShipmentsPage() {
     setDetailModalOpen(true)
   }
 
+  function handleOpenEdit(shipment: ShipmentRecord) {
+    setEditingShipment(shipment)
+    setEditForm({
+      clientName: shipment.clientName || '',
+      recipientName: shipment.recipientName || '',
+      recipientDocument: shipment.recipientDocument || '',
+      fiscalDocumentType: shipment.fiscalDocumentType || 'NFE',
+      fiscalDocumentNumber: shipment.fiscalDocumentNumber || '',
+      fiscalDocumentKey: shipment.fiscalDocumentKey || '',
+      fiscalDocumentIssuedAt: shipment.fiscalDocumentIssuedAt ? shipment.fiscalDocumentIssuedAt.slice(0, 10) : '',
+      status: shipment.status === 'DIVERGENT' ? 'READY_TO_ROUTE' : shipment.status,
+      notes: shipment.notes || '',
+      totalWeight: shipment.totalWeight != null ? String(shipment.totalWeight) : '',
+      totalVolume: shipment.totalVolume != null ? String(shipment.totalVolume) : '',
+    })
+    setEditModalOpen(true)
+  }
+
+  async function handleSaveEdit() {
+    if (!editingShipment) return
+    setSavingEdit(true)
+    try {
+      const parsedWeight = parseOptionalPositiveNumber(editForm.totalWeight)
+      if (parsedWeight === null) {
+        toast.error('Informe um peso válido maior ou igual a zero.')
+        return
+      }
+
+      const parsedVolume = parseOptionalPositiveNumber(editForm.totalVolume)
+      if (parsedVolume === null) {
+        toast.error('Informe uma cubagem válida maior ou igual a zero.')
+        return
+      }
+
+      await api.patch(`/shipments/${editingShipment.id}`, {
+        clientName: editForm.clientName.trim() || undefined,
+        recipientName: editForm.recipientName.trim() || undefined,
+        recipientDocument: editForm.recipientDocument.trim() || undefined,
+        fiscalDocumentType: editForm.fiscalDocumentType.trim() || undefined,
+        fiscalDocumentNumber: editForm.fiscalDocumentNumber.trim() || undefined,
+        fiscalDocumentKey: editForm.fiscalDocumentKey.trim() || undefined,
+        fiscalDocumentIssuedAt: editForm.fiscalDocumentIssuedAt || undefined,
+        status: editForm.status || undefined,
+        notes: editForm.notes.trim() || undefined,
+        totalWeight: parsedWeight,
+        totalVolume: parsedVolume,
+      })
+      toast.success('Carga atualizada com sucesso!')
+      setEditModalOpen(false)
+      await loadShipments(false)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Erro ao atualizar carga.'))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   return (
     <div className="app-page">
       <MenuFunctionHeader
@@ -513,13 +620,18 @@ export default function ShipmentsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ALL">Todos os status</SelectItem>
-                        <SelectItem value="DRAFT">Rascunho (DRAFT)</SelectItem>
-                        <SelectItem value="RECEIVED">Recebida (RECEIVED)</SelectItem>
+                        <SelectItem value="DRAFT">Rascunho</SelectItem>
+                        <SelectItem value="RECEIVED">Recebida</SelectItem>
+                        <SelectItem value="CONFERRED">Conferida</SelectItem>
                         <SelectItem value="READY_TO_ROUTE">Pronta para Rota</SelectItem>
+                        <SelectItem value="ALLOCATED">Alocada em Rota</SelectItem>
+                        <SelectItem value="LOADED">Carregada</SelectItem>
+                        <SelectItem value="DISPATCHED">Despachada</SelectItem>
                         <SelectItem value="IN_TRANSIT">Em Trânsito</SelectItem>
                         <SelectItem value="DELIVERED">Entregue</SelectItem>
                         <SelectItem value="DIVERGENT">Com Divergência</SelectItem>
                         <SelectItem value="DAMAGED">Com Avaria</SelectItem>
+                        <SelectItem value="CANCELLED">Cancelada</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -559,9 +671,9 @@ export default function ShipmentsPage() {
                       <TableHead className="w-[140px]">Código</TableHead>
                       <TableHead>Origem / Ref</TableHead>
                       <TableHead>Cliente / Destinatário</TableHead>
-                      <TableHead className="w-[130px]">Status</TableHead>
+                      <TableHead className="w-[140px]">Status</TableHead>
                       <TableHead>Prontidão & Volumes</TableHead>
-                      <TableHead className="text-right w-[110px]">Ações</TableHead>
+                      <TableHead className="text-right w-[140px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -583,6 +695,7 @@ export default function ShipmentsPage() {
                       paginatedShipments.map((shipment) => {
                         const readinessIssues = getShipmentReadinessIssues(shipment)
                         const isReady = readinessIssues.length === 0
+                        const isDivergent = shipment.status === 'DIVERGENT'
 
                         return (
                           <TableRow key={shipment.id} className="hover:bg-muted/30 transition-colors">
@@ -608,7 +721,7 @@ export default function ShipmentsPage() {
 
                             <TableCell>
                               <Badge variant={getShipmentBadgeVariant(shipment.status)}>
-                                {shipment.status}
+                                {getShipmentStatusLabel(shipment.status)}
                               </Badge>
                             </TableCell>
 
@@ -631,26 +744,48 @@ export default function ShipmentsPage() {
                             </TableCell>
 
                             <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="size-8">
-                                    <MoreHorizontal className="size-4" />
+                              <div className="flex items-center justify-end gap-1.5">
+                                {canManageCargo && isDivergent && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenEdit(shipment)}
+                                    className="h-7 px-2 text-xs border-amber-500/50 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 font-medium gap-1"
+                                    title="Corrigir divergência desta carga"
+                                  >
+                                    <Pencil className="size-3" />
+                                    <span>Corrigir</span>
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={() => handleOpenDetail(shipment)}>
-                                    <FileText className="size-4 mr-2" />
-                                    <span>Ver detalhes</span>
-                                  </DropdownMenuItem>
+                                )}
 
-                                  {canManageCargo && (
-                                    <DropdownMenuItem onClick={() => handleOpenConference(shipment)}>
-                                      <PackageCheck className="size-4 mr-2" />
-                                      <span>Conferência de volumes</span>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="size-8">
+                                      <MoreHorizontal className="size-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-52">
+                                    <DropdownMenuItem onClick={() => handleOpenDetail(shipment)}>
+                                      <FileText className="size-4 mr-2" />
+                                      <span>Ver detalhes</span>
                                     </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+
+                                    {canManageCargo && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleOpenEdit(shipment)}>
+                                          <Pencil className="size-4 mr-2 text-amber-600" />
+                                          <span>{isDivergent ? 'Corrigir divergência' : 'Editar dados da carga'}</span>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem onClick={() => handleOpenConference(shipment)}>
+                                          <PackageCheck className="size-4 mr-2" />
+                                          <span>Conferência de volumes</span>
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )
@@ -964,7 +1099,7 @@ export default function ShipmentsPage() {
           <DialogHeader>
             <DialogTitle>Detalhes da Carga — {selectedShipment?.code}</DialogTitle>
             <DialogDescription>
-              Status: {selectedShipment?.status} • Cliente: {selectedShipment?.clientName || 'Geral'}
+              Status: {selectedShipment ? getShipmentStatusLabel(selectedShipment.status) : ''} • Cliente: {selectedShipment?.clientName || 'Geral'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1010,6 +1145,175 @@ export default function ShipmentsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailModalOpen(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- MODAL 4: EDITAR / CORRIGIR CARGA --- */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Carga — {editingShipment?.code}</DialogTitle>
+            <DialogDescription>
+              Atualize as informações cadastrais, documentos fiscais ou resolva divergências.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs max-h-[70vh] overflow-y-auto pr-1">
+            {editingShipment?.status === 'DIVERGENT' && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-700 dark:text-amber-400 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <AlertTriangle className="size-4" />
+                  <span>Carga em Divergência</span>
+                </div>
+                <p>
+                  Revise os dados fiscais ou destinatário abaixo e selecione o status apropriado (ex: &quot;Pronta para Rota&quot;) para liberar a carga.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cliente / Remetente</Label>
+                <Input
+                  placeholder="Nome do cliente"
+                  value={editForm.clientName}
+                  onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status da Carga</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(val) => setEditForm({ ...editForm, status: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="READY_TO_ROUTE">Pronta para Rota</SelectItem>
+                    <SelectItem value="CONFERRED">Conferida</SelectItem>
+                    <SelectItem value="RECEIVED">Recebida</SelectItem>
+                    <SelectItem value="DRAFT">Rascunho</SelectItem>
+                    <SelectItem value="DIVERGENT">Com Divergência</SelectItem>
+                    <SelectItem value="DAMAGED">Com Avaria</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nome do Destinatário</Label>
+                <Input
+                  placeholder="Nome completo ou Razão Social"
+                  value={editForm.recipientName}
+                  onChange={(e) => setEditForm({ ...editForm, recipientName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">CPF / CNPJ do Destinatário</Label>
+                <Input
+                  placeholder="000.000.000-00"
+                  value={editForm.recipientDocument}
+                  onChange={(e) => setEditForm({ ...editForm, recipientDocument: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo Fiscal</Label>
+                <Select
+                  value={editForm.fiscalDocumentType}
+                  onValueChange={(val) => setEditForm({ ...editForm, fiscalDocumentType: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NFE">NF-e</SelectItem>
+                    <SelectItem value="CTE">CT-e</SelectItem>
+                    <SelectItem value="DECLARACAO">Declaração</SelectItem>
+                    <SelectItem value="OUTROS">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Número do Documento</Label>
+                <Input
+                  placeholder="Ex: 12345"
+                  value={editForm.fiscalDocumentNumber}
+                  onChange={(e) => setEditForm({ ...editForm, fiscalDocumentNumber: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Data de Emissão</Label>
+                <Input
+                  type="date"
+                  value={editForm.fiscalDocumentIssuedAt}
+                  onChange={(e) => setEditForm({ ...editForm, fiscalDocumentIssuedAt: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Chave de Acesso Fiscal (44 dígitos)</Label>
+              <Input
+                placeholder="Ex: 35231000000000000000550010000000011000000010"
+                value={editForm.fiscalDocumentKey}
+                onChange={(e) => setEditForm({ ...editForm, fiscalDocumentKey: e.target.value })}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Peso Total (kg)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Ex: 150.5"
+                  value={editForm.totalWeight}
+                  onChange={(e) => setEditForm({ ...editForm, totalWeight: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cubagem Total (m³)</Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="Ex: 1.25"
+                  value={editForm.totalVolume}
+                  onChange={(e) => setEditForm({ ...editForm, totalVolume: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Observações / Motivo da Correção</Label>
+              <Textarea
+                placeholder="Descreva detalhes operacionais ou ajustes realizados..."
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>
